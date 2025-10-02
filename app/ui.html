@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 240px;
+            background: #0d0d0d;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar-header {
+            padding: 24px 20px 16px;
+        }
+
+        .sidebar-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .sidebar-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .sidebar-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.3s ease;
+        }
+
+        .icon-btn:hover {
+            color: #ffffff;
+        }
+
+        .icon-btn.active {
+            color: #3b82f6;
+        }
+
+        .doner-icon {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            width: 18px;
+        }
+
+        .doner-line {
+            width: 100%;
+            height: 2px;
+            background: currentColor;
+            border-radius: 1px;
+        }
+
+        .bento-icon {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 3px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .bento-dot {
+            width: 4px;
+            height: 4px;
+            background: currentColor;
+            border-radius: 50%;
+        }
+
+        .people-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px;
+            scrollbar-width: thin;
+            scrollbar-color: #2a2a2a transparent;
+        }
+
+        .people-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .people-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .people-list::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 3px;
+        }
+
+        .people-list::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+
+        .person-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 10px;
+            margin-bottom: 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .person-item:hover:not(.menu-active) {
+            background: #2a2a2a;
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .person-item.active {
+            background: #2a2a2a;
+        }
+
+        .person-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+            margin-right: 12px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .person-item:hover:not(.menu-active) .person-avatar {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .person-info {
+            flex: 1;
+        }
+
+        .person-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+            color: #ffffff;
+        }
+
+        .person-count {
+            font-size: 12px;
+            color: #a0a0a0;
+        }
+
+        .kebab-menu {
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 6px 10px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .kebab-dot {
+            width: 3px;
+            height: 3px;
+            background: #ffffff;
+            border-radius: 50%;
+        }
+
+        .person-item:hover .kebab-menu {
+            opacity: 1;
+        }
+
+        .photo-item:hover .kebab-menu {
+            opacity: 1;
+        }
+
+        .kebab-menu:hover {
+            background: #3a3a3a;
+        }
+
+        .context-menu {
+            position: fixed;
+            background: #2a2a2a;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            z-index: 10000;
+            min-width: 200px;
+            display: none;
+            animation: menuSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .context-menu.show {
+            display: block;
+        }
+
+        @keyframes menuSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .context-menu-item {
+            padding: 12px 16px;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            font-size: 13px;
+            background: #2a2a2a;
+        }
+
+        .context-menu-item:hover {
+            background: #3a3a3a;
+        }
+
+        .alphabet-item {
+            padding: 12px 10px;
+            margin-bottom: 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .alphabet-item:hover {
+            background: #2a2a2a;
+            transform: translateX(4px);
+        }
+
+        .alphabet-item.disabled {
+            color: #4a4a4a;
+            cursor: default;
+        }
+
+        .alphabet-item.disabled:hover {
+            background: transparent;
+            transform: none;
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a1a;
+        }
+
+        .content-header {
+            padding: 24px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .content-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .content-controls {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .size-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .size-label {
+            font-size: 13px;
+            color: #a0a0a0;
+        }
+
+        .size-slider {
+            width: 160px;
+            height: 6px;
+            border-radius: 3px;
+            background: #2a2a2a;
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .size-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .size-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6);
+        }
+
+        .size-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .size-slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6);
+        }
+
+        .view-dropdown {
+            padding: 10px 16px;
+            background: #2a2a2a;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+
+        .view-dropdown:hover {
+            background: #3a3a3a;
+        }
+
+        .view-dropdown:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Photo Grid */
+        .photo-grid-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+            scrollbar-width: thin;
+            scrollbar-color: #2a2a2a transparent;
+        }
+
+        .photo-grid-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .photo-grid-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .photo-grid-container::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+
+        .photo-grid-container::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .photo-item:hover:not(.menu-active) {
+            transform: scale(1.05);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+            z-index: 10;
+        }
+
+        .photo-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.3) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1;
+            pointer-events: none;
+            border-radius: 8px;
+        }
+
+        .photo-item:hover:not(.menu-active)::before {
+            opacity: 1;
+        }
+
+        .photo-placeholder {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .photo-item .kebab-menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 2;
+        }
+
+        /* Bottom Bar */
+        .bottom-bar {
+            background: #0d0d0d;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 16px 28px;
+        }
+
+        .bottom-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .settings-btn {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .settings-btn:hover {
+            background: #3a3a3a;
+        }
+
+        .progress-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 0 32px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+            width: 35%;
+            border-radius: 4px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent
+            );
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #a0a0a0;
+            white-space: nowrap;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #a0a0a0;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border-radius: 6px;
+        }
+
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 4px;
+            color: #3b82f6;
+            transition: all 0.3s ease;
+        }
+
+        .status-badge:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #3b82f6;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-title-row">
+                        <div class="sidebar-title">People</div>
+                        <div class="sidebar-controls">
+                            <button class="icon-btn" id="filterBtn" title="Filter">
+                                <div class="doner-icon">
+                                    <div class="doner-line"></div>
+                                    <div class="doner-line"></div>
+                                    <div class="doner-line"></div>
+                                </div>
+                            </button>
+                            <button class="icon-btn" id="jumpToBtn" title="Jump to">
+                                <div class="bento-icon">
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                    <div class="bento-dot"></div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="people-list" id="peopleList">
+                    <!-- People items will be generated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <div class="content-header">
+                    <div class="content-title" id="contentTitle">Michael Chen's Photos</div>
+                    <div class="content-controls">
+                        <div class="size-control">
+                            <span class="size-label">Size:</span>
+                            <input type="range" class="size-slider" id="sizeSlider" min="100" max="300" value="180">
+                        </div>
+                        <select class="view-dropdown">
+                            <option>Show entire photo</option>
+                            <option>Zoom to tagged faces</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="photo-grid-container">
+                    <div class="photo-grid" id="photoGrid">
+                        <!-- Photos will be generated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Bar -->
+        <div class="bottom-bar">
+            <div class="bottom-content">
+                <button class="settings-btn">Settings</button>
+                <div class="progress-section">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">Scanning: 1200/234567</div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div class="status-info">
+                    <span class="status-badge">
+                        <span class="status-indicator"></span>
+                        PyTorch 0.6+cu126
+                    </span>
+                    <span>GPU Available</span>
+                    <span>CUDA: 12.6</span>
+                    <span>Found: 12005 faces</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data
+        const people = [
+            { name: 'Sarah Johnson', count: 34, color: '#667eea' },
+            { name: 'Emily Davis', count: 18, color: '#f093fb' },
+            { name: 'Michael Chen', count: 32, color: '#4facfe' },
+            { name: 'David Wilson', count: 15, color: '#43e97b' },
+            { name: 'Rachel Martinez', count: 27, color: '#fa709a' },
+            { name: 'Jessica Anderson', count: 21, color: '#30cfd0' },
+            { name: 'James Thompson', count: 19, color: '#a8edea' },
+            { name: 'Amanda Lee', count: 29, color: '#fed6e3' },
+            { name: 'Robert Garcia', count: 16, color: '#c1dfc4' },
+            { name: 'Christopher Brown', count: 23, color: '#d299c2' },
+            { name: 'Jennifer White', count: 31, color: '#fda085' },
+            { name: 'Daniel Martinez', count: 14, color: '#f6d365' },
+            { name: 'Matthew Harris', count: 26, color: '#96e6a1' }
+        ];
+
+        const photoColors = [
+            '#4a5568', '#ed8936', '#48bb78', '#4299e1', '#9f7aea',
+            '#f56565', '#38b2ac', '#ecc94b', '#ed64a6', '#667eea'
+        ];
+
+        let currentPerson = 'Michael Chen';
+        let isAlphabetMode = false;
+        let activeMenu = null;
+
+        // Position context menu
+        function positionMenu(menu, button) {
+            const buttonRect = button.getBoundingClientRect();
+            const menuRect = menu.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+
+            let top = buttonRect.bottom + 4;
+            let left = buttonRect.right - menuRect.width;
+
+            if (top + menuRect.height > viewportHeight) {
+                top = buttonRect.top - menuRect.height - 4;
+            }
+
+            if (left < 0) {
+                left = buttonRect.left;
+            }
+
+            if (left + menuRect.width > viewportWidth) {
+                left = viewportWidth - menuRect.width - 8;
+            }
+
+            menu.style.top = top + 'px';
+            menu.style.left = left + 'px';
+        }
+
+        // Generate people list
+        function renderPeopleList() {
+            const peopleList = document.getElementById('peopleList');
+            peopleList.innerHTML = '';
+            
+            people.forEach(person => {
+                const item = document.createElement('div');
+                item.className = 'person-item';
+                if (person.name === currentPerson) item.classList.add('active');
+                
+                item.innerHTML = `
+                    <div class="person-avatar" style="background: linear-gradient(135deg, ${person.color} 0%, ${person.color}99 100%)">
+                        ${person.name.charAt(0)}
+                    </div>
+                    <div class="person-info">
+                        <div class="person-name">${person.name}</div>
+                        <div class="person-count">${person.count} photos</div>
+                    </div>
+                    <button class="kebab-menu" data-person="${person.name}">
+                        <span class="kebab-dot"></span>
+                        <span class="kebab-dot"></span>
+                        <span class="kebab-dot"></span>
+                    </button>
+                `;
+                
+                const contextMenu = document.createElement('div');
+                contextMenu.className = 'context-menu';
+                contextMenu.innerHTML = `
+                    <div class="context-menu-item" onclick="renamePerson('${person.name}')">Rename</div>
+                    <div class="context-menu-item" onclick="hidePerson('${person.name}')">Hide person</div>
+                `;
+                document.body.appendChild(contextMenu);
+                
+                item.addEventListener('click', (e) => {
+                    if (!e.target.closest('.kebab-menu') && !e.target.closest('.context-menu')) {
+                        selectPerson(person.name);
+                    }
+                });
+                
+                peopleList.appendChild(item);
+
+                const kebabBtn = item.querySelector('.kebab-menu');
+                
+                kebabBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const personItem = kebabBtn.closest('.person-item');
+                    
+                    closeAllMenus();
+                    
+                    contextMenu.classList.add('show');
+                    personItem.classList.add('menu-active');
+                    activeMenu = { element: contextMenu, parent: personItem };
+                    
+                    positionMenu(contextMenu, kebabBtn);
+                });
+
+                contextMenu.addEventListener('mouseleave', () => {
+                    closeAllMenus();
+                });
+            });
+        }
+
+        // Generate alphabet list
+        function renderAlphabetList() {
+            const peopleList = document.getElementById('peopleList');
+            peopleList.innerHTML = '';
+            
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const availableLetters = new Set(people.map(p => p.name.charAt(0).toUpperCase()));
+            
+            alphabet.split('').forEach(letter => {
+                const item = document.createElement('div');
+                item.className = 'alphabet-item';
+                if (!availableLetters.has(letter)) {
+                    item.classList.add('disabled');
+                }
+                item.textContent = letter;
+                
+                if (availableLetters.has(letter)) {
+                    item.addEventListener('click', () => {
+                        const person = people.find(p => p.name.charAt(0).toUpperCase() === letter);
+                        if (person) {
+                            isAlphabetMode = false;
+                            document.getElementById('jumpToBtn').classList.remove('active');
+                            selectPerson(person.name);
+                            renderPeopleList();
+                        }
+                    });
+                }
+                
+                peopleList.appendChild(item);
+            });
+        }
+
+        // Select person and update view
+        function selectPerson(personName) {
+            currentPerson = personName;
+            const person = people.find(p => p.name === personName);
+            
+            document.getElementById('contentTitle').textContent = `${personName}'s Photos`;
+            
+            document.querySelectorAll('.person-item').forEach(item => {
+                item.classList.remove('active');
+                const nameElement = item.querySelector('.person-name');
+                if (nameElement && nameElement.textContent === personName) {
+                    item.classList.add('active');
+                }
+            });
+            
+            renderPhotos(person.count);
+        }
+
+        // Render photos
+        function renderPhotos(count) {
+            const photoGrid = document.getElementById('photoGrid');
+            photoGrid.innerHTML = '';
+            
+            for (let i = 0; i < count; i++) {
+                const photo = document.createElement('div');
+                photo.className = 'photo-item';
+                photo.innerHTML = `
+                    <div class="photo-placeholder" style="background: ${photoColors[i % photoColors.length]}"></div>
+                    <button class="kebab-menu">
+                        <span class="kebab-dot"></span>
+                        <span class="kebab-dot"></span>
+                        <span class="kebab-dot"></span>
+                    </button>
+                `;
+                
+                const contextMenu = document.createElement('div');
+                contextMenu.className = 'context-menu';
+                contextMenu.innerHTML = `
+                    <div class="context-menu-item" onclick="removeTag()">Remove tag</div>
+                    <div class="context-menu-item" onclick="transferTag()">Transfer tag to someone else</div>
+                `;
+                document.body.appendChild(contextMenu);
+                
+                photoGrid.appendChild(photo);
+
+                const kebabBtn = photo.querySelector('.kebab-menu');
+                
+                kebabBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const photoItem = kebabBtn.closest('.photo-item');
+                    
+                    closeAllMenus();
+                    
+                    contextMenu.classList.add('show');
+                    photoItem.classList.add('menu-active');
+                    activeMenu = { element: contextMenu, parent: photoItem };
+                    
+                    positionMenu(contextMenu, kebabBtn);
+                });
+
+                contextMenu.addEventListener('mouseleave', () => {
+                    closeAllMenus();
+                });
+            }
+        }
+
+        // Jump to button
+        document.getElementById('jumpToBtn').addEventListener('click', () => {
+            isAlphabetMode = !isAlphabetMode;
+            document.getElementById('jumpToBtn').classList.toggle('active');
+            
+            if (isAlphabetMode) {
+                renderAlphabetList();
+            } else {
+                renderPeopleList();
+            }
+        });
+
+        // Size slider
+        const sizeSlider = document.getElementById('sizeSlider');
+        sizeSlider.addEventListener('input', (e) => {
+            const size = e.target.value;
+            document.getElementById('photoGrid').style.gridTemplateColumns = `repeat(auto-fill, minmax(${size}px, 1fr))`;
+        });
+
+        // Context menu actions
+        function renamePerson(name) {
+            console.log('Rename person:', name);
+            closeAllMenus();
+        }
+
+        function hidePerson(name) {
+            console.log('Hide person:', name);
+            closeAllMenus();
+        }
+
+        function removeTag() {
+            console.log('Remove tag');
+            closeAllMenus();
+        }
+
+        function transferTag() {
+            console.log('Transfer tag');
+            closeAllMenus();
+        }
+
+        function closeAllMenus() {
+            document.querySelectorAll('.context-menu').forEach(m => {
+                m.classList.remove('show');
+            });
+            document.querySelectorAll('.person-item, .photo-item').forEach(item => {
+                item.classList.remove('menu-active');
+            });
+            activeMenu = null;
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.kebab-menu') && !e.target.closest('.context-menu')) {
+                closeAllMenus();
+            }
+        });
+
+        // Initialize
+        renderPeopleList();
+        renderPhotos(32);
+    </script>
+</body>
+</html>
