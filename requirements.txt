@@ -1,0 +1,8 @@
+insightface
+onnxruntime
+opencv-python
+PyQt6
+lmdb
+numpy
+Pillow
+networkx

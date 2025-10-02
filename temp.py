@@ -6,17 +6,24 @@ import lmdb
 import pickle
 import hashlib
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
 from PIL import Image
+import networkx as nx
+import torch
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QListWidget, QLabel, QProgressBar,
-                             QListWidgetItem, QSplitter)
+                             QListWidgetItem, QSplitter, QPushButton, QSlider,
+                             QMessageBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QPixmap, QIcon
+
+
+GPU_AVAILABLE = torch.cuda.is_available()
+DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
 
 
 class FaceDatabase:
@@ -51,26 +58,37 @@ class FaceDatabase:
         ''')
         
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS persons (
-                person_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                person_label TEXT NOT NULL,
-                face_count INTEGER DEFAULT 0
+            CREATE TABLE IF NOT EXISTS faces (
+                face_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                photo_id INTEGER NOT NULL,
+                FOREIGN KEY (photo_id) REFERENCES photos(photo_id)
             )
         ''')
         
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS faces (
-                face_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                photo_id INTEGER NOT NULL,
-                person_id INTEGER,
+            CREATE TABLE IF NOT EXISTS clusterings (
+                clustering_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                threshold REAL NOT NULL,
+                created_at REAL DEFAULT (julianday('now')),
+                is_active BOOLEAN DEFAULT 0
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cluster_assignments (
+                face_id INTEGER NOT NULL,
+                clustering_id INTEGER NOT NULL,
+                person_id INTEGER NOT NULL,
                 confidence_score REAL,
-                FOREIGN KEY (photo_id) REFERENCES photos(photo_id),
-                FOREIGN KEY (person_id) REFERENCES persons(person_id)
+                PRIMARY KEY (face_id, clustering_id),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id),
+                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
             )
         ''')
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_person ON faces(person_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         
         self.conn.commit()
     
@@ -89,12 +107,9 @@ class FaceDatabase:
         row = cursor.fetchone()
         return row[0] if row else None
     
-    def add_face(self, photo_id: int, embedding: np.ndarray, person_id: Optional[int] = None) -> int:
+    def add_face(self, photo_id: int, embedding: np.ndarray) -> int:
         cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO faces (photo_id, person_id)
-            VALUES (?, ?)
-        ''', (photo_id, person_id))
+        cursor.execute('INSERT INTO faces (photo_id) VALUES (?)', (photo_id,))
         self.conn.commit()
         face_id = cursor.lastrowid
         
@@ -113,52 +128,69 @@ class FaceDatabase:
                 return pickle.loads(value)
         return None
     
-    def get_all_person_embeddings(self, person_id: int) -> List[np.ndarray]:
+    def get_all_embeddings(self) -> Tuple[List[int], np.ndarray]:
         cursor = self.conn.cursor()
-        cursor.execute('SELECT face_id FROM faces WHERE person_id = ?', (person_id,))
+        cursor.execute('SELECT face_id FROM faces ORDER BY face_id')
         face_ids = [row[0] for row in cursor.fetchall()]
         
         embeddings = []
+        valid_face_ids = []
         for face_id in face_ids:
             embedding = self.get_face_embedding(face_id)
             if embedding is not None:
                 embeddings.append(embedding)
+                valid_face_ids.append(face_id)
         
-        return embeddings
+        if embeddings:
+            return valid_face_ids, np.array(embeddings)
+        return [], np.array([])
     
-    def create_new_person(self) -> int:
+    def create_clustering(self, threshold: float) -> int:
         cursor = self.conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM persons')
-        count = cursor.fetchone()[0]
-        
-        label = f"Person {count + 1}"
-        cursor.execute('INSERT INTO persons (person_label) VALUES (?)', (label,))
+        cursor.execute('UPDATE clusterings SET is_active = 0')
+        cursor.execute('INSERT INTO clusterings (threshold, is_active) VALUES (?, 1)', (threshold,))
         self.conn.commit()
         return cursor.lastrowid
     
-    def assign_face_to_person(self, face_id: int, person_id: int, confidence: float = None):
+    def save_cluster_assignments(self, clustering_id: int, face_ids: List[int], 
+                                 person_ids: List[int], confidences: List[float]):
         cursor = self.conn.cursor()
-        cursor.execute('''
-            UPDATE faces 
-            SET person_id = ?, confidence_score = ?
-            WHERE face_id = ?
-        ''', (person_id, confidence, face_id))
-        
-        cursor.execute('''
-            UPDATE persons 
-            SET face_count = (SELECT COUNT(*) FROM faces WHERE person_id = ?)
-            WHERE person_id = ?
-        ''', (person_id, person_id))
-        
+        data = [(fid, clustering_id, pid, conf) 
+                for fid, pid, conf in zip(face_ids, person_ids, confidences)]
+        cursor.executemany('''
+            INSERT OR REPLACE INTO cluster_assignments 
+            (face_id, clustering_id, person_id, confidence_score)
+            VALUES (?, ?, ?, ?)
+        ''', data)
         self.conn.commit()
     
-    def get_pending_photos(self) -> List[dict]:
+    def get_active_clustering(self) -> Optional[dict]:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM clusterings WHERE is_active = 1')
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    
+    def get_persons_in_clustering(self, clustering_id: int) -> List[dict]:
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT * FROM photos 
-            WHERE scan_status = 'pending'
-        ''')
+            SELECT person_id, COUNT(*) as face_count
+            FROM cluster_assignments
+            WHERE clustering_id = ?
+            GROUP BY person_id
+            ORDER BY person_id
+        ''', (clustering_id,))
         return [dict(row) for row in cursor.fetchall()]
+    
+    def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[str]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT p.file_path
+            FROM photos p
+            JOIN faces f ON p.photo_id = f.photo_id
+            JOIN cluster_assignments ca ON f.face_id = ca.face_id
+            WHERE ca.clustering_id = ? AND ca.person_id = ?
+        ''', (clustering_id, person_id))
+        return [row[0] for row in cursor.fetchall()]
     
     def update_photo_status(self, photo_id: int, status: str):
         cursor = self.conn.cursor()
@@ -166,46 +198,25 @@ class FaceDatabase:
                       (status, photo_id))
         self.conn.commit()
     
-    def get_all_persons(self) -> List[dict]:
+    def get_total_faces(self) -> int:
         cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM persons ORDER BY person_id')
-        return [dict(row) for row in cursor.fetchall()]
-    
-    def get_photos_by_person(self, person_id: int) -> List[str]:
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT DISTINCT p.file_path
-            FROM photos p
-            JOIN faces f ON p.photo_id = f.photo_id
-            WHERE f.person_id = ?
-        ''', (person_id,))
-        return [row[0] for row in cursor.fetchall()]
+        cursor.execute('SELECT COUNT(*) FROM faces')
+        return cursor.fetchone()[0]
     
     def close(self):
         self.conn.close()
         self.env.close()
 
 
-def cosine_similarity(embedding1: np.ndarray, embedding2: np.ndarray) -> float:
-    return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
-
-
-def cosine_similarity_batch(embeddings: np.ndarray, target_embedding: np.ndarray) -> np.ndarray:
-    embeddings_norm = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-    target_norm = target_embedding / np.linalg.norm(target_embedding)
-    return np.dot(embeddings_norm, target_norm)
-
-
-class FaceRecognitionWorker(QThread):
+class ScanWorker(QThread):
     progress = pyqtSignal(int, int)
     finished = pyqtSignal()
     log = pyqtSignal(str)
     
-    def __init__(self, db: FaceDatabase, location: str, threshold: float):
+    def __init__(self, db: FaceDatabase, location: str):
         super().__init__()
         self.db = db
         self.location = location
-        self.threshold = threshold / 100.0
         self.face_app = None
     
     def run(self):
@@ -213,7 +224,7 @@ class FaceRecognitionWorker(QThread):
             self.log.emit("Initializing InsightFace model...")
             self.face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
             self.face_app.prepare(ctx_id=-1, det_size=(640, 640))
-            self.log.emit("Model loaded successfully")
+            self.log.emit("Model loaded")
         except Exception as e:
             self.log.emit(f"Error loading model: {e}")
             self.finished.emit()
@@ -222,7 +233,7 @@ class FaceRecognitionWorker(QThread):
         image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
         image_files = []
         
-        self.log.emit(f"Scanning folder: {self.location}")
+        self.log.emit(f"Scanning folder...")
         for root, dirs, files in os.walk(self.location):
             for file in files:
                 if Path(file).suffix.lower() in image_extensions:
@@ -259,61 +270,109 @@ class FaceRecognitionWorker(QThread):
             
             faces = self.face_app.get(image)
             
-            if len(faces) == 0:
-                self.db.update_photo_status(photo_id, 'completed')
-                return
-            
             for face in faces:
                 embedding = face.embedding
                 embedding_norm = embedding / np.linalg.norm(embedding)
-                
-                result = self.find_matching_person(embedding_norm)
-                
-                if result is None:
-                    person_id = self.db.create_new_person()
-                    similarity = 0.0
-                    self.log.emit(f"Created Person {person_id} (no match found)")
-                else:
-                    person_id, similarity = result
-                    self.log.emit(f"Matched to Person {person_id} (similarity: {similarity:.3f})")
-                
-                face_id = self.db.add_face(photo_id, embedding_norm, person_id)
-                self.db.assign_face_to_person(face_id, person_id, similarity)
+                self.db.add_face(photo_id, embedding_norm)
             
             self.db.update_photo_status(photo_id, 'completed')
             
         except Exception as e:
-            self.log.emit(f"Error processing {os.path.basename(file_path)}: {str(e)}")
+            self.log.emit(f"Error: {os.path.basename(file_path)}")
             if 'photo_id' in locals():
                 self.db.update_photo_status(photo_id, 'error')
+
+
+class ClusterWorker(QThread):
+    progress = pyqtSignal(str)
+    finished = pyqtSignal()
     
-    def find_matching_person(self, embedding: np.ndarray) -> Optional[tuple]:
-        persons = self.db.get_all_persons()
+    def __init__(self, db: FaceDatabase, threshold: float):
+        super().__init__()
+        self.db = db
+        self.threshold = threshold / 100.0
+    
+    def run(self):
+        try:
+            self.progress.emit("Loading embeddings...")
+            face_ids, embeddings = self.db.get_all_embeddings()
+            
+            if len(embeddings) == 0:
+                self.progress.emit("No faces found")
+                self.finished.emit()
+                return
+            
+            self.progress.emit(f"Clustering {len(embeddings)} faces with PyTorch...")
+            
+            person_ids, confidences = self.cluster_with_pytorch(embeddings)
+            
+            self.progress.emit("Saving clustering...")
+            clustering_id = self.db.create_clustering(self.threshold * 100)
+            self.db.save_cluster_assignments(clustering_id, face_ids, person_ids, confidences)
+            
+            unique_persons = len(set(person_ids))
+            self.progress.emit(f"Complete: {unique_persons} persons")
+            self.finished.emit()
+            
+        except Exception as e:
+            self.progress.emit(f"Error: {str(e)}")
+            self.finished.emit()
+    
+    def cluster_with_pytorch(self, embeddings: np.ndarray) -> Tuple[List[int], List[float]]:
+        n_faces = len(embeddings)
         
-        best_match_person_id = None
-        best_match_similarity = -1
+        device_name = "GPU" if GPU_AVAILABLE else "CPU"
+        self.progress.emit(f"Using {device_name} for clustering...")
         
-        for person in persons:
-            person_id = person['person_id']
-            person_embeddings = self.db.get_all_person_embeddings(person_id)
-            
-            if not person_embeddings:
-                continue
-            
-            person_embeddings_array = np.array(person_embeddings)
-            
-            similarities = cosine_similarity_batch(person_embeddings_array, embedding)
-            
-            max_similarity = np.max(similarities)
-            
-            if max_similarity > best_match_similarity:
-                best_match_similarity = max_similarity
-                best_match_person_id = person_id
+        embeddings_tensor = torch.tensor(embeddings, dtype=torch.float32).to(DEVICE)
         
-        if best_match_similarity >= self.threshold:
-            return (best_match_person_id, best_match_similarity)
+        self.progress.emit("Normalizing embeddings...")
+        embeddings_norm = embeddings_tensor / embeddings_tensor.norm(dim=1, keepdim=True)
         
-        return None
+        batch_size = 1000
+        n_batches = (n_faces + batch_size - 1) // batch_size
+        
+        self.progress.emit("Computing similarity matrix...")
+        
+        G = nx.Graph()
+        
+        for i in range(n_batches):
+            start_i = i * batch_size
+            end_i = min((i + 1) * batch_size, n_faces)
+            batch_i = embeddings_norm[start_i:end_i]
+            
+            similarities = torch.mm(batch_i, embeddings_norm.T)
+            
+            similarities_cpu = similarities.cpu().numpy()
+            
+            for local_idx, global_idx in enumerate(range(start_i, end_i)):
+                similar_indices = np.where(similarities_cpu[local_idx] >= self.threshold)[0]
+                
+                for j in similar_indices:
+                    if global_idx != j and global_idx < j:
+                        G.add_edge(global_idx, int(j), weight=float(similarities_cpu[local_idx, j]))
+            
+            if (i + 1) % 10 == 0 or i == n_batches - 1:
+                self.progress.emit(f"Processing batch {i+1}/{n_batches}...")
+        
+        self.progress.emit("Finding connected components...")
+        components = list(nx.connected_components(G))
+        
+        person_ids = [0] * n_faces
+        confidences = [0.0] * n_faces
+        
+        for person_id, component in enumerate(components, start=1):
+            for face_idx in component:
+                person_ids[face_idx] = person_id
+                
+                neighbors = list(G.neighbors(face_idx))
+                if neighbors:
+                    weights = [G[face_idx][n]['weight'] for n in neighbors]
+                    confidences[face_idx] = float(np.mean(weights))
+                else:
+                    confidences[face_idx] = 1.0
+        
+        return person_ids, confidences
 
 
 class MainWindow(QMainWindow):
@@ -323,11 +382,11 @@ class MainWindow(QMainWindow):
         self.threshold = threshold
         self.db = FaceDatabase("./face_data")
         
-        self.setWindowTitle("Face Recognition Photo Organizer (InsightFace)")
+        self.setWindowTitle("Face Recognition Photo Organizer (PyTorch)")
         self.setGeometry(100, 100, 1200, 800)
         
         self.setup_ui()
-        self.start_scanning()
+        self.check_scan_status()
     
     def setup_ui(self):
         central_widget = QWidget()
@@ -342,7 +401,7 @@ class MainWindow(QMainWindow):
         top_layout.setSpacing(3)
         
         status_layout = QHBoxLayout()
-        self.status_label = QLabel(f"Scanning: {self.location}")
+        self.status_label = QLabel(f"Initializing...")
         self.status_label.setStyleSheet("font-size: 11px;")
         status_layout.addWidget(self.status_label)
         
@@ -356,6 +415,27 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setMaximumHeight(15)
         top_layout.addWidget(self.progress_bar)
+        
+        controls_layout = QHBoxLayout()
+        
+        threshold_label = QLabel(f"Threshold: {self.threshold}%")
+        threshold_label.setStyleSheet("font-size: 11px;")
+        controls_layout.addWidget(threshold_label)
+        
+        self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
+        self.threshold_slider.setMinimum(10)
+        self.threshold_slider.setMaximum(90)
+        self.threshold_slider.setValue(int(self.threshold))
+        self.threshold_slider.setEnabled(False)
+        self.threshold_slider.valueChanged.connect(lambda v: threshold_label.setText(f"Threshold: {v}%"))
+        controls_layout.addWidget(self.threshold_slider, 1)
+        
+        self.cluster_button = QPushButton("Re-cluster")
+        self.cluster_button.setEnabled(False)
+        self.cluster_button.clicked.connect(self.start_clustering)
+        controls_layout.addWidget(self.cluster_button)
+        
+        top_layout.addLayout(controls_layout)
         
         layout.addWidget(top_widget)
         
@@ -399,78 +479,110 @@ class MainWindow(QMainWindow):
         splitter.setSizes([300, 900])
         layout.addWidget(splitter)
         
-        bottom_widget = QWidget()
-        bottom_layout = QHBoxLayout(bottom_widget)
-        bottom_layout.setContentsMargins(0, 5, 0, 0)
+        gpu_status = "GPU Available" if GPU_AVAILABLE else "CPU Only"
+        cuda_version = torch.version.cuda if GPU_AVAILABLE else "N/A"
+        bottom_info = QLabel(f"PyTorch: {torch.__version__} | {gpu_status} | CUDA: {cuda_version}")
+        bottom_info.setStyleSheet("color: #888; font-size: 10px;")
+        layout.addWidget(bottom_info)
+    
+    def check_scan_status(self):
+        total_faces = self.db.get_total_faces()
         
-        threshold_info = QLabel(f"Threshold: {self.threshold}% (Higher = stricter)")
-        threshold_info.setStyleSheet("color: #888; font-size: 10px;")
-        bottom_layout.addWidget(threshold_info)
-        
-        layout.addWidget(bottom_widget)
+        if total_faces == 0:
+            self.status_label.setText(f"Starting scan of {self.location}")
+            self.start_scanning()
+        else:
+            active_clustering = self.db.get_active_clustering()
+            if active_clustering:
+                self.status_label.setText(f"Loaded: {total_faces} faces")
+                self.progress_bar.hide()
+                self.threshold_slider.setEnabled(True)
+                self.cluster_button.setEnabled(True)
+                self.load_persons()
+            else:
+                self.status_label.setText(f"Found {total_faces} faces, starting clustering...")
+                self.start_clustering()
     
     def start_scanning(self):
-        self.worker = FaceRecognitionWorker(self.db, self.location, self.threshold)
-        self.worker.progress.connect(self.update_progress)
-        self.worker.finished.connect(self.scanning_finished)
-        self.worker.log.connect(self.update_log)
-        self.worker.start()
+        self.scan_worker = ScanWorker(self.db, self.location)
+        self.scan_worker.progress.connect(self.update_scan_progress)
+        self.scan_worker.finished.connect(self.scan_finished)
+        self.scan_worker.log.connect(self.update_log)
+        self.scan_worker.start()
     
-    def update_progress(self, current: int, total: int):
+    def update_scan_progress(self, current: int, total: int):
         self.progress_bar.setMaximum(total)
         self.progress_bar.setValue(current)
-        self.status_label.setText(f"Processing {current}/{total}")
+        self.status_label.setText(f"Scanning {current}/{total}")
     
     def update_log(self, message: str):
         self.log_label.setText(message)
     
-    def scanning_finished(self):
-        self.status_label.setText(f"Complete: {self.person_list.count()} persons found")
-        self.log_label.setText("")
+    def scan_finished(self):
+        total_faces = self.db.get_total_faces()
+        self.status_label.setText(f"Scan complete: {total_faces} faces found")
+        self.start_clustering()
+    
+    def start_clustering(self):
+        threshold = self.threshold_slider.value()
+        self.cluster_button.setEnabled(False)
+        self.threshold_slider.setEnabled(False)
+        
+        self.cluster_worker = ClusterWorker(self.db, threshold)
+        self.cluster_worker.progress.connect(self.update_cluster_progress)
+        self.cluster_worker.finished.connect(self.cluster_finished)
+        self.cluster_worker.start()
+    
+    def update_cluster_progress(self, message: str):
+        self.status_label.setText(message)
+    
+    def cluster_finished(self):
         self.progress_bar.hide()
+        self.threshold_slider.setEnabled(True)
+        self.cluster_button.setEnabled(True)
         self.load_persons()
     
     def load_persons(self):
         self.person_list.clear()
-        persons = self.db.get_all_persons()
+        clustering = self.db.get_active_clustering()
+        
+        if not clustering:
+            return
+        
+        persons = self.db.get_persons_in_clustering(clustering['clustering_id'])
         
         for person in persons:
-            item_text = f"{person['person_label']} ({person['face_count']} faces)"
+            item_text = f"Person {person['person_id']} ({person['face_count']} faces)"
             item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, person['person_id'])
+            item.setData(Qt.ItemDataRole.UserRole, (clustering['clustering_id'], person['person_id']))
             self.person_list.addItem(item)
     
     def on_person_selected(self, current: QListWidgetItem, previous: QListWidgetItem):
         if current is None:
             return
         
-        person_id = current.data(Qt.ItemDataRole.UserRole)
-        self.load_photos(person_id)
+        clustering_id, person_id = current.data(Qt.ItemDataRole.UserRole)
+        self.load_photos(clustering_id, person_id)
     
     def create_thumbnail(self, image_path: str, size: int = 150) -> Optional[QPixmap]:
         try:
             img = Image.open(image_path)
             img.thumbnail((size, size), Image.Resampling.LANCZOS)
-            
             img_rgb = img.convert('RGB')
-            
             temp_path = f"temp_thumb_{hash(image_path)}.jpg"
             img_rgb.save(temp_path, 'JPEG')
-            
             pixmap = QPixmap(temp_path)
-            
             try:
                 os.remove(temp_path)
             except:
                 pass
-            
             return pixmap
         except Exception as e:
             return None
     
-    def load_photos(self, person_id: int):
+    def load_photos(self, clustering_id: int, person_id: int):
         self.photo_list.clear()
-        photos = self.db.get_photos_by_person(person_id)
+        photos = self.db.get_photos_by_person(clustering_id, person_id)
         
         for photo_path in photos:
             pixmap = self.create_thumbnail(photo_path)
@@ -493,7 +605,7 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Face Recognition Photo Organizer (InsightFace)')
+    parser = argparse.ArgumentParser(description='Face Recognition Photo Organizer (PyTorch)')
     parser.add_argument('-threshold', type=int, required=True, 
                        help='Recognition threshold (0-100, recommended: 30-50)')
     parser.add_argument('-location', type=str, required=True,
@@ -508,6 +620,12 @@ def main():
     if args.threshold < 0 or args.threshold > 100:
         print("Error: Threshold must be between 0 and 100")
         sys.exit(1)
+    
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA available: {GPU_AVAILABLE}")
+    if GPU_AVAILABLE:
+        print(f"CUDA version: {torch.version.cuda}")
+        print(f"GPU device: {torch.cuda.get_device_name(0)}")
     
     app = QApplication(sys.argv)
     window = MainWindow(args.location, args.threshold)
