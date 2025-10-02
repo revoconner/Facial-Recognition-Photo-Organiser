@@ -17,7 +17,7 @@ import torch
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QListWidget, QLabel, QProgressBar,
                              QListWidgetItem, QSplitter, QPushButton, QSlider,
-                             QMessageBox)
+                             QCheckBox, QMessageBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QPixmap, QIcon
 
@@ -435,6 +435,12 @@ class MainWindow(QMainWindow):
         self.cluster_button.clicked.connect(self.start_clustering)
         controls_layout.addWidget(self.cluster_button)
         
+        self.show_unmatched_checkbox = QCheckBox("Show unmatched faces")
+        self.show_unmatched_checkbox.setChecked(True)
+        self.show_unmatched_checkbox.setStyleSheet("font-size: 11px;")
+        self.show_unmatched_checkbox.stateChanged.connect(self.load_persons)
+        controls_layout.addWidget(self.show_unmatched_checkbox)
+        
         top_layout.addLayout(controls_layout)
         
         layout.addWidget(top_widget)
@@ -551,11 +557,35 @@ class MainWindow(QMainWindow):
         
         persons = self.db.get_persons_in_clustering(clustering['clustering_id'])
         
+        show_unmatched = self.show_unmatched_checkbox.isChecked()
+        
+        unmatched_count = 0
+        matched_count = 0
+        
         for person in persons:
-            item_text = f"Person {person['person_id']} ({person['face_count']} faces)"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, (clustering['clustering_id'], person['person_id']))
-            self.person_list.addItem(item)
+            person_id = person['person_id']
+            face_count = person['face_count']
+            
+            if person_id == 0:
+                unmatched_count = face_count
+                if not show_unmatched:
+                    continue
+                item_text = f"Unmatched Faces ({face_count} faces)"
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.ItemDataRole.UserRole, (clustering['clustering_id'], person_id))
+                item.setForeground(Qt.GlobalColor.darkGray)
+                self.person_list.addItem(item)
+            else:
+                matched_count += 1
+                item_text = f"Person {person_id} ({face_count} faces)"
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.ItemDataRole.UserRole, (clustering['clustering_id'], person_id))
+                self.person_list.addItem(item)
+        
+        if not show_unmatched and unmatched_count > 0:
+            self.show_unmatched_checkbox.setText(f"Show unmatched faces ({unmatched_count})")
+        else:
+            self.show_unmatched_checkbox.setText("Show unmatched faces")
     
     def on_person_selected(self, current: QListWidgetItem, previous: QListWidgetItem):
         if current is None:
