@@ -702,12 +702,13 @@ def main():
         js_api=api,
         width=1200,
         height=800,
-        resizable=True
+        resizable=True,
+        easy_drag=False
     )
     
     api.set_window(window)
     
-    webview.start(debug=True)
+    webview.start(debug=False)
     
     api.close()
 
