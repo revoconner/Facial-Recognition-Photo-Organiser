@@ -535,23 +535,24 @@ class API:
     def set_window(self, window):
         self._window = window
         self._setup_window_events()
-        self._setup_tray()
+        if self._close_to_tray:
+            self._setup_tray()
     
     def _setup_window_events(self):
-        def on_minimized():
+        def on_closing():
+            if self._quit_flag:
+                return False
             if self._close_to_tray:
                 self._window.hide()
-        
-        def on_closing():
-            if self._close_to_tray and not self._quit_flag:
-                self._window.minimize()
                 return True
             return False
         
-        self._window.events.minimized += on_minimized
         self._window.events.closing += on_closing
     
     def _setup_tray(self):
+        if self._tray_icon:
+            return
+        
         def on_quit(icon, item):
             self._quit_flag = True
             icon.stop()
@@ -767,29 +768,79 @@ class API:
     
     def set_close_to_tray(self, enabled):
         self._close_to_tray = enabled
+        if enabled:
+            if not self._tray_icon or not self._tray_icon.visible:
+                self._setup_tray()
+        else:
+            if self._tray_icon:
+                try:
+                    self._tray_icon.stop()
+                except:
+                    pass
+                self._tray_icon = None
     
     def minimize_window(self):
         if self._window:
-            self._window.minimize()
+            if self._close_to_tray:
+                self._window.hide()
+            else:
+                self._window.minimize()
     
     def maximize_window(self):
         if self._window:
             self._window.toggle_fullscreen()
     
     def close_window(self):
+        print(f"close_window called: close_to_tray={self._close_to_tray}, quit_flag={self._quit_flag}")
+        
         if self._close_to_tray and not self._quit_flag:
+            print("Hiding window to tray")
             if self._window:
-                self._window.minimize()
+                self._window.hide()
         else:
+            print("Attempting to close application")
             self._quit_flag = True
+            
             if self._tray_icon:
-                self._tray_icon.stop()
+                print("Stopping tray icon")
+                try:
+                    self._tray_icon.stop()
+                    print("Tray icon stopped")
+                except Exception as e:
+                    print(f"Error stopping tray icon: {e}")
+                self._tray_icon = None
+            
             if self._window:
-                self._window.destroy()
+                print("Destroying window")
+                try:
+                    # Force destroy all windows
+                    for win in webview.windows:
+                        print(f"Destroying window: {win}")
+                        win.destroy()
+                    print("All windows destroyed")
+                except Exception as e:
+                    print(f"Error destroying windows: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # Force exit after a short delay to allow cleanup
+            import threading
+            def force_exit():
+                import time
+                time.sleep(0.5)
+                print("Force exiting application")
+                import os
+                os._exit(0)
+            
+            exit_thread = threading.Thread(target=force_exit, daemon=True)
+            exit_thread.start()
     
     def close(self):
         if self._tray_icon:
-            self._tray_icon.stop()
+            try:
+                self._tray_icon.stop()
+            except:
+                pass
         self._db.close()
 
 

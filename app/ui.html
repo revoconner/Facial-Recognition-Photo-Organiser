@@ -631,7 +631,11 @@
 
         document.getElementById('closeToTrayToggle').addEventListener('change', (e) => {
             pywebview.api.set_close_to_tray(e.target.checked);
-            addLogEntry(`Close to tray ${e.target.checked ? 'enabled' : 'disabled'}`);
+            if (e.target.checked) {
+                addLogEntry('Close to tray enabled - tray icon started');
+            } else {
+                addLogEntry('Close to tray disabled - tray icon removed');
+            }
         });
 
         document.getElementById('saveLogBtn').addEventListener('click', async () => {
