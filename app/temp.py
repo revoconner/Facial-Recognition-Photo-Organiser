@@ -17,6 +17,9 @@ from PIL import Image
 import networkx as nx
 import torch
 import webview
+import pystray
+from pystray import MenuItem as item
+from PIL import Image as PILImage, ImageDraw
 
 GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
@@ -503,6 +506,20 @@ class ClusterWorker(threading.Thread):
         return person_ids, confidences
 
 
+def create_tray_icon():
+    width = 64
+    height = 64
+    image = PILImage.new('RGB', (width, height), (255, 255, 255))
+    dc = ImageDraw.Draw(image)
+    
+    dc.ellipse([10, 10, 54, 54], fill=(59, 130, 246))
+    dc.ellipse([20, 20, 30, 30], fill=(255, 255, 255))
+    dc.ellipse([34, 20, 44, 30], fill=(255, 255, 255))
+    dc.arc([15, 25, 49, 50], 0, 180, fill=(255, 255, 255), width=3)
+    
+    return image
+
+
 class API:
     def __init__(self, location: str, threshold: float):
         self._location = location
@@ -511,9 +528,65 @@ class API:
         self._window = None
         self._scan_worker = None
         self._cluster_worker = None
+        self._tray_icon = None
+        self._close_to_tray = True
+        self._quit_flag = False
     
     def set_window(self, window):
         self._window = window
+        self._setup_window_events()
+        self._setup_tray()
+    
+    def _setup_window_events(self):
+        def on_minimized():
+            if self._close_to_tray:
+                self._window.hide()
+        
+        def on_closing():
+            if self._close_to_tray and not self._quit_flag:
+                self._window.minimize()
+                return True
+            return False
+        
+        self._window.events.minimized += on_minimized
+        self._window.events.closing += on_closing
+    
+    def _setup_tray(self):
+        def on_quit(icon, item):
+            self._quit_flag = True
+            icon.stop()
+            if self._window:
+                try:
+                    self._window.destroy()
+                except:
+                    pass
+        
+        def on_restore(icon=None, item=None):
+            if self._window:
+                try:
+                    self._window.restore()
+                    self._window.show()
+                except Exception as e:
+                    print(f"Error restoring window: {e}")
+        
+        icon_image = create_tray_icon()
+        
+        menu = pystray.Menu(
+            item('Open', on_restore, default=True),
+            item('Quit', on_quit)
+        )
+        
+        self._tray_icon = pystray.Icon(
+            "face_recognition",
+            icon_image,
+            "Face Recognition",
+            menu
+        )
+        
+        self._tray_icon.on_activate = on_restore
+        
+        tray_thread = threading.Thread(target=self._tray_icon.run, daemon=False)
+        tray_thread.start()
     
     def update_status(self, message: str):
         if self._window:
@@ -689,7 +762,34 @@ class API:
         self.start_scanning()
         return {'needs_scan': True}
     
+    def get_close_to_tray(self):
+        return self._close_to_tray
+    
+    def set_close_to_tray(self, enabled):
+        self._close_to_tray = enabled
+    
+    def minimize_window(self):
+        if self._window:
+            self._window.minimize()
+    
+    def maximize_window(self):
+        if self._window:
+            self._window.toggle_fullscreen()
+    
+    def close_window(self):
+        if self._close_to_tray and not self._quit_flag:
+            if self._window:
+                self._window.minimize()
+        else:
+            self._quit_flag = True
+            if self._tray_icon:
+                self._tray_icon.stop()
+            if self._window:
+                self._window.destroy()
+    
     def close(self):
+        if self._tray_icon:
+            self._tray_icon.stop()
         self._db.close()
 
 
@@ -731,7 +831,7 @@ def main():
         width=1200,
         height=800,
         resizable=True,
-        easy_drag=False
+        frameless=True
     )
     
     api.set_window(window)

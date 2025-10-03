@@ -15,6 +15,28 @@
     </style>
 </head>
 <body>
+    <div class="title-bar">
+        <div class="title-bar-drag">
+            <div class="title-bar-title">Face Recognition Photo Organizer</div>
+        </div>
+        <div class="title-bar-controls">
+            <button class="title-bar-btn minimize-btn" id="minimizeBtn" title="Minimize">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <rect x="0" y="5" width="12" height="2" fill="currentColor"/>
+                </svg>
+            </button>
+            <button class="title-bar-btn maximize-btn" id="maximizeBtn" title="Maximize">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+            </button>
+            <button class="title-bar-btn close-btn" id="closeBtn" title="Close">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M1 1 L11 11 M11 1 L1 11" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+            </button>
+        </div>
+    </div>
     <div class="app-container" id="appContainer">
         <div class="main-content">
             <div class="sidebar">
@@ -166,14 +188,14 @@
                         
                         <div class="setting-row">
                             <div class="setting-label">
-                                <span>Use GPU</span>
+                                <span>Close to tray</span>
                                 <span class="info-icon">
                                     i
-                                    <div class="tooltip">Use GPU for faster processing. Works best with Nvidia GPU. Falls back to CPU automatically if GPU is not detected. Default On</div>
+                                    <div class="tooltip">Keeps the program running in system's tray when closed, to quit right click the tray icon and select quit. Default On</div>
                                 </span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="closeToTrayToggle" checked>
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -518,6 +540,9 @@
                 document.getElementById('thresholdSlider').value = threshold;
                 document.getElementById('thresholdValue').textContent = threshold + '%';
                 
+                const closeToTray = await pywebview.api.get_close_to_tray();
+                document.getElementById('closeToTrayToggle').checked = closeToTray;
+                
                 document.getElementById('progressSection').style.display = 'flex';
                 
                 const state = await pywebview.api.check_initial_state();
@@ -604,6 +629,11 @@
             renderPeopleList();
         });
 
+        document.getElementById('closeToTrayToggle').addEventListener('change', (e) => {
+            pywebview.api.set_close_to_tray(e.target.checked);
+            addLogEntry(`Close to tray ${e.target.checked ? 'enabled' : 'disabled'}`);
+        });
+
         document.getElementById('saveLogBtn').addEventListener('click', async () => {
             const logViewer = document.getElementById('logViewer');
             const logContent = logViewer.innerText;
@@ -687,6 +717,18 @@
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
             return false;
+        });
+
+        document.getElementById('minimizeBtn').addEventListener('click', () => {
+            pywebview.api.minimize_window();
+        });
+
+        document.getElementById('maximizeBtn').addEventListener('click', () => {
+            pywebview.api.maximize_window();
+        });
+
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            pywebview.api.close_window();
         });
 
         window.addEventListener('pywebviewready', initialize);
