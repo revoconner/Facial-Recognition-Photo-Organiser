@@ -283,6 +283,12 @@
         </div>
     </div>
 
+    <div class="cleanup-overlay" id="cleanupOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title">Cleaning up and quitting</div>
+        </div>
+    </div>
+
     <script>
         let people = [];
         let currentPerson = null;
@@ -734,6 +740,11 @@
         document.getElementById('closeBtn').addEventListener('click', () => {
             pywebview.api.close_window();
         });
+
+        function showCleanupMessage() {
+            document.getElementById('cleanupOverlay').classList.add('active');
+            document.getElementById('appContainer').classList.add('blurred');
+        }
 
         window.addEventListener('pywebviewready', initialize);
     </script>

@@ -801,6 +801,10 @@ class API:
             print("Attempting to close application")
             self._quit_flag = True
             
+            # Show cleanup message
+            if self._window:
+                self._window.evaluate_js("showCleanupMessage()")
+            
             if self._tray_icon:
                 print("Stopping tray icon")
                 try:

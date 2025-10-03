@@ -1206,3 +1206,37 @@
         .hidden-file-input {
             display: none;
         }
+
+        .cleanup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100000;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            animation: fadeInOverlay 0.3s ease;
+        }
+
+        .cleanup-overlay.active {
+            display: flex;
+        }
+
+        .cleanup-message {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 48px 64px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .cleanup-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+            text-align: center;
+        }
