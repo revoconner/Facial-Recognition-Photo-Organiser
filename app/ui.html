@@ -514,14 +514,7 @@
                 
                 const state = await pywebview.api.check_initial_state();
                 
-                if (state.needs_scan) {
-                    updateStatusMessage('Scanning for new and incomplete photos...');
-                } else if (state.has_clustering) {
-                    hideProgress();
-                    await loadPeople();
-                } else {
-                    updateStatusMessage('Starting initial calibration...');
-                }
+                updateStatusMessage('Checking for new photos...');
             } catch (error) {
                 console.error('Initialization error:', error);
                 addLogEntry('ERROR: Initialization failed - ' + error);

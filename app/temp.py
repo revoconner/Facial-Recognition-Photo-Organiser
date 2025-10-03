@@ -89,14 +89,23 @@ class FaceDatabase:
         
         self.conn.commit()
     
-    def add_photo(self, file_path: str, file_hash: str) -> int:
+    def add_photo(self, file_path: str, file_hash: str) -> Optional[int]:
         cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT OR IGNORE INTO photos (file_path, file_hash)
-            VALUES (?, ?)
-        ''', (file_path, file_hash))
-        self.conn.commit()
-        return cursor.lastrowid if cursor.lastrowid else self.get_photo_id(file_path)
+        try:
+            cursor.execute('''
+                INSERT OR IGNORE INTO photos (file_path, file_hash)
+                VALUES (?, ?)
+            ''', (file_path, file_hash))
+            self.conn.commit()
+            
+            if cursor.lastrowid:
+                return cursor.lastrowid
+            
+            return self.get_photo_id(file_path)
+        except Exception as e:
+            print(f"Database error in add_photo: {e}")
+            self.conn.rollback()
+            return None
     
     def get_photo_id(self, file_path: str) -> Optional[int]:
         cursor = self.conn.cursor()
@@ -116,6 +125,26 @@ class FaceDatabase:
             WHERE scan_status IN ("pending", "error")
         ''')
         return [row[0] for row in cursor.fetchall()]
+    
+    def remove_deleted_photos(self, existing_paths: Set[str]) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT photo_id, file_path FROM photos')
+        all_db_photos = cursor.fetchall()
+        
+        deleted_count = 0
+        deleted_photo_ids = []
+        for photo_id, file_path in all_db_photos:
+            if file_path not in existing_paths:
+                deleted_photo_ids.append(photo_id)
+                deleted_count += 1
+        
+        if deleted_photo_ids:
+            placeholders = ','.join('?' * len(deleted_photo_ids))
+            cursor.execute(f'DELETE FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+            cursor.execute(f'DELETE FROM photos WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+        
+        self.conn.commit()
+        return deleted_count
     
     def get_photos_needing_scan(self) -> int:
         cursor = self.conn.cursor()
@@ -259,20 +288,33 @@ class ScanWorker(threading.Thread):
                 if Path(file).suffix.lower() in image_extensions:
                     all_image_files.add(os.path.join(root, file))
         
+        self.api.update_status("Cleaning up deleted photos from database...")
+        deleted_count = self.db.remove_deleted_photos(all_image_files)
+        if deleted_count > 0:
+            self.api.update_status(f"Removed {deleted_count} deleted photos from database")
+        
         scanned_paths = self.db.get_all_scanned_paths()
-        pending_paths = set(self.db.get_pending_and_error_paths())
+        pending_paths_all = self.db.get_pending_and_error_paths()
+        pending_paths = set(p for p in pending_paths_all if os.path.exists(p))
+        
+        stale_pending = len(pending_paths_all) - len(pending_paths)
+        if stale_pending > 0:
+            self.api.update_status(f"Ignoring {stale_pending} pending files that no longer exist")
         
         new_photos = all_image_files - scanned_paths
         photos_to_scan = list(new_photos | pending_paths)
         
         if len(photos_to_scan) == 0:
             self.api.update_status("No new photos to scan")
+            self.api.set_new_photos_found(False)
             self.api.scan_complete()
             return
         
+        self.api.set_new_photos_found(len(new_photos) > 0)
+        
         total = len(photos_to_scan)
         total_photos = len(all_image_files)
-        scanned_count = len(scanned_paths)
+        scanned_count = total_photos - total
         
         self.api.update_status(f"Found {len(new_photos)} new photos, {len(pending_paths)} incomplete")
         
@@ -322,10 +364,20 @@ class ScanWorker(threading.Thread):
             
             photo_id = self.db.add_photo(file_path, file_hash)
             
-            existing_status = self.db.conn.execute(
+            if not photo_id:
+                self.api.update_status(f"ERROR: Failed to add photo to database - {os.path.basename(file_path)}")
+                return
+            
+            status_row = self.db.conn.execute(
                 'SELECT scan_status FROM photos WHERE photo_id = ?', 
                 (photo_id,)
-            ).fetchone()[0]
+            ).fetchone()
+            
+            if not status_row:
+                self.api.update_status(f"ERROR: Photo record not found after insert - {os.path.basename(file_path)}")
+                return
+            
+            existing_status = status_row[0]
             
             if existing_status == 'completed':
                 return
@@ -340,6 +392,8 @@ class ScanWorker(threading.Thread):
             
             if len(faces) == 0:
                 self.api.update_status(f"INFO: No faces detected - {os.path.basename(file_path)}")
+            else:
+                self.api.update_status(f"INFO: Found {len(faces)} face(s) - {os.path.basename(file_path)}")
             
             for face in faces:
                 embedding = face.embedding
@@ -350,7 +404,7 @@ class ScanWorker(threading.Thread):
             
         except Exception as e:
             self.api.update_status(f"ERROR: Exception processing {os.path.basename(file_path)}: {str(e)}")
-            if 'photo_id' in locals():
+            if 'photo_id' in locals() and photo_id:
                 self.db.update_photo_status(photo_id, 'error')
 
 
@@ -451,43 +505,58 @@ class ClusterWorker(threading.Thread):
 
 class API:
     def __init__(self, location: str, threshold: float):
-        self.location = location
-        self.threshold = threshold
-        self.db = FaceDatabase("./face_data")
-        self.window = None
-        self.scan_worker = None
-        self.cluster_worker = None
+        self._location = location
+        self._threshold = threshold
+        self._db = FaceDatabase("./face_data")
+        self._window = None
+        self._scan_worker = None
+        self._cluster_worker = None
     
     def set_window(self, window):
-        self.window = window
+        self._window = window
     
     def update_status(self, message: str):
-        if self.window:
-            self.window.evaluate_js(f'updateStatusMessage("{message}")')
+        if self._window:
+            safe_message = message.replace('"', '\\"').replace('\n', ' ')
+            self._window.evaluate_js(f'updateStatusMessage("{safe_message}")')
     
     def update_progress(self, current: int, total: int):
-        if self.window:
+        if self._window:
             percent = (current / total) * 100 if total > 0 else 0
-            self.window.evaluate_js(f'updateProgress({current}, {total}, {percent})')
+            self._window.evaluate_js(f'updateProgress({current}, {total}, {percent})')
     
     def scan_complete(self):
-        total_faces = self.db.get_total_faces()
-        total_photos = self.db.get_total_photos()
-        self.update_status(f"Scan complete: {total_faces} faces in {total_photos} photos")
-        self.update_status(f"Database updated successfully")
+        total_faces = self._db.get_total_faces()
+        total_photos = self._db.get_total_photos()
+        pending_count = self._db.get_photos_needing_scan()
         
-        needs_clustering = self.db.get_photos_needing_scan() == 0
-        if needs_clustering:
+        self.update_status(f"Scan complete: {total_faces} faces in {total_photos} photos")
+        
+        if pending_count > 0:
+            self.update_status(f"Warning: {pending_count} photos had errors and were skipped")
+        
+        active_clustering = self._db.get_active_clustering()
+        has_existing_clustering = active_clustering is not None
+        new_photos_found = getattr(self, '_new_photos_found', False)
+        
+        should_recalibrate = new_photos_found or not has_existing_clustering
+        
+        if should_recalibrate:
+            self.update_status("Database updated successfully")
             self.update_status("Starting automatic recalibration...")
             self.start_clustering()
         else:
-            pending = self.db.get_photos_needing_scan()
-            self.update_status(f"Warning: {pending} photos still pending")
+            self.update_status("No new photos found, loading existing clustering")
+            self.update_status(f"Using threshold: {active_clustering['threshold']}%")
+            self.cluster_complete()
+    
+    def set_new_photos_found(self, found):
+        self._new_photos_found = found
     
     def cluster_complete(self):
-        if self.window:
-            self.window.evaluate_js('hideProgress()')
-            self.window.evaluate_js('loadPeople()')
+        if self._window:
+            self._window.evaluate_js('hideProgress()')
+            self._window.evaluate_js('loadPeople()')
     
     def get_system_info(self):
         return {
@@ -495,36 +564,36 @@ class API:
             'gpu_available': GPU_AVAILABLE,
             'cuda_version': torch.version.cuda if GPU_AVAILABLE else 'N/A',
             'gpu_name': torch.cuda.get_device_name(0) if GPU_AVAILABLE else 'N/A',
-            'total_faces': self.db.get_total_faces()
+            'total_faces': self._db.get_total_faces()
         }
     
     def start_scanning(self):
-        if self.scan_worker is None or not self.scan_worker.is_alive():
-            self.scan_worker = ScanWorker(self.db, self.location, self)
-            self.scan_worker.start()
+        if self._scan_worker is None or not self._scan_worker.is_alive():
+            self._scan_worker = ScanWorker(self._db, self._location, self)
+            self._scan_worker.start()
     
     def start_clustering(self):
-        if self.cluster_worker is None or not self.cluster_worker.is_alive():
+        if self._cluster_worker is None or not self._cluster_worker.is_alive():
             threshold = self.get_threshold()
-            self.cluster_worker = ClusterWorker(self.db, threshold, self)
-            self.cluster_worker.start()
+            self._cluster_worker = ClusterWorker(self._db, threshold, self)
+            self._cluster_worker.start()
     
     def get_threshold(self):
-        return self.threshold
+        return self._threshold
     
     def set_threshold(self, value):
-        self.threshold = value
+        self._threshold = value
     
     def recalibrate(self, threshold):
-        self.threshold = threshold
+        self._threshold = threshold
         self.start_clustering()
     
     def get_people(self):
-        clustering = self.db.get_active_clustering()
+        clustering = self._db.get_active_clustering()
         if not clustering:
             return []
         
-        persons = self.db.get_persons_in_clustering(clustering['clustering_id'])
+        persons = self._db.get_persons_in_clustering(clustering['clustering_id'])
         result = []
         
         for person in persons:
@@ -542,7 +611,7 @@ class API:
         return result
     
     def get_photos(self, clustering_id, person_id):
-        photo_paths = self.db.get_photos_by_person(clustering_id, person_id)
+        photo_paths = self._db.get_photos_by_person(clustering_id, person_id)
         photos = []
         
         for path in photo_paths:
@@ -583,32 +652,17 @@ class API:
             print(f"Error opening photo: {e}")
     
     def check_initial_state(self):
-        photos_needing_scan = self.db.get_photos_needing_scan()
-        total_faces = self.db.get_total_faces()
-        total_photos = self.db.get_total_photos()
+        total_faces = self._db.get_total_faces()
+        total_photos = self._db.get_total_photos()
         
         self.update_status(f"Database status: {total_photos} photos scanned, {total_faces} faces detected")
         
-        if photos_needing_scan > 0:
-            self.update_status(f"Found {photos_needing_scan} photos needing scan/retry")
-        
-        if photos_needing_scan > 0 or total_faces == 0:
-            self.update_status("Checking for new photos...")
-            self.start_scanning()
-            return {'needs_scan': True, 'photos_pending': photos_needing_scan}
-        else:
-            active_clustering = self.db.get_active_clustering()
-            if active_clustering:
-                self.update_status("Loaded existing database")
-                self.update_status(f"Using threshold: {active_clustering['threshold']}%")
-                return {'needs_scan': False, 'has_clustering': True}
-            else:
-                self.update_status("No clustering found, starting calibration...")
-                self.start_clustering()
-                return {'needs_scan': False, 'has_clustering': False}
+        self.update_status("Checking filesystem for changes...")
+        self.start_scanning()
+        return {'needs_scan': True}
     
     def close(self):
-        self.db.close()
+        self._db.close()
 
 
 def main():
