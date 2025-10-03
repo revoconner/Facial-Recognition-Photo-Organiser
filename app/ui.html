@@ -471,6 +471,16 @@
 
         function hideProgress() {
             document.getElementById('progressSection').style.display = 'none';
+            updateFaceCount();
+        }
+
+        async function updateFaceCount() {
+            try {
+                const sysInfo = await pywebview.api.get_system_info();
+                document.getElementById('faceCount').textContent = `Found: ${sysInfo.total_faces} faces`;
+            } catch (error) {
+                console.error('Error updating face count:', error);
+            }
         }
 
         function addLogEntry(message) {
@@ -486,24 +496,35 @@
 
         async function initialize() {
             try {
+                addLogEntry('Application started');
+                
                 const sysInfo = await pywebview.api.get_system_info();
                 document.getElementById('pytorchVersion').textContent = `PyTorch ${sysInfo.pytorch_version}`;
                 document.getElementById('gpuStatus').textContent = sysInfo.gpu_available ? 'GPU Available' : 'CPU Only';
                 document.getElementById('cudaVersion').textContent = `CUDA: ${sysInfo.cuda_version}`;
                 document.getElementById('faceCount').textContent = `Found: ${sysInfo.total_faces} faces`;
                 
+                addLogEntry(`System: PyTorch ${sysInfo.pytorch_version}, ${sysInfo.gpu_available ? 'GPU' : 'CPU'}, CUDA ${sysInfo.cuda_version}`);
+                
                 const threshold = await pywebview.api.get_threshold();
                 document.getElementById('thresholdSlider').value = threshold;
                 document.getElementById('thresholdValue').textContent = threshold + '%';
                 
+                document.getElementById('progressSection').style.display = 'flex';
+                
                 const state = await pywebview.api.check_initial_state();
                 
-                if (state.has_clustering) {
+                if (state.needs_scan) {
+                    updateStatusMessage('Scanning for new and incomplete photos...');
+                } else if (state.has_clustering) {
                     hideProgress();
                     await loadPeople();
+                } else {
+                    updateStatusMessage('Starting initial calibration...');
                 }
             } catch (error) {
                 console.error('Initialization error:', error);
+                addLogEntry('ERROR: Initialization failed - ' + error);
             }
         }
 

@@ -9,7 +9,7 @@ import threading
 import json
 import base64
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
 import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
@@ -83,6 +83,7 @@ class FaceDatabase:
         ''')
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         
@@ -102,6 +103,27 @@ class FaceDatabase:
         cursor.execute('SELECT photo_id FROM photos WHERE file_path = ?', (file_path,))
         row = cursor.fetchone()
         return row[0] if row else None
+    
+    def get_all_scanned_paths(self) -> Set[str]:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT file_path FROM photos WHERE scan_status = "completed"')
+        return {row[0] for row in cursor.fetchall()}
+    
+    def get_pending_and_error_paths(self) -> List[str]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT file_path FROM photos 
+            WHERE scan_status IN ("pending", "error")
+        ''')
+        return [row[0] for row in cursor.fetchall()]
+    
+    def get_photos_needing_scan(self) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(*) FROM photos 
+            WHERE scan_status IN ("pending", "error")
+        ''')
+        return cursor.fetchone()[0]
     
     def add_face(self, photo_id: int, embedding: np.ndarray) -> int:
         cursor = self.conn.cursor()
@@ -199,6 +221,11 @@ class FaceDatabase:
         cursor.execute('SELECT COUNT(*) FROM faces')
         return cursor.fetchone()[0]
     
+    def get_total_photos(self) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM photos WHERE scan_status = "completed"')
+        return cursor.fetchone()[0]
+    
     def close(self):
         self.conn.close()
         self.env.close()
@@ -224,25 +251,72 @@ class ScanWorker(threading.Thread):
             return
         
         image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
-        image_files = []
         
-        self.api.update_status(f"Scanning folder...")
+        self.api.update_status("Discovering photos...")
+        all_image_files = set()
         for root, dirs, files in os.walk(self.location):
             for file in files:
                 if Path(file).suffix.lower() in image_extensions:
-                    image_files.append(os.path.join(root, file))
+                    all_image_files.add(os.path.join(root, file))
         
-        total = len(image_files)
-        self.api.update_status(f"Found {total} images")
+        scanned_paths = self.db.get_all_scanned_paths()
+        pending_paths = set(self.db.get_pending_and_error_paths())
         
-        for idx, file_path in enumerate(image_files):
-            self.api.update_progress(idx + 1, total)
+        new_photos = all_image_files - scanned_paths
+        photos_to_scan = list(new_photos | pending_paths)
+        
+        if len(photos_to_scan) == 0:
+            self.api.update_status("No new photos to scan")
+            self.api.scan_complete()
+            return
+        
+        total = len(photos_to_scan)
+        total_photos = len(all_image_files)
+        scanned_count = len(scanned_paths)
+        
+        self.api.update_status(f"Found {len(new_photos)} new photos, {len(pending_paths)} incomplete")
+        
+        if len(new_photos) > 0:
+            self.api.update_status(f"New photos detected: {len(new_photos)} files")
+            new_photos_list = sorted(list(new_photos))
+            for i, photo_path in enumerate(new_photos_list[:10]):
+                self.api.update_status(f"  NEW: {os.path.basename(photo_path)}")
+            if len(new_photos_list) > 10:
+                self.api.update_status(f"  ... and {len(new_photos_list) - 10} more")
+        
+        if len(pending_paths) > 0:
+            self.api.update_status(f"Incomplete photos to retry: {len(pending_paths)} files")
+            pending_list = sorted(list(pending_paths))
+            for i, photo_path in enumerate(pending_list[:10]):
+                self.api.update_status(f"  RETRY: {os.path.basename(photo_path)}")
+            if len(pending_list) > 10:
+                self.api.update_status(f"  ... and {len(pending_list) - 10} more")
+        
+        self.api.update_status(f"Starting scan of {total} photos...")
+        
+        for idx, file_path in enumerate(photos_to_scan):
+            current_overall = scanned_count + idx + 1
+            self.api.update_progress(current_overall, total_photos)
+            
+            is_new = file_path in new_photos
+            status_prefix = "NEW" if is_new else "RETRY"
+            
+            if (idx + 1) % 10 == 0 or idx == 0 or (idx + 1) == total:
+                self.api.update_status(f"Scanning {status_prefix}: {os.path.basename(file_path)} ({idx + 1}/{total})")
+            
             self.process_photo(file_path)
         
         self.api.scan_complete()
     
     def process_photo(self, file_path: str):
         try:
+            if not os.path.exists(file_path):
+                self.api.update_status(f"ERROR: File not found - {os.path.basename(file_path)}")
+                photo_id = self.db.get_photo_id(file_path)
+                if photo_id:
+                    self.db.update_photo_status(photo_id, 'error')
+                return
+            
             with open(file_path, 'rb') as f:
                 file_hash = hashlib.md5(f.read()).hexdigest()
             
@@ -258,10 +332,14 @@ class ScanWorker(threading.Thread):
             
             image = cv2.imread(file_path)
             if image is None:
+                self.api.update_status(f"ERROR: Cannot read image - {os.path.basename(file_path)}")
                 self.db.update_photo_status(photo_id, 'error')
                 return
             
             faces = self.face_app.get(image)
+            
+            if len(faces) == 0:
+                self.api.update_status(f"INFO: No faces detected - {os.path.basename(file_path)}")
             
             for face in faces:
                 embedding = face.embedding
@@ -271,6 +349,7 @@ class ScanWorker(threading.Thread):
             self.db.update_photo_status(photo_id, 'completed')
             
         except Exception as e:
+            self.api.update_status(f"ERROR: Exception processing {os.path.basename(file_path)}: {str(e)}")
             if 'photo_id' in locals():
                 self.db.update_photo_status(photo_id, 'error')
 
@@ -301,7 +380,14 @@ class ClusterWorker(threading.Thread):
             self.db.save_cluster_assignments(clustering_id, face_ids, person_ids, confidences)
             
             unique_persons = len(set(person_ids))
-            self.api.update_status(f"Complete: {unique_persons} persons")
+            matched_faces = sum(1 for pid in person_ids if pid > 0)
+            unmatched_faces = sum(1 for pid in person_ids if pid == 0)
+            
+            self.api.update_status(f"Clustering complete:")
+            self.api.update_status(f"  Total persons: {unique_persons}")
+            self.api.update_status(f"  Matched faces: {matched_faces}")
+            self.api.update_status(f"  Unmatched faces: {unmatched_faces}")
+            self.api.update_status(f"Complete: {unique_persons} persons identified")
             self.api.cluster_complete()
             
         except Exception as e:
@@ -381,13 +467,22 @@ class API:
     
     def update_progress(self, current: int, total: int):
         if self.window:
-            percent = (current / total) * 100
+            percent = (current / total) * 100 if total > 0 else 0
             self.window.evaluate_js(f'updateProgress({current}, {total}, {percent})')
     
     def scan_complete(self):
         total_faces = self.db.get_total_faces()
-        self.update_status(f"Scan complete: {total_faces} faces found")
-        self.start_clustering()
+        total_photos = self.db.get_total_photos()
+        self.update_status(f"Scan complete: {total_faces} faces in {total_photos} photos")
+        self.update_status(f"Database updated successfully")
+        
+        needs_clustering = self.db.get_photos_needing_scan() == 0
+        if needs_clustering:
+            self.update_status("Starting automatic recalibration...")
+            self.start_clustering()
+        else:
+            pending = self.db.get_photos_needing_scan()
+            self.update_status(f"Warning: {pending} photos still pending")
     
     def cluster_complete(self):
         if self.window:
@@ -488,16 +583,27 @@ class API:
             print(f"Error opening photo: {e}")
     
     def check_initial_state(self):
+        photos_needing_scan = self.db.get_photos_needing_scan()
         total_faces = self.db.get_total_faces()
+        total_photos = self.db.get_total_photos()
         
-        if total_faces == 0:
+        self.update_status(f"Database status: {total_photos} photos scanned, {total_faces} faces detected")
+        
+        if photos_needing_scan > 0:
+            self.update_status(f"Found {photos_needing_scan} photos needing scan/retry")
+        
+        if photos_needing_scan > 0 or total_faces == 0:
+            self.update_status("Checking for new photos...")
             self.start_scanning()
-            return {'needs_scan': True}
+            return {'needs_scan': True, 'photos_pending': photos_needing_scan}
         else:
             active_clustering = self.db.get_active_clustering()
             if active_clustering:
+                self.update_status("Loaded existing database")
+                self.update_status(f"Using threshold: {active_clustering['threshold']}%")
                 return {'needs_scan': False, 'has_clustering': True}
             else:
+                self.update_status("No clustering found, starting calibration...")
                 self.start_clustering()
                 return {'needs_scan': False, 'has_clustering': False}
     
@@ -522,11 +628,17 @@ def main():
         print("Error: Threshold must be between 0 and 100")
         sys.exit(1)
     
+    print("=" * 60)
+    print("Face Recognition Photo Organizer")
+    print("=" * 60)
     print(f"PyTorch version: {torch.__version__}")
     print(f"CUDA available: {GPU_AVAILABLE}")
     if GPU_AVAILABLE:
         print(f"CUDA version: {torch.version.cuda}")
         print(f"GPU device: {torch.cuda.get_device_name(0)}")
+    print(f"Scan location: {args.location}")
+    print(f"Initial threshold: {args.threshold}%")
+    print("=" * 60)
     
     api = API(args.location, args.threshold)
     
