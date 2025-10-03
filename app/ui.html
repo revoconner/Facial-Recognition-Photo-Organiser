@@ -163,11 +163,11 @@
                                 <span>Use system resources dynamically</span>
                                 <span class="info-icon">
                                     i
-                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When turn off, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
+                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage to 5% when app runs in background. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
                                 </span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="dynamicResourcesToggle" checked>
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
@@ -549,6 +549,9 @@
                 const closeToTray = await pywebview.api.get_close_to_tray();
                 document.getElementById('closeToTrayToggle').checked = closeToTray;
                 
+                const dynamicResources = await pywebview.api.get_dynamic_resources();
+                document.getElementById('dynamicResourcesToggle').checked = dynamicResources;
+                
                 document.getElementById('progressSection').style.display = 'flex';
                 
                 const state = await pywebview.api.check_initial_state();
@@ -641,6 +644,15 @@
                 addLogEntry('Close to tray enabled - tray icon started');
             } else {
                 addLogEntry('Close to tray disabled - tray icon removed');
+            }
+        });
+
+        document.getElementById('dynamicResourcesToggle').addEventListener('change', (e) => {
+            pywebview.api.set_dynamic_resources(e.target.checked);
+            if (e.target.checked) {
+                addLogEntry('Dynamic resource management enabled - will throttle CPU to 5% when in background');
+            } else {
+                addLogEntry('Dynamic resource management disabled - full speed processing');
             }
         });
 

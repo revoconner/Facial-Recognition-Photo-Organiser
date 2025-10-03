@@ -8,6 +8,7 @@ import hashlib
 import threading
 import json
 import base64
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple, Set
 import numpy as np
@@ -349,7 +350,15 @@ class ScanWorker(threading.Thread):
             if (idx + 1) % 10 == 0 or idx == 0 or (idx + 1) == total:
                 self.api.update_status(f"Scanning {status_prefix}: {os.path.basename(file_path)} ({idx + 1}/{total})")
             
+            process_start = time.time()
             self.process_photo(file_path)
+            process_time = time.time() - process_start
+            
+            should_throttle = self.api.get_dynamic_resources() and not self.api.is_window_foreground()
+            
+            if should_throttle:
+                sleep_time = process_time * 19
+                time.sleep(sleep_time)
         
         self.api.scan_complete()
     
@@ -524,13 +533,20 @@ class API:
     def __init__(self, location: str, threshold: float):
         self._location = location
         self._threshold = threshold
-        self._db = FaceDatabase("./face_data")
+        
+        script_dir = Path(__file__).parent.resolve()
+        db_path = script_dir / "face_data"
+        print(f"Database location: {db_path}")
+        
+        self._db = FaceDatabase(str(db_path))
         self._window = None
         self._scan_worker = None
         self._cluster_worker = None
         self._tray_icon = None
         self._close_to_tray = True
         self._quit_flag = False
+        self._dynamic_resources = True
+        self._window_foreground = True
     
     def set_window(self, window):
         self._window = window
@@ -544,6 +560,7 @@ class API:
                 return False
             if self._close_to_tray:
                 self._window.hide()
+                self._window_foreground = False
                 return True
             return False
         
@@ -564,7 +581,6 @@ class API:
                 except:
                     pass
             
-            # Force destroy all windows
             try:
                 for win in webview.windows:
                     print(f"Destroying window from tray: {win}")
@@ -572,7 +588,6 @@ class API:
             except Exception as e:
                 print(f"Error destroying windows from tray: {e}")
             
-            # Force exit
             import threading
             def force_exit():
                 import time
@@ -589,6 +604,7 @@ class API:
                 try:
                     self._window.restore()
                     self._window.show()
+                    self._window_foreground = True
                 except Exception as e:
                     print(f"Error restoring window: {e}")
         
@@ -801,12 +817,30 @@ class API:
                     pass
                 self._tray_icon = None
     
+    def get_dynamic_resources(self):
+        return self._dynamic_resources
+    
+    def set_dynamic_resources(self, enabled):
+        self._dynamic_resources = enabled
+        if enabled:
+            self.update_status("Dynamic resource management enabled - will throttle when in background")
+        else:
+            self.update_status("Dynamic resource management disabled - full speed always")
+    
+    def is_window_foreground(self):
+        return self._window_foreground
+    
+    def set_window_foreground(self, foreground):
+        self._window_foreground = foreground
+    
     def minimize_window(self):
         if self._window:
             if self._close_to_tray:
                 self._window.hide()
+                self._window_foreground = False
             else:
                 self._window.minimize()
+                self._window_foreground = False
     
     def maximize_window(self):
         if self._window:
@@ -819,11 +853,11 @@ class API:
             print("Hiding window to tray")
             if self._window:
                 self._window.hide()
+                self._window_foreground = False
         else:
             print("Attempting to close application")
             self._quit_flag = True
             
-            # Show cleanup message
             if self._window:
                 self._window.evaluate_js("showCleanupMessage()")
             
@@ -839,7 +873,6 @@ class API:
             if self._window:
                 print("Destroying window")
                 try:
-                    # Force destroy all windows
                     for win in webview.windows:
                         print(f"Destroying window: {win}")
                         win.destroy()
@@ -849,7 +882,6 @@ class API:
                     import traceback
                     traceback.print_exc()
             
-            # Force exit after a short delay to allow cleanup
             import threading
             def force_exit():
                 import time
