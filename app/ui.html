@@ -604,6 +604,23 @@
             renderPeopleList();
         });
 
+        document.getElementById('saveLogBtn').addEventListener('click', async () => {
+            const logViewer = document.getElementById('logViewer');
+            const logContent = logViewer.innerText;
+            
+            try {
+                const result = await pywebview.api.save_log(logContent);
+                if (result.success) {
+                    addLogEntry('Log saved to: ' + result.path);
+                } else if (result.message !== 'Save cancelled') {
+                    addLogEntry('Error saving log: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error saving log:', error);
+                addLogEntry('Error saving log: ' + error);
+            }
+        });
+
         function renamePerson(name) {
             console.log('Rename person:', name);
             closeAllMenus();
@@ -667,12 +684,12 @@
             });
         });
 
-        window.addEventListener('pywebviewready', initialize);
-        
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
             return false;
         });
+
+        window.addEventListener('pywebviewready', initialize);
     </script>
 </body>
 </html>

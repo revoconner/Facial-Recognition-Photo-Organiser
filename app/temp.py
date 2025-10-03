@@ -651,6 +651,34 @@ class API:
         except Exception as e:
             print(f"Error opening photo: {e}")
     
+    def save_log(self, log_content):
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            
+            file_path = filedialog.asksaveasfilename(
+                title="Save Log File",
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                initialfile="face_recognition_log.txt"
+            )
+            
+            root.destroy()
+            
+            if file_path:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(log_content)
+                return {'success': True, 'path': file_path}
+            else:
+                return {'success': False, 'message': 'Save cancelled'}
+                
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+    
     def check_initial_state(self):
         total_faces = self._db.get_total_faces()
         total_photos = self._db.get_total_photos()
