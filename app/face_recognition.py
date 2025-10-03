@@ -554,13 +554,35 @@ class API:
             return
         
         def on_quit(icon, item):
+            print("Tray quit clicked")
             self._quit_flag = True
             icon.stop()
+            
             if self._window:
                 try:
-                    self._window.destroy()
+                    self._window.evaluate_js("showCleanupMessage()")
                 except:
                     pass
+            
+            # Force destroy all windows
+            try:
+                for win in webview.windows:
+                    print(f"Destroying window from tray: {win}")
+                    win.destroy()
+            except Exception as e:
+                print(f"Error destroying windows from tray: {e}")
+            
+            # Force exit
+            import threading
+            def force_exit():
+                import time
+                time.sleep(0.5)
+                print("Force exiting from tray")
+                import os
+                os._exit(0)
+            
+            exit_thread = threading.Thread(target=force_exit, daemon=True)
+            exit_thread.start()
         
         def on_restore(icon=None, item=None):
             if self._window:
