@@ -11,7 +11,8 @@ import base64
 import time
 import fnmatch
 from pathlib import Path
-from typing import List, Optional, Tuple, Set
+from typing import List, Optional, Tuple, Set, Dict
+from collections import Counter
 import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
@@ -150,13 +151,11 @@ class FaceDatabase:
         ''')
         
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS person_names (
-                clustering_id INTEGER NOT NULL,
-                person_id INTEGER NOT NULL,
-                custom_name TEXT NOT NULL,
-                renamed_at REAL DEFAULT (julianday('now')),
-                PRIMARY KEY (clustering_id, person_id),
-                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
+            CREATE TABLE IF NOT EXISTS face_tags (
+                face_id INTEGER PRIMARY KEY,
+                tag_name TEXT NOT NULL,
+                tagged_at REAL DEFAULT (julianday('now')),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id)
             )
         ''')
         
@@ -165,7 +164,7 @@ class FaceDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_person_names ON person_names(clustering_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
         
         self.conn.commit()
     
@@ -220,6 +219,14 @@ class FaceDatabase:
         
         if deleted_photo_ids:
             placeholders = ','.join('?' * len(deleted_photo_ids))
+            
+            cursor.execute(f'SELECT face_id FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+            deleted_face_ids = [row[0] for row in cursor.fetchall()]
+            
+            if deleted_face_ids:
+                face_placeholders = ','.join('?' * len(deleted_face_ids))
+                cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({face_placeholders})', deleted_face_ids)
+            
             cursor.execute(f'DELETE FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
             cursor.execute(f'DELETE FROM photos WHERE photo_id IN ({placeholders})', deleted_photo_ids)
         
@@ -308,6 +315,14 @@ class FaceDatabase:
         ''', (clustering_id,))
         return [dict(row) for row in cursor.fetchall()]
     
+    def get_face_ids_for_person(self, clustering_id: int, person_id: int) -> List[int]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT face_id FROM cluster_assignments
+            WHERE clustering_id = ? AND person_id = ?
+        ''', (clustering_id, person_id))
+        return [row[0] for row in cursor.fetchall()]
+    
     def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[str]:
         cursor = self.conn.cursor()
         cursor.execute('''
@@ -343,22 +358,53 @@ class FaceDatabase:
         ''', (clustering_id,))
         return {row[0] for row in cursor.fetchall()}
     
-    def rename_person(self, clustering_id: int, person_id: int, custom_name: str):
+    def tag_faces(self, face_ids: List[int], tag_name: str):
         cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT OR REPLACE INTO person_names (clustering_id, person_id, custom_name)
-            VALUES (?, ?, ?)
-        ''', (clustering_id, person_id, custom_name))
+        data = [(fid, tag_name) for fid in face_ids]
+        cursor.executemany('''
+            INSERT OR REPLACE INTO face_tags (face_id, tag_name)
+            VALUES (?, ?)
+        ''', data)
         self.conn.commit()
     
-    def get_person_name(self, clustering_id: int, person_id: int) -> Optional[str]:
+    def untag_faces(self, face_ids: List[int]):
         cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT custom_name FROM person_names
-            WHERE clustering_id = ? AND person_id = ?
-        ''', (clustering_id, person_id))
-        row = cursor.fetchone()
-        return row[0] if row else None
+        if face_ids:
+            placeholders = ','.join('?' * len(face_ids))
+            cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({placeholders})', face_ids)
+            self.conn.commit()
+    
+    def get_face_tags(self, face_ids: List[int]) -> Dict[int, str]:
+        cursor = self.conn.cursor()
+        if not face_ids:
+            return {}
+        
+        placeholders = ','.join('?' * len(face_ids))
+        cursor.execute(f'''
+            SELECT face_id, tag_name FROM face_tags
+            WHERE face_id IN ({placeholders})
+        ''', face_ids)
+        
+        return {row[0]: row[1] for row in cursor.fetchall()}
+    
+    def get_person_tag_summary(self, face_ids: List[int]) -> Optional[Dict]:
+        if not face_ids:
+            return None
+        
+        tags = self.get_face_tags(face_ids)
+        
+        if not tags:
+            return None
+        
+        tag_counts = Counter(tags.values())
+        most_common_tag, count = tag_counts.most_common(1)[0]
+        
+        return {
+            'name': most_common_tag,
+            'tagged_count': count,
+            'total_count': len(face_ids),
+            'all_tags': dict(tag_counts)
+        }
     
     def update_photo_status(self, photo_id: int, status: str):
         cursor = self.conn.cursor()
@@ -916,14 +962,18 @@ class API:
             if is_hidden and not show_hidden:
                 continue
             
-            custom_name = self._db.get_person_name(clustering_id, person_id)
+            face_ids = self._db.get_face_ids_for_person(clustering_id, person_id)
+            tag_summary = self._db.get_person_tag_summary(face_ids)
             
-            if custom_name:
-                name = custom_name
+            if tag_summary:
+                name = tag_summary['name']
+                tagged_count = tag_summary['tagged_count']
             elif person_id > 0:
                 name = f"Person {person_id}"
+                tagged_count = 0
             else:
                 name = "Unmatched Faces"
+                tagged_count = 0
             
             if is_hidden:
                 name += " (hidden)"
@@ -932,6 +982,7 @@ class API:
                 'id': person_id,
                 'name': name,
                 'count': face_count,
+                'tagged_count': tagged_count,
                 'clustering_id': clustering_id,
                 'is_hidden': is_hidden
             })
@@ -953,12 +1004,31 @@ class API:
             return {'success': False, 'message': 'Name cannot be empty'}
         
         new_name = new_name.strip()
-        self._db.rename_person(clustering_id, person_id, new_name)
+        
+        face_ids = self._db.get_face_ids_for_person(clustering_id, person_id)
+        
+        if not face_ids:
+            return {'success': False, 'message': 'No faces found for this person'}
+        
+        self._db.tag_faces(face_ids, new_name)
         
         if self._window:
             self._window.evaluate_js('loadPeople()')
         
-        return {'success': True}
+        return {'success': True, 'faces_tagged': len(face_ids)}
+    
+    def untag_person(self, clustering_id, person_id):
+        face_ids = self._db.get_face_ids_for_person(clustering_id, person_id)
+        
+        if not face_ids:
+            return {'success': False, 'message': 'No faces found for this person'}
+        
+        self._db.untag_faces(face_ids)
+        
+        if self._window:
+            self._window.evaluate_js('loadPeople()')
+        
+        return {'success': True, 'faces_untagged': len(face_ids)}
     
     def get_photos(self, clustering_id, person_id):
         photo_paths = self._db.get_photos_by_person(clustering_id, person_id)

@@ -74,13 +74,15 @@ let people = [];
                 const color = getPersonColor(person.id);
                 const initial = person.name.charAt(0);
                 
+                const tagInfo = person.tagged_count > 0 ? ` (${person.tagged_count}/${person.count} tagged)` : '';
+                
                 item.innerHTML = `
                     <div class="person-avatar" style="background: linear-gradient(135deg, ${color} 0%, ${color}99 100%)">
                         ${initial}
                     </div>
                     <div class="person-info">
                         <div class="person-name">${person.name}</div>
-                        <div class="person-count">${person.count} photos</div>
+                        <div class="person-count">${person.count} photos${tagInfo}</div>
                     </div>
                     <button class="kebab-menu">
                         <span class="kebab-dot"></span>
@@ -95,11 +97,13 @@ let people = [];
                 if (person.is_hidden) {
                     contextMenu.innerHTML = `
                         <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>
+                        <div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>
                         <div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>
                     `;
                 } else {
                     contextMenu.innerHTML = `
                         <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>
+                        <div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>
                         <div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>
                     `;
                 }
@@ -599,7 +603,7 @@ let people = [];
             try {
                 const result = await pywebview.api.rename_person(clusteringId, personId, newName.trim());
                 if (result.success) {
-                    addLogEntry(`Person renamed from "${cleanName}" to "${newName.trim()}"`);
+                    addLogEntry(`Person renamed to "${newName.trim()}" - ${result.faces_tagged} faces tagged`);
                 } else {
                     addLogEntry('ERROR: ' + result.message);
                     alert('Error: ' + result.message);
@@ -608,6 +612,26 @@ let people = [];
                 console.error('Error renaming person:', error);
                 addLogEntry('Error renaming person: ' + error);
                 alert('Error renaming person');
+            }
+        }
+
+        async function untagPerson(clusteringId, personId) {
+            closeAllMenus();
+            
+            if (!confirm('Remove all tags from this person? They will revert to "Person X" until renamed again.')) {
+                return;
+            }
+            
+            try {
+                const result = await pywebview.api.untag_person(clusteringId, personId);
+                if (result.success) {
+                    addLogEntry(`Removed all tags from person ${personId} - ${result.faces_untagged} faces untagged`);
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error untagging person:', error);
+                addLogEntry('Error untagging person: ' + error);
             }
         }
 
