@@ -48,7 +48,8 @@ class Settings:
             'include_folders': [],
             'exclude_folders': [],
             'wildcard_exclusions': '',
-            'view_mode': 'entire_photo'
+            'view_mode': 'entire_photo',
+            'sort_mode': 'names_asc'
         }
         
         self.settings = self.load()
@@ -1294,6 +1295,12 @@ class API:
         self._settings.set('view_mode', mode)
         if self._window:
             self._window.evaluate_js('reloadCurrentPhotos()')
+    
+    def get_sort_mode(self):
+        return self._settings.get('sort_mode', 'names_asc')
+    
+    def set_sort_mode(self, mode):
+        self._settings.set('sort_mode', mode)
     
     def select_folder(self):
         try:

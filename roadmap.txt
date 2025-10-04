@@ -1,5 +1,3 @@
-sort by names - 
-sorty by photos - 
 hide people with less than X photos - Toggle to show - name has (< X photos), can still be hidden by hide user
-show alphabet list (only if sorted by name)
-Remove Tag - Transfer Tag will be done in V2
+hide Photo - Transfer Tag will be done in V2
+ADD heif support

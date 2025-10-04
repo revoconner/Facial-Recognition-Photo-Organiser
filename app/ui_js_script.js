@@ -6,6 +6,7 @@ let people = [];
         let showHidden = false;
         let showDevOptions = false;
         let currentPhotoContext = null;
+        let currentSortMode = 'names_asc';
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -41,6 +42,89 @@ let people = [];
             menu.style.left = left + 'px';
         }
 
+        function sortPeople(peopleArray, mode) {
+            const sorted = [...peopleArray];
+            
+            switch(mode) {
+                case 'names_asc':
+                    sorted.sort((a, b) => a.name.localeCompare(b.name));
+                    break;
+                case 'names_desc':
+                    sorted.sort((a, b) => b.name.localeCompare(a.name));
+                    break;
+                case 'photos_asc':
+                    sorted.sort((a, b) => a.count - b.count);
+                    break;
+                case 'photos_desc':
+                    sorted.sort((a, b) => b.count - a.count);
+                    break;
+            }
+            
+            return sorted;
+        }
+
+        function getAvailableAlphabets(peopleArray) {
+            const alphabets = new Set();
+            peopleArray.forEach(person => {
+                const firstChar = person.name.charAt(0).toUpperCase();
+                if (firstChar.match(/[A-Z]/)) {
+                    alphabets.add(firstChar);
+                }
+            });
+            return Array.from(alphabets).sort();
+        }
+
+        function scrollToAlphabet(letter) {
+            const peopleList = document.getElementById('peopleList');
+            const items = peopleList.querySelectorAll('.person-item');
+            
+            for (let item of items) {
+                const nameEl = item.querySelector('.person-name');
+                if (nameEl && nameEl.textContent.charAt(0).toUpperCase() === letter) {
+                    item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    break;
+                }
+            }
+        }
+
+        function renderAlphabetList() {
+            const peopleList = document.getElementById('peopleList');
+            peopleList.innerHTML = '';
+            
+            const filteredPeople = people.filter(person => {
+                if (person.id === 0 && !showUnmatched) {
+                    return false;
+                }
+                return true;
+            });
+            
+            const sortedPeople = sortPeople(filteredPeople, currentSortMode);
+            const availableLetters = getAvailableAlphabets(sortedPeople);
+            const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+            
+            if (currentSortMode === 'names_desc') {
+                allLetters.reverse();
+            }
+            
+            allLetters.forEach(letter => {
+                const item = document.createElement('div');
+                item.className = 'alphabet-item';
+                item.textContent = letter;
+                
+                if (availableLetters.includes(letter)) {
+                    item.addEventListener('click', () => {
+                        isAlphabetMode = false;
+                        renderPeopleList();
+                        setTimeout(() => scrollToAlphabet(letter), 100);
+                    });
+                } else {
+                    item.classList.add('disabled');
+                }
+                
+                peopleList.appendChild(item);
+            });
+        }
+
         async function loadPeople() {
             try {
                 people = await pywebview.api.get_people();
@@ -66,7 +150,9 @@ let people = [];
                 return true;
             });
             
-            filteredPeople.forEach(person => {
+            const sortedPeople = sortPeople(filteredPeople, currentSortMode);
+            
+            sortedPeople.forEach(person => {
                 const item = document.createElement('div');
                 item.className = 'person-item';
                 if (currentPerson && person.id === currentPerson.id) {
@@ -323,6 +409,10 @@ let people = [];
                 const viewMode = await pywebview.api.get_view_mode();
                 document.getElementById('viewModeDropdown').value = viewMode;
                 
+                const sortMode = await pywebview.api.get_sort_mode();
+                currentSortMode = sortMode;
+                updateJumpToButtonVisibility();
+                
                 includeFolders = await pywebview.api.get_include_folders();
                 renderIncludeFolders();
                 
@@ -336,6 +426,19 @@ let people = [];
             } catch (error) {
                 console.error('Error loading settings:', error);
                 addLogEntry('ERROR: Failed to load settings - ' + error);
+            }
+        }
+
+        function updateJumpToButtonVisibility() {
+            const jumpToBtn = document.getElementById('jumpToBtn');
+            if (currentSortMode.startsWith('names_')) {
+                jumpToBtn.style.display = 'flex';
+            } else {
+                jumpToBtn.style.display = 'none';
+                if (isAlphabetMode) {
+                    isAlphabetMode = false;
+                    renderPeopleList();
+                }
             }
         }
 
@@ -363,6 +466,70 @@ let people = [];
                 addLogEntry('ERROR: Initialization failed - ' + error);
             }
         }
+
+        document.getElementById('filterBtn').addEventListener('click', () => {
+            closeAllMenus();
+            
+            const filterMenu = document.createElement('div');
+            filterMenu.className = 'context-menu';
+            filterMenu.innerHTML = `
+                <div class="context-menu-item" data-sort="names_asc">By Names (A to Z)</div>
+                <div class="context-menu-item" data-sort="names_desc">By Names (Z to A)</div>
+                <div class="context-menu-item" data-sort="photos_asc">By Photos (Low to High)</div>
+                <div class="context-menu-item" data-sort="photos_desc">By Photos (High to Low)</div>
+            `;
+            
+            document.body.appendChild(filterMenu);
+            
+            filterMenu.classList.add('show');
+            
+            const filterBtn = document.getElementById('filterBtn');
+            activeMenu = { element: filterMenu, parent: filterBtn };
+            
+            positionMenu(filterMenu, filterBtn);
+            
+            filterMenu.addEventListener('click', async (e) => {
+                const menuItem = e.target.closest('.context-menu-item');
+                if (menuItem) {
+                    const sortMode = menuItem.getAttribute('data-sort');
+                    currentSortMode = sortMode;
+                    await pywebview.api.set_sort_mode(sortMode);
+                    
+                    const sortNames = {
+                        'names_asc': 'By Names (A to Z)',
+                        'names_desc': 'By Names (Z to A)',
+                        'photos_asc': 'By Photos (Low to High)',
+                        'photos_desc': 'By Photos (High to Low)'
+                    };
+                    addLogEntry('Sort changed to: ' + sortNames[sortMode]);
+                    
+                    updateJumpToButtonVisibility();
+                    renderPeopleList();
+                    closeAllMenus();
+                }
+            });
+            
+            filterMenu.addEventListener('mouseleave', () => {
+                closeAllMenus();
+            });
+        });
+
+        document.getElementById('jumpToBtn').addEventListener('click', () => {
+            if (currentSortMode.startsWith('names_')) {
+                isAlphabetMode = !isAlphabetMode;
+                const jumpToBtn = document.getElementById('jumpToBtn');
+                
+                if (isAlphabetMode) {
+                    jumpToBtn.classList.add('active');
+                    renderAlphabetList();
+                    addLogEntry('Alphabet navigation enabled');
+                } else {
+                    jumpToBtn.classList.remove('active');
+                    renderPeopleList();
+                    addLogEntry('Alphabet navigation disabled');
+                }
+            }
+        });
 
         document.getElementById('sizeSlider').addEventListener('input', (e) => {
             const size = e.target.value;
@@ -450,7 +617,11 @@ let people = [];
         document.getElementById('showUnmatchedToggle').addEventListener('change', (e) => {
             showUnmatched = e.target.checked;
             pywebview.api.set_show_unmatched(e.target.checked);
-            renderPeopleList();
+            if (isAlphabetMode) {
+                renderAlphabetList();
+            } else {
+                renderPeopleList();
+            }
             addLogEntry('Show unmatched faces: ' + (e.target.checked ? 'enabled' : 'disabled'));
         });
 
@@ -776,7 +947,7 @@ let people = [];
         }
 
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.kebab-menu') && !e.target.closest('.context-menu')) {
+            if (!e.target.closest('.kebab-menu') && !e.target.closest('.context-menu') && !e.target.closest('#filterBtn')) {
                 closeAllMenus();
             }
         });
