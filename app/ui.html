@@ -530,6 +530,34 @@
             logViewer.scrollTop = logViewer.scrollHeight;
         }
 
+        async function loadAllSettings() {
+            try {
+                const threshold = await pywebview.api.get_threshold();
+                document.getElementById('thresholdSlider').value = threshold;
+                document.getElementById('thresholdValue').textContent = threshold + '%';
+                
+                const closeToTray = await pywebview.api.get_close_to_tray();
+                document.getElementById('closeToTrayToggle').checked = closeToTray;
+                
+                const dynamicResources = await pywebview.api.get_dynamic_resources();
+                document.getElementById('dynamicResourcesToggle').checked = dynamicResources;
+                
+                const showUnmatchedSetting = await pywebview.api.get_show_unmatched();
+                showUnmatched = showUnmatchedSetting;
+                document.getElementById('showUnmatchedToggle').checked = showUnmatchedSetting;
+                
+                const gridSize = await pywebview.api.get_grid_size();
+                document.getElementById('sizeSlider').value = gridSize;
+                document.getElementById('photoGrid').style.gridTemplateColumns = 
+                    `repeat(auto-fill, minmax(${gridSize}px, 1fr))`;
+                
+                addLogEntry('Settings loaded successfully');
+            } catch (error) {
+                console.error('Error loading settings:', error);
+                addLogEntry('ERROR: Failed to load settings - ' + error);
+            }
+        }
+
         async function initialize() {
             try {
                 addLogEntry('Application started');
@@ -542,15 +570,7 @@
                 
                 addLogEntry(`System: PyTorch ${sysInfo.pytorch_version}, ${sysInfo.gpu_available ? 'GPU' : 'CPU'}, CUDA ${sysInfo.cuda_version}`);
                 
-                const threshold = await pywebview.api.get_threshold();
-                document.getElementById('thresholdSlider').value = threshold;
-                document.getElementById('thresholdValue').textContent = threshold + '%';
-                
-                const closeToTray = await pywebview.api.get_close_to_tray();
-                document.getElementById('closeToTrayToggle').checked = closeToTray;
-                
-                const dynamicResources = await pywebview.api.get_dynamic_resources();
-                document.getElementById('dynamicResourcesToggle').checked = dynamicResources;
+                await loadAllSettings();
                 
                 document.getElementById('progressSection').style.display = 'flex';
                 
@@ -567,6 +587,7 @@
             const size = e.target.value;
             document.getElementById('photoGrid').style.gridTemplateColumns = 
                 `repeat(auto-fill, minmax(${size}px, 1fr))`;
+            pywebview.api.set_grid_size(parseInt(size));
         });
 
         const appContainer = document.getElementById('appContainer');
@@ -635,7 +656,9 @@
 
         document.getElementById('showUnmatchedToggle').addEventListener('change', (e) => {
             showUnmatched = e.target.checked;
+            pywebview.api.set_show_unmatched(e.target.checked);
             renderPeopleList();
+            addLogEntry('Show unmatched faces: ' + (e.target.checked ? 'enabled' : 'disabled'));
         });
 
         document.getElementById('closeToTrayToggle').addEventListener('change', (e) => {

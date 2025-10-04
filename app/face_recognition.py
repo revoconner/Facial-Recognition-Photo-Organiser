@@ -26,6 +26,54 @@ GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
 
 
+class Settings:
+    def __init__(self, settings_path: str):
+        self.settings_path = Path(settings_path)
+        self.settings_file = self.settings_path / "settings.json"
+        self.settings_path.mkdir(parents=True, exist_ok=True)
+        
+        self.defaults = {
+            'threshold': 50,
+            'close_to_tray': True,
+            'dynamic_resources': True,
+            'show_unmatched': False,
+            'grid_size': 180,
+            'window_width': 1200,
+            'window_height': 800
+        }
+        
+        self.settings = self.load()
+    
+    def load(self) -> dict:
+        try:
+            if self.settings_file.exists():
+                with open(self.settings_file, 'r') as f:
+                    loaded = json.load(f)
+                    return {**self.defaults, **loaded}
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+        
+        return self.defaults.copy()
+    
+    def save(self):
+        try:
+            with open(self.settings_file, 'w') as f:
+                json.dump(self.settings, f, indent=4)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+    
+    def get(self, key: str, default=None):
+        return self.settings.get(key, default)
+    
+    def set(self, key: str, value):
+        self.settings[key] = value
+        self.save()
+    
+    def update(self, updates: dict):
+        self.settings.update(updates)
+        self.save()
+
+
 class FaceDatabase:
     def __init__(self, db_folder: str):
         self.db_folder = Path(db_folder)
@@ -530,9 +578,10 @@ def create_tray_icon():
 
 
 class API:
-    def __init__(self, location: str, threshold: float):
+    def __init__(self, location: str, settings: Settings):
         self._location = location
-        self._threshold = threshold
+        self._settings = settings
+        self._threshold = settings.get('threshold', 50)
         
         script_dir = Path(__file__).parent.resolve()
         db_path = script_dir / "face_data"
@@ -543,9 +592,9 @@ class API:
         self._scan_worker = None
         self._cluster_worker = None
         self._tray_icon = None
-        self._close_to_tray = True
+        self._close_to_tray = settings.get('close_to_tray', True)
         self._quit_flag = False
-        self._dynamic_resources = True
+        self._dynamic_resources = settings.get('dynamic_resources', True)
         self._window_foreground = True
     
     def set_window(self, window):
@@ -695,9 +744,11 @@ class API:
     
     def set_threshold(self, value):
         self._threshold = value
+        self._settings.set('threshold', value)
     
     def recalibrate(self, threshold):
         self._threshold = threshold
+        self._settings.set('threshold', threshold)
         self.start_clustering()
     
     def get_people(self):
@@ -806,6 +857,7 @@ class API:
     
     def set_close_to_tray(self, enabled):
         self._close_to_tray = enabled
+        self._settings.set('close_to_tray', enabled)
         if enabled:
             if not self._tray_icon or not self._tray_icon.visible:
                 self._setup_tray()
@@ -822,10 +874,23 @@ class API:
     
     def set_dynamic_resources(self, enabled):
         self._dynamic_resources = enabled
+        self._settings.set('dynamic_resources', enabled)
         if enabled:
             self.update_status("Dynamic resource management enabled - will throttle when in background")
         else:
             self.update_status("Dynamic resource management disabled - full speed always")
+    
+    def get_show_unmatched(self):
+        return self._settings.get('show_unmatched', False)
+    
+    def set_show_unmatched(self, enabled):
+        self._settings.set('show_unmatched', enabled)
+    
+    def get_grid_size(self):
+        return self._settings.get('grid_size', 180)
+    
+    def set_grid_size(self, size):
+        self._settings.set('grid_size', size)
     
     def is_window_foreground(self):
         return self._window_foreground
@@ -904,7 +969,7 @@ class API:
 
 def main():
     parser = argparse.ArgumentParser(description='Face Recognition Photo Organizer')
-    parser.add_argument('-threshold', type=int, required=True, 
+    parser.add_argument('-threshold', type=int, required=False, 
                        help='Recognition threshold (0-100, recommended: 30-50)')
     parser.add_argument('-location', type=str, required=True,
                        help='Root folder containing photos')
@@ -915,9 +980,15 @@ def main():
         print(f"Error: Location '{args.location}' does not exist")
         sys.exit(1)
     
-    if args.threshold < 0 or args.threshold > 100:
-        print("Error: Threshold must be between 0 and 100")
-        sys.exit(1)
+    script_dir = Path(__file__).parent.resolve()
+    settings_path = script_dir / "face_data"
+    settings = Settings(str(settings_path))
+    
+    if args.threshold is not None:
+        if args.threshold < 0 or args.threshold > 100:
+            print("Error: Threshold must be between 0 and 100")
+            sys.exit(1)
+        settings.set('threshold', args.threshold)
     
     print("=" * 60)
     print("Face Recognition Photo Organizer")
@@ -928,17 +999,18 @@ def main():
         print(f"CUDA version: {torch.version.cuda}")
         print(f"GPU device: {torch.cuda.get_device_name(0)}")
     print(f"Scan location: {args.location}")
-    print(f"Initial threshold: {args.threshold}%")
+    print(f"Initial threshold: {settings.get('threshold')}%")
+    print(f"Settings loaded from: {settings.settings_file}")
     print("=" * 60)
     
-    api = API(args.location, args.threshold)
+    api = API(args.location, settings)
     
     window = webview.create_window(
         'Face Recognition Photo Organizer',
         'ui.html',
         js_api=api,
-        width=1200,
-        height=800,
+        width=settings.get('window_width', 1200),
+        height=settings.get('window_height', 800),
         resizable=True,
         frameless=True,
         easy_drag=False
