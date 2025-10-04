@@ -940,7 +940,8 @@ def main():
         width=1200,
         height=800,
         resizable=True,
-        frameless=True
+        frameless=True,
+        easy_drag=False
     )
     
     api.set_window(window)
