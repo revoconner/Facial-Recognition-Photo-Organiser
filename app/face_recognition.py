@@ -9,6 +9,7 @@ import threading
 import json
 import base64
 import time
+import fnmatch
 from pathlib import Path
 from typing import List, Optional, Tuple, Set
 import numpy as np
@@ -316,13 +317,59 @@ class FaceDatabase:
 
 
 class ScanWorker(threading.Thread):
-    def __init__(self, db: FaceDatabase, location: str, api):
+    def __init__(self, db: FaceDatabase, api):
         super().__init__()
         self.db = db
-        self.location = location
         self.api = api
         self.face_app = None
         self.daemon = True
+    
+    def should_exclude_path(self, path: str) -> bool:
+        include_folders = self.api.get_include_folders()
+        exclude_folders = self.api.get_exclude_folders()
+        wildcard_text = self.api.get_wildcard_exclusions()
+        
+        path_normalized = os.path.normpath(path)
+        
+        if not include_folders:
+            return False
+        
+        is_in_include = False
+        for include_folder in include_folders:
+            include_normalized = os.path.normpath(include_folder)
+            if path_normalized.startswith(include_normalized):
+                is_in_include = True
+                break
+        
+        if not is_in_include:
+            return True
+        
+        for exclude_folder in exclude_folders:
+            exclude_normalized = os.path.normpath(exclude_folder)
+            if path_normalized.startswith(exclude_normalized):
+                return True
+        
+        if wildcard_text:
+            wildcards = [w.strip() for w in wildcard_text.split(',') if w.strip()]
+            
+            for wildcard in wildcards:
+                wildcard_normalized = os.path.normpath(wildcard)
+                
+                if os.path.isabs(wildcard_normalized):
+                    if path_normalized.startswith(wildcard_normalized):
+                        return True
+                else:
+                    path_parts = path_normalized.split(os.sep)
+                    filename = os.path.basename(path_normalized)
+                    
+                    if fnmatch.fnmatch(filename, wildcard):
+                        return True
+                    
+                    for part in path_parts:
+                        if fnmatch.fnmatch(part, wildcard):
+                            return True
+        
+        return False
     
     def run(self):
         try:
@@ -334,14 +381,39 @@ class ScanWorker(threading.Thread):
             self.api.update_status(f"Error loading model: {e}")
             return
         
+        include_folders = self.api.get_include_folders()
+        
+        if not include_folders:
+            self.api.update_status("No folders configured for scanning")
+            self.api.update_status("Please add folders in Settings > Folders to Scan")
+            self.api.scan_complete()
+            return
+        
         image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
         
         self.api.update_status("Discovering photos...")
         all_image_files = set()
-        for root, dirs, files in os.walk(self.location):
-            for file in files:
-                if Path(file).suffix.lower() in image_extensions:
-                    all_image_files.add(os.path.join(root, file))
+        
+        for location in include_folders:
+            if not os.path.exists(location):
+                self.api.update_status(f"WARNING: Folder does not exist: {location}")
+                continue
+            
+            self.api.update_status(f"Scanning folder: {location}")
+            
+            for root, dirs, files in os.walk(location):
+                if self.should_exclude_path(root):
+                    dirs.clear()
+                    continue
+                
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    
+                    if Path(file).suffix.lower() in image_extensions:
+                        if not self.should_exclude_path(file_path):
+                            all_image_files.add(file_path)
+        
+        self.api.update_status(f"Found {len(all_image_files)} images after applying exclusions")
         
         self.api.update_status("Cleaning up deleted photos from database...")
         deleted_count = self.db.remove_deleted_photos(all_image_files)
@@ -581,8 +653,7 @@ def create_tray_icon():
 
 
 class API:
-    def __init__(self, location: str, settings: Settings):
-        self._location = location
+    def __init__(self, settings: Settings):
         self._settings = settings
         self._threshold = settings.get('threshold', 50)
         
@@ -733,7 +804,7 @@ class API:
     
     def start_scanning(self):
         if self._scan_worker is None or not self._scan_worker.is_alive():
-            self._scan_worker = ScanWorker(self._db, self._location, self)
+            self._scan_worker = ScanWorker(self._db, self)
             self._scan_worker.start()
     
     def start_clustering(self):
@@ -913,6 +984,16 @@ class API:
     def set_wildcard_exclusions(self, wildcards):
         self._settings.set('wildcard_exclusions', wildcards)
     
+    def select_folder(self):
+        try:
+            result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+            if result and len(result) > 0:
+                return result[0]
+            return None
+        except Exception as e:
+            print(f"Error selecting folder: {e}")
+            return None
+    
     def is_window_foreground(self):
         return self._window_foreground
     
@@ -979,16 +1060,6 @@ class API:
             exit_thread = threading.Thread(target=force_exit, daemon=True)
             exit_thread.start()
     
-    def select_folder(self):
-        try:
-            result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
-            if result and len(result) > 0:
-                return result[0]
-            return None
-        except Exception as e:
-            print(f"Error selecting folder: {e}")
-            return None
-    
     def close(self):
         if self._tray_icon:
             try:
@@ -999,28 +1070,6 @@ class API:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Face Recognition Photo Organizer')
-    parser.add_argument('-threshold', type=int, required=False, 
-                       help='Recognition threshold (0-100, recommended: 30-50)')
-    parser.add_argument('-location', type=str, required=True,
-                       help='Root folder containing photos')
-    
-    args = parser.parse_args()
-    
-    if not os.path.exists(args.location):
-        print(f"Error: Location '{args.location}' does not exist")
-        sys.exit(1)
-    
-    script_dir = Path(__file__).parent.resolve()
-    settings_path = script_dir / "face_data"
-    settings = Settings(str(settings_path))
-    
-    if args.threshold is not None:
-        if args.threshold < 0 or args.threshold > 100:
-            print("Error: Threshold must be between 0 and 100")
-            sys.exit(1)
-        settings.set('threshold', args.threshold)
-    
     print("=" * 60)
     print("Face Recognition Photo Organizer")
     print("=" * 60)
@@ -1029,12 +1078,20 @@ def main():
     if GPU_AVAILABLE:
         print(f"CUDA version: {torch.version.cuda}")
         print(f"GPU device: {torch.cuda.get_device_name(0)}")
-    print(f"Scan location: {args.location}")
-    print(f"Initial threshold: {settings.get('threshold')}%")
-    print(f"Settings loaded from: {settings.settings_file}")
     print("=" * 60)
     
-    api = API(args.location, settings)
+    script_dir = Path(__file__).parent.resolve()
+    settings_path = script_dir / "face_data"
+    settings = Settings(str(settings_path))
+    
+    print(f"Settings loaded from: {settings.settings_file}")
+    print(f"Threshold: {settings.get('threshold')}%")
+    print(f"Include folders: {settings.get('include_folders')}")
+    print(f"Exclude folders: {settings.get('exclude_folders')}")
+    print(f"Wildcard exclusions: {settings.get('wildcard_exclusions')}")
+    print("=" * 60)
+    
+    api = API(settings)
     
     window = webview.create_window(
         'Face Recognition Photo Organizer',
