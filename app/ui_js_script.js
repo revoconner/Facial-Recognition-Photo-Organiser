@@ -1,9 +1,10 @@
-let people = [];
+        let people = [];
         let currentPerson = null;
         let isAlphabetMode = false;
         let activeMenu = null;
         let showUnmatched = false;
         let showHidden = false;
+        let showDevOptions = false;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -74,7 +75,7 @@ let people = [];
                 const color = getPersonColor(person.id);
                 const initial = person.name.charAt(0);
                 
-                const tagInfo = person.tagged_count > 0 ? ` (${person.tagged_count}/${person.count} tagged)` : '';
+                const tagInfo = (showDevOptions && person.tagged_count > 0) ? ` (${person.tagged_count}/${person.count} tagged)` : '';
                 
                 item.innerHTML = `
                     <div class="person-avatar" style="background: linear-gradient(135deg, ${color} 0%, ${color}99 100%)">
@@ -94,19 +95,23 @@ let people = [];
                 const contextMenu = document.createElement('div');
                 contextMenu.className = 'context-menu';
                 
+                let menuHTML = '';
+                
                 if (person.is_hidden) {
-                    contextMenu.innerHTML = `
-                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>
-                        <div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>
-                        <div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>
-                    `;
+                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>`;
+                    if (showDevOptions) {
+                        menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
+                    }
+                    menuHTML += `<div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>`;
                 } else {
-                    contextMenu.innerHTML = `
-                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>
-                        <div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>
-                        <div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>
-                    `;
+                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>`;
+                    if (showDevOptions) {
+                        menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
+                    }
+                    menuHTML += `<div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>`;
                 }
+                
+                contextMenu.innerHTML = menuHTML;
                 
                 document.body.appendChild(contextMenu);
                 
@@ -272,6 +277,10 @@ let people = [];
                 showHidden = showHiddenSetting;
                 document.getElementById('showHiddenToggle').checked = showHiddenSetting;
                 
+                const showDevOptionsSetting = await pywebview.api.get_show_dev_options();
+                showDevOptions = showDevOptionsSetting;
+                document.getElementById('showDevOptionsToggle').checked = showDevOptionsSetting;
+                
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 document.getElementById('photoGrid').style.gridTemplateColumns = 
@@ -401,6 +410,13 @@ let people = [];
             await pywebview.api.set_show_hidden(e.target.checked);
             await loadPeople();
             addLogEntry('Show hidden persons: ' + (e.target.checked ? 'enabled' : 'disabled'));
+        });
+
+        document.getElementById('showDevOptionsToggle').addEventListener('change', async (e) => {
+            showDevOptions = e.target.checked;
+            await pywebview.api.set_show_dev_options(e.target.checked);
+            await loadPeople();
+            addLogEntry('Show development options: ' + (e.target.checked ? 'enabled' : 'disabled'));
         });
 
         document.getElementById('closeToTrayToggle').addEventListener('change', (e) => {

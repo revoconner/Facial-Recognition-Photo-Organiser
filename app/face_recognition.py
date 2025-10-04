@@ -40,6 +40,7 @@ class Settings:
             'dynamic_resources': True,
             'show_unmatched': False,
             'show_hidden': False,
+            'show_dev_options': False,
             'grid_size': 180,
             'window_width': 1200,
             'window_height': 800,
@@ -1148,6 +1149,12 @@ class API:
     
     def set_show_hidden(self, enabled):
         self._settings.set('show_hidden', enabled)
+    
+    def get_show_dev_options(self):
+        return self._settings.get('show_dev_options', False)
+    
+    def set_show_dev_options(self, enabled):
+        self._settings.set('show_dev_options', enabled)
     
     def get_grid_size(self):
         return self._settings.get('grid_size', 180)
