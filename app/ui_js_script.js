@@ -1,9 +1,10 @@
-        let people = [];
+let people = [];
         let currentPerson = null;
         let isAlphabetMode = false;
         let activeMenu = null;
         let showUnmatched = false;
         let showHidden = false;
+        let showHiddenPhotos = false;
         let showDevOptions = false;
         let currentPhotoContext = null;
         let currentSortMode = 'names_asc';
@@ -294,8 +295,11 @@
                     const photoItem = document.createElement('div');
                     photoItem.className = 'photo-item';
                     photoItem.setAttribute('data-face-id', photo.face_id);
+                    
+                    const opacityStyle = photo.is_hidden ? 'opacity: 0.5; filter: grayscale(100%);' : '';
+                    
                     photoItem.innerHTML = `
-                        <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
+                        <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover; ${opacityStyle}">
                         <button class="kebab-menu">
                             <span class="kebab-dot"></span>
                             <span class="kebab-dot"></span>
@@ -305,11 +309,19 @@
                     
                     const contextMenu = document.createElement('div');
                     contextMenu.className = 'context-menu';
-                    contextMenu.innerHTML = `
-                        <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
-                        <div class="context-menu-item" data-action="remove-tag">Remove tag</div>
-                        <div class="context-menu-item" data-action="transfer-tag">Transfer tag to someone else</div>
-                    `;
+                    
+                    if (photo.is_hidden) {
+                        contextMenu.innerHTML = `
+                            <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                            <div class="context-menu-item" data-action="unhide-photo">Unhide photo</div>
+                        `;
+                    } else {
+                        contextMenu.innerHTML = `
+                            <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                            <div class="context-menu-item" data-action="hide-photo">Hide photo</div>
+                        `;
+                    }
+                    
                     document.body.appendChild(contextMenu);
                     
                     photoItem.addEventListener('dblclick', () => {
@@ -326,7 +338,8 @@
                         currentPhotoContext = {
                             person_name: currentPerson.name,
                             face_id: photo.face_id,
-                            path: photo.path
+                            path: photo.path,
+                            is_hidden: photo.is_hidden
                         };
                         
                         contextMenu.classList.add('show');
@@ -354,10 +367,10 @@
                             const action = menuItem.getAttribute('data-action');
                             if (action === 'make-primary') {
                                 makePrimaryPhoto();
-                            } else if (action === 'remove-tag') {
-                                removeTag();
-                            } else if (action === 'transfer-tag') {
-                                transferTag();
+                            } else if (action === 'hide-photo') {
+                                hidePhoto();
+                            } else if (action === 'unhide-photo') {
+                                unhidePhoto();
                             }
                         }
                     });
@@ -441,6 +454,10 @@
                 const showHiddenSetting = await pywebview.api.get_show_hidden();
                 showHidden = showHiddenSetting;
                 document.getElementById('showHiddenToggle').checked = showHiddenSetting;
+                
+                const showHiddenPhotosSetting = await pywebview.api.get_show_hidden_photos();
+                showHiddenPhotos = showHiddenPhotosSetting;
+                document.getElementById('showHiddenPhotosToggle').checked = showHiddenPhotosSetting;
                 
                 const showDevOptionsSetting = await pywebview.api.get_show_dev_options();
                 showDevOptions = showDevOptionsSetting;
@@ -697,6 +714,13 @@
             await pywebview.api.set_show_hidden(e.target.checked);
             await loadPeople();
             addLogEntry('Show hidden persons: ' + (e.target.checked ? 'enabled' : 'disabled'));
+        });
+
+        document.getElementById('showHiddenPhotosToggle').addEventListener('change', async (e) => {
+            showHiddenPhotos = e.target.checked;
+            await pywebview.api.set_show_hidden_photos(e.target.checked);
+            await reloadCurrentPhotos();
+            addLogEntry('Show hidden photos: ' + (e.target.checked ? 'enabled' : 'disabled'));
         });
 
         document.getElementById('showDevOptionsToggle').addEventListener('change', async (e) => {
@@ -991,15 +1015,45 @@
             currentPhotoContext = null;
         }
 
-        function removeTag() {
-            console.log('Remove tag');
+        async function hidePhoto() {
             closeAllMenus();
+            
+            if (!currentPhotoContext) {
+                addLogEntry('ERROR: No photo context available');
+                return;
+            }
+            
+            try {
+                const result = await pywebview.api.hide_photo(currentPhotoContext.face_id);
+                if (result.success) {
+                    addLogEntry(`Photo hidden: face_id ${currentPhotoContext.face_id}`);
+                }
+            } catch (error) {
+                console.error('Error hiding photo:', error);
+                addLogEntry('Error hiding photo: ' + error);
+            }
+            
             currentPhotoContext = null;
         }
 
-        function transferTag() {
-            console.log('Transfer tag');
+        async function unhidePhoto() {
             closeAllMenus();
+            
+            if (!currentPhotoContext) {
+                addLogEntry('ERROR: No photo context available');
+                return;
+            }
+            
+            try {
+                const result = await pywebview.api.unhide_photo(currentPhotoContext.face_id);
+                if (result.success) {
+                    addLogEntry(`Photo unhidden: face_id ${currentPhotoContext.face_id}`);
+                }
+            } catch (error) {
+                console.error('Error unhiding photo:', error);
+                addLogEntry('Error unhiding photo: ' + error);
+            }
+            
             currentPhotoContext = null;
         }
 

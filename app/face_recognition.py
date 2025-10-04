@@ -42,6 +42,7 @@ class Settings:
             'dynamic_resources': True,
             'show_unmatched': False,
             'show_hidden': False,
+            'show_hidden_photos': False,
             'show_dev_options': False,
             'grid_size': 180,
             'window_width': 1200,
@@ -160,6 +161,14 @@ class FaceDatabase:
         ''')
         
         cursor.execute('''
+            CREATE TABLE IF NOT EXISTS hidden_photos (
+                face_id INTEGER PRIMARY KEY,
+                hidden_at REAL DEFAULT (julianday('now')),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id)
+            )
+        ''')
+        
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS face_tags (
                 face_id INTEGER PRIMARY KEY,
                 tag_name TEXT NOT NULL,
@@ -182,6 +191,7 @@ class FaceDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_photos ON hidden_photos(face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tag_primary_photos ON tag_primary_photos(tag_name)')
         
@@ -246,6 +256,7 @@ class FaceDatabase:
                 face_placeholders = ','.join('?' * len(deleted_face_ids))
                 cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({face_placeholders})', deleted_face_ids)
                 cursor.execute(f'DELETE FROM tag_primary_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
+                cursor.execute(f'DELETE FROM hidden_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
             
             cursor.execute(f'DELETE FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
             cursor.execute(f'DELETE FROM photos WHERE photo_id IN ({placeholders})', deleted_photo_ids)
@@ -390,6 +401,27 @@ class FaceDatabase:
             SELECT person_id FROM hidden_persons
             WHERE clustering_id = ?
         ''', (clustering_id,))
+        return {row[0] for row in cursor.fetchall()}
+    
+    def hide_photo(self, face_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR IGNORE INTO hidden_photos (face_id)
+            VALUES (?)
+        ''', (face_id,))
+        self.conn.commit()
+    
+    def unhide_photo(self, face_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM hidden_photos 
+            WHERE face_id = ?
+        ''', (face_id,))
+        self.conn.commit()
+    
+    def get_hidden_photos(self) -> Set[int]:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT face_id FROM hidden_photos')
         return {row[0] for row in cursor.fetchall()}
     
     def set_primary_photo_for_tag(self, tag_name: str, face_id: int):
@@ -1076,6 +1108,18 @@ class API:
         if self._window:
             self._window.evaluate_js('loadPeople()')
     
+    def hide_photo(self, face_id):
+        self._db.hide_photo(face_id)
+        if self._window:
+            self._window.evaluate_js('reloadCurrentPhotos()')
+        return {'success': True}
+    
+    def unhide_photo(self, face_id):
+        self._db.unhide_photo(face_id)
+        if self._window:
+            self._window.evaluate_js('reloadCurrentPhotos()')
+        return {'success': True}
+    
     def rename_person(self, clustering_id, person_id, new_name):
         if not new_name or not new_name.strip():
             return {'success': False, 'message': 'Name cannot be empty'}
@@ -1121,13 +1165,20 @@ class API:
     
     def get_photos(self, clustering_id, person_id):
         photo_data = self._db.get_photos_by_person(clustering_id, person_id)
+        hidden_photos = self._db.get_hidden_photos()
+        show_hidden_photos = self._settings.get('show_hidden_photos', False)
         photos = []
         
         view_mode = self._settings.get('view_mode', 'entire_photo')
         
         for data in photo_data:
-            path = data['file_path']
             face_id = data['face_id']
+            is_hidden = face_id in hidden_photos
+            
+            if is_hidden and not show_hidden_photos:
+                continue
+            
+            path = data['file_path']
             bbox = None
             
             if view_mode == 'zoom_to_faces':
@@ -1139,7 +1190,8 @@ class API:
                     'path': path,
                     'thumbnail': thumbnail,
                     'name': os.path.basename(path),
-                    'face_id': face_id
+                    'face_id': face_id,
+                    'is_hidden': is_hidden
                 })
         
         return photos
@@ -1258,6 +1310,12 @@ class API:
     
     def set_show_hidden(self, enabled):
         self._settings.set('show_hidden', enabled)
+    
+    def get_show_hidden_photos(self):
+        return self._settings.get('show_hidden_photos', False)
+    
+    def set_show_hidden_photos(self, enabled):
+        self._settings.set('show_hidden_photos', enabled)
     
     def get_show_dev_options(self):
         return self._settings.get('show_dev_options', False)
