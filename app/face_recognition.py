@@ -17,6 +17,7 @@ import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
 from PIL import Image
+from io import BytesIO
 import networkx as nx
 import torch
 import webview
@@ -46,7 +47,8 @@ class Settings:
             'window_height': 800,
             'include_folders': [],
             'exclude_folders': [],
-            'wildcard_exclusions': ''
+            'wildcard_exclusions': '',
+            'view_mode': 'entire_photo'
         }
         
         self.settings = self.load()
@@ -116,6 +118,10 @@ class FaceDatabase:
             CREATE TABLE IF NOT EXISTS faces (
                 face_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 photo_id INTEGER NOT NULL,
+                bbox_x1 REAL,
+                bbox_y1 REAL,
+                bbox_x2 REAL,
+                bbox_y2 REAL,
                 FOREIGN KEY (photo_id) REFERENCES photos(photo_id)
             )
         ''')
@@ -242,9 +248,12 @@ class FaceDatabase:
         ''')
         return cursor.fetchone()[0]
     
-    def add_face(self, photo_id: int, embedding: np.ndarray) -> int:
+    def add_face(self, photo_id: int, embedding: np.ndarray, bbox: List[float]) -> int:
         cursor = self.conn.cursor()
-        cursor.execute('INSERT INTO faces (photo_id) VALUES (?)', (photo_id,))
+        cursor.execute('''
+            INSERT INTO faces (photo_id, bbox_x1, bbox_y1, bbox_x2, bbox_y2) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (photo_id, bbox[0], bbox[1], bbox[2], bbox[3]))
         self.conn.commit()
         face_id = cursor.lastrowid
         
@@ -324,16 +333,16 @@ class FaceDatabase:
         ''', (clustering_id, person_id))
         return [row[0] for row in cursor.fetchall()]
     
-    def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[str]:
+    def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[dict]:
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT DISTINCT p.file_path
+            SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
             FROM photos p
             JOIN faces f ON p.photo_id = f.photo_id
             JOIN cluster_assignments ca ON f.face_id = ca.face_id
             WHERE ca.clustering_id = ? AND ca.person_id = ?
         ''', (clustering_id, person_id))
-        return [row[0] for row in cursor.fetchall()]
+        return [dict(row) for row in cursor.fetchall()]
     
     def hide_person(self, clustering_id: int, person_id: int):
         cursor = self.conn.cursor()
@@ -647,7 +656,8 @@ class ScanWorker(threading.Thread):
             for face in faces:
                 embedding = face.embedding
                 embedding_norm = embedding / np.linalg.norm(embedding)
-                self.db.add_face(photo_id, embedding_norm)
+                bbox = face.bbox.tolist()
+                self.db.add_face(photo_id, embedding_norm, bbox)
             
             self.db.update_photo_status(photo_id, 'completed')
             
@@ -1032,27 +1042,48 @@ class API:
         return {'success': True, 'faces_untagged': len(face_ids)}
     
     def get_photos(self, clustering_id, person_id):
-        photo_paths = self._db.get_photos_by_person(clustering_id, person_id)
+        photo_data = self._db.get_photos_by_person(clustering_id, person_id)
         photos = []
         
-        for path in photo_paths:
-            thumbnail = self.create_thumbnail(path)
+        view_mode = self._settings.get('view_mode', 'entire_photo')
+        
+        for data in photo_data:
+            path = data['file_path']
+            face_id = data['face_id']
+            bbox = None
+            
+            if view_mode == 'zoom_to_faces':
+                bbox = [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']]
+            
+            thumbnail = self.create_thumbnail(path, bbox=bbox)
             if thumbnail:
                 photos.append({
                     'path': path,
                     'thumbnail': thumbnail,
-                    'name': os.path.basename(path)
+                    'name': os.path.basename(path),
+                    'face_id': face_id
                 })
         
         return photos
     
-    def create_thumbnail(self, image_path: str, size: int = 150) -> Optional[str]:
+    def create_thumbnail(self, image_path: str, size: int = 150, bbox: Optional[List[float]] = None) -> Optional[str]:
         try:
             img = Image.open(image_path)
+            
+            if bbox is not None:
+                x1, y1, x2, y2 = bbox
+                padding = 20
+                
+                x1 = max(0, x1 - padding)
+                y1 = max(0, y1 - padding)
+                x2 = min(img.width, x2 + padding)
+                y2 = min(img.height, y2 + padding)
+                
+                img = img.crop((int(x1), int(y1), int(x2), int(y2)))
+            
             img.thumbnail((size, size), Image.Resampling.LANCZOS)
             img_rgb = img.convert('RGB')
             
-            from io import BytesIO
             buffer = BytesIO()
             img_rgb.save(buffer, format='JPEG', quality=85)
             img_base64 = base64.b64encode(buffer.getvalue()).decode()
@@ -1179,6 +1210,14 @@ class API:
     
     def set_wildcard_exclusions(self, wildcards):
         self._settings.set('wildcard_exclusions', wildcards)
+    
+    def get_view_mode(self):
+        return self._settings.get('view_mode', 'entire_photo')
+    
+    def set_view_mode(self, mode):
+        self._settings.set('view_mode', mode)
+        if self._window:
+            self._window.evaluate_js('reloadCurrentPhotos()')
     
     def select_folder(self):
         try:

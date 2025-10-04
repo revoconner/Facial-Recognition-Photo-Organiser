@@ -1,4 +1,4 @@
-        let people = [];
+let people = [];
         let currentPerson = null;
         let isAlphabetMode = false;
         let activeMenu = null;
@@ -222,6 +222,12 @@
             }
         }
 
+        async function reloadCurrentPhotos() {
+            if (currentPerson) {
+                await loadPhotos(currentPerson.clustering_id, currentPerson.id);
+            }
+        }
+
         function updateStatusMessage(message) {
             document.getElementById('progressText').textContent = message;
             addLogEntry(message);
@@ -286,6 +292,9 @@
                 document.getElementById('photoGrid').style.gridTemplateColumns = 
                     `repeat(auto-fill, minmax(${gridSize}px, 1fr))`;
                 
+                const viewMode = await pywebview.api.get_view_mode();
+                document.getElementById('viewModeDropdown').value = viewMode;
+                
                 includeFolders = await pywebview.api.get_include_folders();
                 renderIncludeFolders();
                 
@@ -332,6 +341,18 @@
             document.getElementById('photoGrid').style.gridTemplateColumns = 
                 `repeat(auto-fill, minmax(${size}px, 1fr))`;
             pywebview.api.set_grid_size(parseInt(size));
+        });
+
+        document.getElementById('viewModeDropdown').addEventListener('change', async (e) => {
+            const mode = e.target.value;
+            try {
+                await pywebview.api.set_view_mode(mode);
+                const modeName = mode === 'entire_photo' ? 'entire photo' : 'zoomed to faces';
+                addLogEntry(`View mode changed to: ${modeName}`);
+            } catch (error) {
+                console.error('Error changing view mode:', error);
+                addLogEntry('ERROR: Failed to change view mode - ' + error);
+            }
         });
 
         const appContainer = document.getElementById('appContainer');
