@@ -166,12 +166,22 @@ class FaceDatabase:
             )
         ''')
         
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tag_primary_photos (
+                tag_name TEXT PRIMARY KEY,
+                face_id INTEGER NOT NULL,
+                set_at REAL DEFAULT (julianday('now')),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id)
+            )
+        ''')
+        
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_tag_primary_photos ON tag_primary_photos(tag_name)')
         
         self.conn.commit()
     
@@ -233,6 +243,7 @@ class FaceDatabase:
             if deleted_face_ids:
                 face_placeholders = ','.join('?' * len(deleted_face_ids))
                 cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({face_placeholders})', deleted_face_ids)
+                cursor.execute(f'DELETE FROM tag_primary_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
             
             cursor.execute(f'DELETE FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
             cursor.execute(f'DELETE FROM photos WHERE photo_id IN ({placeholders})', deleted_photo_ids)
@@ -344,6 +355,17 @@ class FaceDatabase:
         ''', (clustering_id, person_id))
         return [dict(row) for row in cursor.fetchall()]
     
+    def get_face_data(self, face_id: int) -> Optional[dict]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT f.face_id, f.photo_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2, p.file_path
+            FROM faces f
+            JOIN photos p ON f.photo_id = p.photo_id
+            WHERE f.face_id = ?
+        ''', (face_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    
     def hide_person(self, clustering_id: int, person_id: int):
         cursor = self.conn.cursor()
         cursor.execute('''
@@ -367,6 +389,32 @@ class FaceDatabase:
             WHERE clustering_id = ?
         ''', (clustering_id,))
         return {row[0] for row in cursor.fetchall()}
+    
+    def set_primary_photo_for_tag(self, tag_name: str, face_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO tag_primary_photos (tag_name, face_id)
+            VALUES (?, ?)
+        ''', (tag_name, face_id))
+        self.conn.commit()
+    
+    def get_primary_photo_for_tag(self, tag_name: str) -> Optional[int]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT face_id FROM tag_primary_photos
+            WHERE tag_name = ?
+        ''', (tag_name,))
+        row = cursor.fetchone()
+        if row:
+            face_id = row[0]
+            face_data = self.get_face_data(face_id)
+            if face_data:
+                return face_id
+            else:
+                cursor.execute('DELETE FROM tag_primary_photos WHERE tag_name = ?', (tag_name,))
+                self.conn.commit()
+                return None
+        return None
     
     def tag_faces(self, face_ids: List[int], tag_name: str):
         cursor = self.conn.cursor()
@@ -989,13 +1037,29 @@ class API:
             if is_hidden:
                 name += " (hidden)"
             
+            primary_face_id = None
+            if tag_summary:
+                primary_face_id = self._db.get_primary_photo_for_tag(tag_summary['name'])
+            
+            if not primary_face_id and face_ids:
+                primary_face_id = face_ids[0]
+            
+            thumbnail = None
+            if primary_face_id:
+                face_data = self._db.get_face_data(primary_face_id)
+                if face_data:
+                    bbox = [face_data['bbox_x1'], face_data['bbox_y1'], 
+                           face_data['bbox_x2'], face_data['bbox_y2']]
+                    thumbnail = self.create_thumbnail(face_data['file_path'], size=80, bbox=bbox)
+            
             result.append({
                 'id': person_id,
                 'name': name,
                 'count': face_count,
                 'tagged_count': tagged_count,
                 'clustering_id': clustering_id,
-                'is_hidden': is_hidden
+                'is_hidden': is_hidden,
+                'thumbnail': thumbnail
             })
         
         return result
@@ -1040,6 +1104,18 @@ class API:
             self._window.evaluate_js('loadPeople()')
         
         return {'success': True, 'faces_untagged': len(face_ids)}
+    
+    def set_primary_photo(self, tag_name, face_id):
+        try:
+            if not tag_name or tag_name.startswith('Person ') or tag_name == 'Unmatched Faces':
+                return {'success': False, 'message': 'Please name this person before setting a primary photo'}
+            
+            self._db.set_primary_photo_for_tag(tag_name, face_id)
+            if self._window:
+                self._window.evaluate_js('loadPeople()')
+            return {'success': True, 'message': 'Primary photo set successfully'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
     
     def get_photos(self, clustering_id, person_id):
         photo_data = self._db.get_photos_by_person(clustering_id, person_id)

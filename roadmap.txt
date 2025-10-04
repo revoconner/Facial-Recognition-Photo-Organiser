@@ -1,6 +1,5 @@
-zoom to faces - persistent but universal to all 
 sort by names - 
 sorty by photos - 
 hide people with less than X photos - Toggle to show - name has (< X photos), can still be hidden by hide user
-people with faces instead of initial - make primary photo option (if viable)
 show alphabet list (only if sorted by name)
+Remove Tag - Transfer Tag will be done in V2

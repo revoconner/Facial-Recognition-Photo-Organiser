@@ -5,6 +5,7 @@ let people = [];
         let showUnmatched = false;
         let showHidden = false;
         let showDevOptions = false;
+        let currentPhotoContext = null;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -77,10 +78,15 @@ let people = [];
                 
                 const tagInfo = (showDevOptions && person.tagged_count > 0) ? ` (${person.tagged_count}/${person.count} tagged)` : '';
                 
+                let avatarHTML;
+                if (person.thumbnail) {
+                    avatarHTML = `<img src="${person.thumbnail}" class="person-avatar" style="width: 44px; height: 44px; object-fit: cover;">`;
+                } else {
+                    avatarHTML = `<div class="person-avatar" style="background: linear-gradient(135deg, ${color} 0%, ${color}99 100%)">${initial}</div>`;
+                }
+                
                 item.innerHTML = `
-                    <div class="person-avatar" style="background: linear-gradient(135deg, ${color} 0%, ${color}99 100%)">
-                        ${initial}
-                    </div>
+                    ${avatarHTML}
                     <div class="person-info">
                         <div class="person-name">${person.name}</div>
                         <div class="person-count">${person.count} photos${tagInfo}</div>
@@ -178,6 +184,7 @@ let people = [];
                 photos.forEach(photo => {
                     const photoItem = document.createElement('div');
                     photoItem.className = 'photo-item';
+                    photoItem.setAttribute('data-face-id', photo.face_id);
                     photoItem.innerHTML = `
                         <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
                         <button class="kebab-menu">
@@ -190,9 +197,9 @@ let people = [];
                     const contextMenu = document.createElement('div');
                     contextMenu.className = 'context-menu';
                     contextMenu.innerHTML = `
-                        <div class="context-menu-item" onclick="makePrimaryPhoto()">Make primary photo</div>
-                        <div class="context-menu-item" onclick="removeTag()">Remove tag</div>
-                        <div class="context-menu-item" onclick="transferTag()">Transfer tag to someone else</div>
+                        <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                        <div class="context-menu-item" data-action="remove-tag">Remove tag</div>
+                        <div class="context-menu-item" data-action="transfer-tag">Transfer tag to someone else</div>
                     `;
                     document.body.appendChild(contextMenu);
                     
@@ -206,10 +213,31 @@ let people = [];
                     kebabBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         closeAllMenus();
+                        
+                        currentPhotoContext = {
+                            person_name: currentPerson.name,
+                            face_id: photo.face_id,
+                            path: photo.path
+                        };
+                        
                         contextMenu.classList.add('show');
                         photoItem.classList.add('menu-active');
                         activeMenu = { element: contextMenu, parent: photoItem };
                         positionMenu(contextMenu, kebabBtn);
+                    });
+
+                    contextMenu.addEventListener('click', (e) => {
+                        const menuItem = e.target.closest('.context-menu-item');
+                        if (menuItem) {
+                            const action = menuItem.getAttribute('data-action');
+                            if (action === 'make-primary') {
+                                makePrimaryPhoto();
+                            } else if (action === 'remove-tag') {
+                                removeTag();
+                            } else if (action === 'transfer-tag') {
+                                transferTag();
+                            }
+                        }
                     });
 
                     contextMenu.addEventListener('mouseleave', () => {
@@ -694,19 +722,47 @@ let people = [];
             }
         }
 
-        function makePrimaryPhoto() {
-            console.log('Make primary photo');
+        async function makePrimaryPhoto() {
             closeAllMenus();
+            
+            if (!currentPhotoContext) {
+                addLogEntry('ERROR: No photo context available');
+                return;
+            }
+            
+            const cleanName = currentPhotoContext.person_name.replace(' (hidden)', '');
+            
+            try {
+                const result = await pywebview.api.set_primary_photo(
+                    cleanName,
+                    currentPhotoContext.face_id
+                );
+                
+                if (result.success) {
+                    addLogEntry(`Primary photo set for ${cleanName}`);
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                    alert(result.message);
+                }
+            } catch (error) {
+                console.error('Error setting primary photo:', error);
+                addLogEntry('Error setting primary photo: ' + error);
+                alert('Error setting primary photo');
+            }
+            
+            currentPhotoContext = null;
         }
 
         function removeTag() {
             console.log('Remove tag');
             closeAllMenus();
+            currentPhotoContext = null;
         }
 
         function transferTag() {
             console.log('Transfer tag');
             closeAllMenus();
+            currentPhotoContext = null;
         }
 
         function closeAllMenus() {
