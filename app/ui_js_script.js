@@ -94,12 +94,12 @@ let people = [];
                 
                 if (person.is_hidden) {
                     contextMenu.innerHTML = `
-                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name}')">Rename</div>
+                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>
                         <div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>
                     `;
                 } else {
                     contextMenu.innerHTML = `
-                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name}')">Rename</div>
+                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>
                         <div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>
                     `;
                 }
@@ -579,9 +579,36 @@ let people = [];
             }
         });
 
-        async function renamePerson(clusteringId, personId, name) {
-            console.log('Rename person:', clusteringId, personId, name);
+        async function renamePerson(clusteringId, personId, currentName) {
             closeAllMenus();
+            
+            const cleanName = currentName.replace(' (hidden)', '');
+            
+            const newName = prompt('Enter new name for this person:', cleanName);
+            
+            if (newName === null) {
+                return;
+            }
+            
+            if (newName.trim() === '') {
+                addLogEntry('ERROR: Person name cannot be empty');
+                alert('Name cannot be empty');
+                return;
+            }
+            
+            try {
+                const result = await pywebview.api.rename_person(clusteringId, personId, newName.trim());
+                if (result.success) {
+                    addLogEntry(`Person renamed from "${cleanName}" to "${newName.trim()}"`);
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error renaming person:', error);
+                addLogEntry('Error renaming person: ' + error);
+                alert('Error renaming person');
+            }
         }
 
         async function hidePerson(clusteringId, personId) {

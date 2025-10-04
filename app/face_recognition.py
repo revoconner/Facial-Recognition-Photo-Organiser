@@ -149,11 +149,23 @@ class FaceDatabase:
             )
         ''')
         
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS person_names (
+                clustering_id INTEGER NOT NULL,
+                person_id INTEGER NOT NULL,
+                custom_name TEXT NOT NULL,
+                renamed_at REAL DEFAULT (julianday('now')),
+                PRIMARY KEY (clustering_id, person_id),
+                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
+            )
+        ''')
+        
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_person_names ON person_names(clustering_id)')
         
         self.conn.commit()
     
@@ -330,6 +342,23 @@ class FaceDatabase:
             WHERE clustering_id = ?
         ''', (clustering_id,))
         return {row[0] for row in cursor.fetchall()}
+    
+    def rename_person(self, clustering_id: int, person_id: int, custom_name: str):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO person_names (clustering_id, person_id, custom_name)
+            VALUES (?, ?, ?)
+        ''', (clustering_id, person_id, custom_name))
+        self.conn.commit()
+    
+    def get_person_name(self, clustering_id: int, person_id: int) -> Optional[str]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT custom_name FROM person_names
+            WHERE clustering_id = ? AND person_id = ?
+        ''', (clustering_id, person_id))
+        row = cursor.fetchone()
+        return row[0] if row else None
     
     def update_photo_status(self, photo_id: int, status: str):
         cursor = self.conn.cursor()
@@ -887,12 +916,17 @@ class API:
             if is_hidden and not show_hidden:
                 continue
             
-            if person_id > 0:
+            custom_name = self._db.get_person_name(clustering_id, person_id)
+            
+            if custom_name:
+                name = custom_name
+            elif person_id > 0:
                 name = f"Person {person_id}"
-                if is_hidden:
-                    name += " (hidden)"
             else:
                 name = "Unmatched Faces"
+            
+            if is_hidden:
+                name += " (hidden)"
             
             result.append({
                 'id': person_id,
@@ -913,6 +947,18 @@ class API:
         self._db.unhide_person(clustering_id, person_id)
         if self._window:
             self._window.evaluate_js('loadPeople()')
+    
+    def rename_person(self, clustering_id, person_id, new_name):
+        if not new_name or not new_name.strip():
+            return {'success': False, 'message': 'Name cannot be empty'}
+        
+        new_name = new_name.strip()
+        self._db.rename_person(clustering_id, person_id, new_name)
+        
+        if self._window:
+            self._window.evaluate_js('loadPeople()')
+        
+        return {'success': True}
     
     def get_photos(self, clustering_id, person_id):
         photo_paths = self._db.get_photos_by_person(clustering_id, person_id)
