@@ -17,6 +17,7 @@ import numpy as np
 import cv2
 from insightface.app import FaceAnalysis
 from PIL import Image
+import pillow_heif
 from io import BytesIO
 import networkx as nx
 import torch
