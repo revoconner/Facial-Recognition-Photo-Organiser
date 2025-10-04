@@ -275,6 +275,10 @@
                         </div>
                         <input type="text" class="wildcard-input" id="wildcardInput" placeholder="e.g., *.gif, *thumbnail, *C:\Photos\private photos ">
                     </div>
+                    
+                    <div class="folder-section">
+                        <button class="recalibrate-btn" id="rescanBtn" style="width: 100%; padding: 12px;">Rescan For Changes</button>
+                    </div>
                 </div>
                 
                 <div class="content-panel" id="log-panel">
@@ -843,6 +847,20 @@
             } catch (error) {
                 console.error('Error saving wildcard exclusions:', error);
                 addLogEntry('Error saving wildcard exclusions: ' + error);
+            }
+        });
+
+        document.getElementById('rescanBtn').addEventListener('click', async () => {
+            updateStatusMessage('Starting folder rescan...');
+            document.getElementById('progressSection').style.display = 'flex';
+            closeSettings();
+            
+            try {
+                await pywebview.api.start_scanning();
+                addLogEntry('Manual rescan initiated');
+            } catch (error) {
+                console.error('Error starting rescan:', error);
+                addLogEntry('Error starting rescan: ' + error);
             }
         });
 

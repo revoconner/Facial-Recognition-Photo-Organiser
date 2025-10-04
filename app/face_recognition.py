@@ -420,6 +420,8 @@ class ScanWorker(threading.Thread):
         if deleted_count > 0:
             self.api.update_status(f"Removed {deleted_count} deleted photos from database")
         
+        self.api.set_photos_deleted(deleted_count > 0)
+        
         scanned_paths = self.db.get_all_scanned_paths()
         pending_paths_all = self.db.get_pending_and_error_paths()
         pending_paths = set(p for p in pending_paths_all if os.path.exists(p))
@@ -773,8 +775,9 @@ class API:
         active_clustering = self._db.get_active_clustering()
         has_existing_clustering = active_clustering is not None
         new_photos_found = getattr(self, '_new_photos_found', False)
+        photos_deleted = getattr(self, '_photos_deleted', False)
         
-        should_recalibrate = new_photos_found or not has_existing_clustering
+        should_recalibrate = new_photos_found or photos_deleted or not has_existing_clustering
         
         if should_recalibrate:
             self.update_status("Database updated successfully")
@@ -787,6 +790,9 @@ class API:
     
     def set_new_photos_found(self, found):
         self._new_photos_found = found
+    
+    def set_photos_deleted(self, deleted):
+        self._photos_deleted = deleted
     
     def cluster_complete(self):
         if self._window:
