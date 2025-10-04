@@ -958,6 +958,16 @@ class API:
             exit_thread = threading.Thread(target=force_exit, daemon=True)
             exit_thread.start()
     
+    def select_folder(self):
+        try:
+            result = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+            if result and len(result) > 0:
+                return result[0]
+            return None
+        except Exception as e:
+            print(f"Error selecting folder: {e}")
+            return None
+    
     def close(self):
         if self._tray_icon:
             try:
