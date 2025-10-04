@@ -1,8 +1,9 @@
-        let people = [];
+let people = [];
         let currentPerson = null;
         let isAlphabetMode = false;
         let activeMenu = null;
         let showUnmatched = false;
+        let showHidden = false;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -90,10 +91,19 @@
                 
                 const contextMenu = document.createElement('div');
                 contextMenu.className = 'context-menu';
-                contextMenu.innerHTML = `
-                    <div class="context-menu-item" onclick="renamePerson('${person.name}')">Rename</div>
-                    <div class="context-menu-item" onclick="hidePerson('${person.name}')">Hide person</div>
-                `;
+                
+                if (person.is_hidden) {
+                    contextMenu.innerHTML = `
+                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name}')">Rename</div>
+                        <div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>
+                    `;
+                } else {
+                    contextMenu.innerHTML = `
+                        <div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name}')">Rename</div>
+                        <div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>
+                    `;
+                }
+                
                 document.body.appendChild(contextMenu);
                 
                 item.addEventListener('click', (e) => {
@@ -254,6 +264,10 @@
                 showUnmatched = showUnmatchedSetting;
                 document.getElementById('showUnmatchedToggle').checked = showUnmatchedSetting;
                 
+                const showHiddenSetting = await pywebview.api.get_show_hidden();
+                showHidden = showHiddenSetting;
+                document.getElementById('showHiddenToggle').checked = showHiddenSetting;
+                
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 document.getElementById('photoGrid').style.gridTemplateColumns = 
@@ -376,6 +390,13 @@
             pywebview.api.set_show_unmatched(e.target.checked);
             renderPeopleList();
             addLogEntry('Show unmatched faces: ' + (e.target.checked ? 'enabled' : 'disabled'));
+        });
+
+        document.getElementById('showHiddenToggle').addEventListener('change', async (e) => {
+            showHidden = e.target.checked;
+            await pywebview.api.set_show_hidden(e.target.checked);
+            await loadPeople();
+            addLogEntry('Show hidden persons: ' + (e.target.checked ? 'enabled' : 'disabled'));
         });
 
         document.getElementById('closeToTrayToggle').addEventListener('change', (e) => {
@@ -558,14 +579,31 @@
             }
         });
 
-        function renamePerson(name) {
-            console.log('Rename person:', name);
+        async function renamePerson(clusteringId, personId, name) {
+            console.log('Rename person:', clusteringId, personId, name);
             closeAllMenus();
         }
 
-        function hidePerson(name) {
-            console.log('Hide person:', name);
-            closeAllMenus();
+        async function hidePerson(clusteringId, personId) {
+            try {
+                await pywebview.api.hide_person(clusteringId, personId);
+                addLogEntry('Person hidden: ' + personId);
+                closeAllMenus();
+            } catch (error) {
+                console.error('Error hiding person:', error);
+                addLogEntry('Error hiding person: ' + error);
+            }
+        }
+
+        async function unhidePerson(clusteringId, personId) {
+            try {
+                await pywebview.api.unhide_person(clusteringId, personId);
+                addLogEntry('Person unhidden: ' + personId);
+                closeAllMenus();
+            } catch (error) {
+                console.error('Error unhiding person:', error);
+                addLogEntry('Error unhiding person: ' + error);
+            }
         }
 
         function makePrimaryPhoto() {

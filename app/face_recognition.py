@@ -38,6 +38,7 @@ class Settings:
             'close_to_tray': True,
             'dynamic_resources': True,
             'show_unmatched': False,
+            'show_hidden': False,
             'grid_size': 180,
             'window_width': 1200,
             'window_height': 800,
@@ -138,10 +139,21 @@ class FaceDatabase:
             )
         ''')
         
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS hidden_persons (
+                clustering_id INTEGER NOT NULL,
+                person_id INTEGER NOT NULL,
+                hidden_at REAL DEFAULT (julianday('now')),
+                PRIMARY KEY (clustering_id, person_id),
+                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
+            )
+        ''')
+        
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
         
         self.conn.commit()
     
@@ -294,6 +306,30 @@ class FaceDatabase:
             WHERE ca.clustering_id = ? AND ca.person_id = ?
         ''', (clustering_id, person_id))
         return [row[0] for row in cursor.fetchall()]
+    
+    def hide_person(self, clustering_id: int, person_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR IGNORE INTO hidden_persons (clustering_id, person_id)
+            VALUES (?, ?)
+        ''', (clustering_id, person_id))
+        self.conn.commit()
+    
+    def unhide_person(self, clustering_id: int, person_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM hidden_persons 
+            WHERE clustering_id = ? AND person_id = ?
+        ''', (clustering_id, person_id))
+        self.conn.commit()
+    
+    def get_hidden_persons(self, clustering_id: int) -> Set[int]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT person_id FROM hidden_persons
+            WHERE clustering_id = ?
+        ''', (clustering_id,))
+        return {row[0] for row in cursor.fetchall()}
     
     def update_photo_status(self, photo_id: int, status: str):
         cursor = self.conn.cursor()
@@ -836,22 +872,47 @@ class API:
         if not clustering:
             return []
         
-        persons = self._db.get_persons_in_clustering(clustering['clustering_id'])
+        clustering_id = clustering['clustering_id']
+        persons = self._db.get_persons_in_clustering(clustering_id)
+        hidden_persons = self._db.get_hidden_persons(clustering_id)
+        show_hidden = self._settings.get('show_hidden', False)
+        
         result = []
         
         for person in persons:
             person_id = person['person_id']
             face_count = person['face_count']
+            is_hidden = person_id in hidden_persons
             
-            name = f"Person {person_id}" if person_id > 0 else "Unmatched Faces"
+            if is_hidden and not show_hidden:
+                continue
+            
+            if person_id > 0:
+                name = f"Person {person_id}"
+                if is_hidden:
+                    name += " (hidden)"
+            else:
+                name = "Unmatched Faces"
+            
             result.append({
                 'id': person_id,
                 'name': name,
                 'count': face_count,
-                'clustering_id': clustering['clustering_id']
+                'clustering_id': clustering_id,
+                'is_hidden': is_hidden
             })
         
         return result
+    
+    def hide_person(self, clustering_id, person_id):
+        self._db.hide_person(clustering_id, person_id)
+        if self._window:
+            self._window.evaluate_js('loadPeople()')
+    
+    def unhide_person(self, clustering_id, person_id):
+        self._db.unhide_person(clustering_id, person_id)
+        if self._window:
+            self._window.evaluate_js('loadPeople()')
     
     def get_photos(self, clustering_id, person_id):
         photo_paths = self._db.get_photos_by_person(clustering_id, person_id)
@@ -965,6 +1026,12 @@ class API:
     
     def set_show_unmatched(self, enabled):
         self._settings.set('show_unmatched', enabled)
+    
+    def get_show_hidden(self):
+        return self._settings.get('show_hidden', False)
+    
+    def set_show_hidden(self, enabled):
+        self._settings.set('show_hidden', enabled)
     
     def get_grid_size(self):
         return self._settings.get('grid_size', 180)
