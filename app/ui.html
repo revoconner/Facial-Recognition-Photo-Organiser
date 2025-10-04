@@ -228,8 +228,7 @@
                             </span>
                         </div>
                         <div class="folder-list-container" id="includeFolders">
-                            <div class="folder-item" data-path="C:\Windows">C:\Windows</div>
-                            <div class="folder-item" data-path="D:\Photos">D:\Photos</div>
+                            <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders added yet</div>
                         </div>
                         <div class="folder-controls">
                             <button class="folder-btn" id="addIncludeBtn">
@@ -252,7 +251,7 @@
                             </span>
                         </div>
                         <div class="folder-list-container" id="excludeFolders">
-                            <div class="folder-item" data-path="C:\Windows\System32">C:\Windows\System32</div>
+                            <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders excluded yet</div>
                         </div>
                         <div class="folder-controls">
                             <button class="folder-btn" id="addExcludeBtn">
@@ -264,6 +263,17 @@
                                 <span>Remove Folder</span>
                             </button>
                         </div>
+                    </div>
+                    
+                    <div class="folder-section">
+                        <div class="folder-section-title">
+                            <span>Wildcard Exclusion</span>
+                            <span class="info-icon">
+                                i
+                                <div class="tooltip">Use wildcards like *.jpg, *.gif with extension names or *thumbnail folder names to exclude them from being scanned, separated by commas</div>
+                            </span>
+                        </div>
+                        <input type="text" class="wildcard-input" id="wildcardInput" placeholder="e.g., *.gif, *thumbnail, *C:\Photos\private photos ">
                     </div>
                 </div>
                 
@@ -693,6 +703,123 @@
             } catch (error) {
                 console.error('Error saving log:', error);
                 addLogEntry('Error saving log: ' + error);
+            }
+        });
+
+        let selectedIncludeFolder = null;
+        let selectedExcludeFolder = null;
+        let includeFolders = [];
+        let excludeFolders = [];
+
+        function renderIncludeFolders() {
+            const container = document.getElementById('includeFolders');
+            container.innerHTML = '';
+            
+            if (includeFolders.length === 0) {
+                container.innerHTML = '<div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders added yet</div>';
+                return;
+            }
+            
+            includeFolders.forEach((folder, index) => {
+                const item = document.createElement('div');
+                item.className = 'folder-item';
+                item.setAttribute('data-path', folder);
+                item.textContent = folder;
+                
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('#includeFolders .folder-item').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    item.classList.add('selected');
+                    selectedIncludeFolder = index;
+                });
+                
+                container.appendChild(item);
+            });
+        }
+
+        function renderExcludeFolders() {
+            const container = document.getElementById('excludeFolders');
+            container.innerHTML = '';
+            
+            if (excludeFolders.length === 0) {
+                container.innerHTML = '<div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders excluded yet</div>';
+                return;
+            }
+            
+            excludeFolders.forEach((folder, index) => {
+                const item = document.createElement('div');
+                item.className = 'folder-item';
+                item.setAttribute('data-path', folder);
+                item.textContent = folder;
+                
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('#excludeFolders .folder-item').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    item.classList.add('selected');
+                    selectedExcludeFolder = index;
+                });
+                
+                container.appendChild(item);
+            });
+        }
+
+        document.getElementById('addIncludeBtn').addEventListener('click', async () => {
+            try {
+                const folder = await pywebview.api.select_folder();
+                if (folder) {
+                    if (!includeFolders.includes(folder)) {
+                        includeFolders.push(folder);
+                        renderIncludeFolders();
+                        addLogEntry('Added include folder: ' + folder);
+                    } else {
+                        addLogEntry('Folder already in list: ' + folder);
+                    }
+                }
+            } catch (error) {
+                console.error('Error selecting folder:', error);
+                addLogEntry('Error selecting folder: ' + error);
+            }
+        });
+
+        document.getElementById('removeIncludeBtn').addEventListener('click', () => {
+            if (selectedIncludeFolder !== null && selectedIncludeFolder < includeFolders.length) {
+                const removed = includeFolders.splice(selectedIncludeFolder, 1)[0];
+                selectedIncludeFolder = null;
+                renderIncludeFolders();
+                addLogEntry('Removed include folder: ' + removed);
+            } else {
+                addLogEntry('No folder selected to remove');
+            }
+        });
+
+        document.getElementById('addExcludeBtn').addEventListener('click', async () => {
+            try {
+                const folder = await pywebview.api.select_folder();
+                if (folder) {
+                    if (!excludeFolders.includes(folder)) {
+                        excludeFolders.push(folder);
+                        renderExcludeFolders();
+                        addLogEntry('Added exclude folder: ' + folder);
+                    } else {
+                        addLogEntry('Folder already in list: ' + folder);
+                    }
+                }
+            } catch (error) {
+                console.error('Error selecting folder:', error);
+                addLogEntry('Error selecting folder: ' + error);
+            }
+        });
+
+        document.getElementById('removeExcludeBtn').addEventListener('click', () => {
+            if (selectedExcludeFolder !== null && selectedExcludeFolder < excludeFolders.length) {
+                const removed = excludeFolders.splice(selectedExcludeFolder, 1)[0];
+                selectedExcludeFolder = null;
+                renderExcludeFolders();
+                addLogEntry('Removed exclude folder: ' + removed);
+            } else {
+                addLogEntry('No folder selected to remove');
             }
         });
 
