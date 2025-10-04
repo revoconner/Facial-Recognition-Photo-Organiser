@@ -26,6 +26,8 @@ import pystray
 from pystray import MenuItem as item
 from PIL import Image as PILImage, ImageDraw
 
+pillow_heif.register_heif_opener()
+
 GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
 
@@ -574,6 +576,22 @@ class ScanWorker(threading.Thread):
         
         return False
     
+    def load_image(self, file_path: str) -> Optional[np.ndarray]:
+        file_ext = Path(file_path).suffix.lower()
+        
+        if file_ext in {'.heic', '.heif'}:
+            try:
+                pil_image = Image.open(file_path)
+                image_rgb = np.array(pil_image.convert('RGB'))
+                image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+                return image_bgr
+            except Exception as e:
+                self.api.update_status(f"ERROR: Cannot read HEIF image - {os.path.basename(file_path)}: {str(e)}")
+                return None
+        else:
+            image = cv2.imread(file_path)
+            return image
+    
     def run(self):
         try:
             self.api.update_status("Initializing InsightFace model...")
@@ -592,7 +610,7 @@ class ScanWorker(threading.Thread):
             self.api.scan_complete()
             return
         
-        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.heic', '.heif'}
         
         self.api.update_status("Discovering photos...")
         all_image_files = set()
@@ -722,7 +740,7 @@ class ScanWorker(threading.Thread):
             if existing_status == 'completed':
                 return
             
-            image = cv2.imread(file_path)
+            image = self.load_image(file_path)
             if image is None:
                 self.api.update_status(f"ERROR: Cannot read image - {os.path.basename(file_path)}")
                 self.db.update_photo_status(photo_id, 'error')
