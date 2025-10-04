@@ -561,6 +561,15 @@
                 document.getElementById('photoGrid').style.gridTemplateColumns = 
                     `repeat(auto-fill, minmax(${gridSize}px, 1fr))`;
                 
+                includeFolders = await pywebview.api.get_include_folders();
+                renderIncludeFolders();
+                
+                excludeFolders = await pywebview.api.get_exclude_folders();
+                renderExcludeFolders();
+                
+                const wildcards = await pywebview.api.get_wildcard_exclusions();
+                document.getElementById('wildcardInput').value = wildcards;
+                
                 addLogEntry('Settings loaded successfully');
             } catch (error) {
                 console.error('Error loading settings:', error);
@@ -771,6 +780,7 @@
                 if (folder) {
                     if (!includeFolders.includes(folder)) {
                         includeFolders.push(folder);
+                        await pywebview.api.set_include_folders(includeFolders);
                         renderIncludeFolders();
                         addLogEntry('Added include folder: ' + folder);
                     } else {
@@ -783,10 +793,11 @@
             }
         });
 
-        document.getElementById('removeIncludeBtn').addEventListener('click', () => {
+        document.getElementById('removeIncludeBtn').addEventListener('click', async () => {
             if (selectedIncludeFolder !== null && selectedIncludeFolder < includeFolders.length) {
                 const removed = includeFolders.splice(selectedIncludeFolder, 1)[0];
                 selectedIncludeFolder = null;
+                await pywebview.api.set_include_folders(includeFolders);
                 renderIncludeFolders();
                 addLogEntry('Removed include folder: ' + removed);
             } else {
@@ -800,6 +811,7 @@
                 if (folder) {
                     if (!excludeFolders.includes(folder)) {
                         excludeFolders.push(folder);
+                        await pywebview.api.set_exclude_folders(excludeFolders);
                         renderExcludeFolders();
                         addLogEntry('Added exclude folder: ' + folder);
                     } else {
@@ -812,14 +824,25 @@
             }
         });
 
-        document.getElementById('removeExcludeBtn').addEventListener('click', () => {
+        document.getElementById('removeExcludeBtn').addEventListener('click', async () => {
             if (selectedExcludeFolder !== null && selectedExcludeFolder < excludeFolders.length) {
                 const removed = excludeFolders.splice(selectedExcludeFolder, 1)[0];
                 selectedExcludeFolder = null;
+                await pywebview.api.set_exclude_folders(excludeFolders);
                 renderExcludeFolders();
                 addLogEntry('Removed exclude folder: ' + removed);
             } else {
                 addLogEntry('No folder selected to remove');
+            }
+        });
+
+        document.getElementById('wildcardInput').addEventListener('change', async (e) => {
+            try {
+                await pywebview.api.set_wildcard_exclusions(e.target.value);
+                addLogEntry('Wildcard exclusions updated: ' + e.target.value);
+            } catch (error) {
+                console.error('Error saving wildcard exclusions:', error);
+                addLogEntry('Error saving wildcard exclusions: ' + error);
             }
         });
 

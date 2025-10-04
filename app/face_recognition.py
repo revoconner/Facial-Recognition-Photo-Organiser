@@ -39,7 +39,10 @@ class Settings:
             'show_unmatched': False,
             'grid_size': 180,
             'window_width': 1200,
-            'window_height': 800
+            'window_height': 800,
+            'include_folders': [],
+            'exclude_folders': [],
+            'wildcard_exclusions': ''
         }
         
         self.settings = self.load()
@@ -891,6 +894,24 @@ class API:
     
     def set_grid_size(self, size):
         self._settings.set('grid_size', size)
+    
+    def get_include_folders(self):
+        return self._settings.get('include_folders', [])
+    
+    def set_include_folders(self, folders):
+        self._settings.set('include_folders', folders)
+    
+    def get_exclude_folders(self):
+        return self._settings.get('exclude_folders', [])
+    
+    def set_exclude_folders(self, folders):
+        self._settings.set('exclude_folders', folders)
+    
+    def get_wildcard_exclusions(self):
+        return self._settings.get('wildcard_exclusions', '')
+    
+    def set_wildcard_exclusions(self, wildcards):
+        self._settings.set('wildcard_exclusions', wildcards)
     
     def is_window_foreground(self):
         return self._window_foreground
