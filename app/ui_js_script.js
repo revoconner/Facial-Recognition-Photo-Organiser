@@ -1,4 +1,4 @@
-let people = [];
+        let people = [];
         let currentPerson = null;
         let isAlphabetMode = false;
         let activeMenu = null;
@@ -7,6 +7,7 @@ let people = [];
         let showDevOptions = false;
         let currentPhotoContext = null;
         let currentSortMode = 'names_asc';
+        let menuCloseTimeout = null;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -229,8 +230,30 @@ let people = [];
                     positionMenu(contextMenu, kebabBtn);
                 });
 
+                kebabBtn.addEventListener('mouseenter', () => {
+                    if (menuCloseTimeout) {
+                        clearTimeout(menuCloseTimeout);
+                        menuCloseTimeout = null;
+                    }
+                });
+
+                kebabBtn.addEventListener('mouseleave', () => {
+                    menuCloseTimeout = setTimeout(() => {
+                        closeAllMenus();
+                    }, 200);
+                });
+
+                contextMenu.addEventListener('mouseenter', () => {
+                    if (menuCloseTimeout) {
+                        clearTimeout(menuCloseTimeout);
+                        menuCloseTimeout = null;
+                    }
+                });
+
                 contextMenu.addEventListener('mouseleave', () => {
-                    closeAllMenus();
+                    menuCloseTimeout = setTimeout(() => {
+                        closeAllMenus();
+                    }, 200);
                 });
             });
         }
@@ -312,6 +335,19 @@ let people = [];
                         positionMenu(contextMenu, kebabBtn);
                     });
 
+                    kebabBtn.addEventListener('mouseenter', () => {
+                        if (menuCloseTimeout) {
+                            clearTimeout(menuCloseTimeout);
+                            menuCloseTimeout = null;
+                        }
+                    });
+
+                    kebabBtn.addEventListener('mouseleave', () => {
+                        menuCloseTimeout = setTimeout(() => {
+                            closeAllMenus();
+                        }, 200);
+                    });
+
                     contextMenu.addEventListener('click', (e) => {
                         const menuItem = e.target.closest('.context-menu-item');
                         if (menuItem) {
@@ -326,8 +362,17 @@ let people = [];
                         }
                     });
 
+                    contextMenu.addEventListener('mouseenter', () => {
+                        if (menuCloseTimeout) {
+                            clearTimeout(menuCloseTimeout);
+                            menuCloseTimeout = null;
+                        }
+                    });
+
                     contextMenu.addEventListener('mouseleave', () => {
-                        closeAllMenus();
+                        menuCloseTimeout = setTimeout(() => {
+                            closeAllMenus();
+                        }, 200);
                     });
                 });
             } catch (error) {
@@ -509,9 +554,31 @@ let people = [];
                 }
             });
             
-            filterMenu.addEventListener('mouseleave', () => {
-                closeAllMenus();
+            filterMenu.addEventListener('mouseenter', () => {
+                if (menuCloseTimeout) {
+                    clearTimeout(menuCloseTimeout);
+                    menuCloseTimeout = null;
+                }
             });
+            
+            filterMenu.addEventListener('mouseleave', () => {
+                menuCloseTimeout = setTimeout(() => {
+                    closeAllMenus();
+                }, 200);
+            });
+        });
+
+        document.getElementById('filterBtn').addEventListener('mouseenter', () => {
+            if (menuCloseTimeout) {
+                clearTimeout(menuCloseTimeout);
+                menuCloseTimeout = null;
+            }
+        });
+
+        document.getElementById('filterBtn').addEventListener('mouseleave', () => {
+            menuCloseTimeout = setTimeout(() => {
+                closeAllMenus();
+            }, 200);
         });
 
         document.getElementById('jumpToBtn').addEventListener('click', () => {
@@ -937,6 +1004,10 @@ let people = [];
         }
 
         function closeAllMenus() {
+            if (menuCloseTimeout) {
+                clearTimeout(menuCloseTimeout);
+                menuCloseTimeout = null;
+            }
             document.querySelectorAll('.context-menu').forEach(m => {
                 m.classList.remove('show');
             });
