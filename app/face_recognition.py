@@ -32,6 +32,14 @@ GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
 
 
+def get_resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
 def get_appdata_path():
     appdata = os.environ.get('APPDATA')
     if appdata:
@@ -873,17 +881,23 @@ class ClusterWorker(threading.Thread):
 
 
 def create_tray_icon():
-    width = 64
-    height = 64
-    image = PILImage.new('RGB', (width, height), (255, 255, 255))
-    dc = ImageDraw.Draw(image)
-    
-    dc.ellipse([10, 10, 54, 54], fill=(59, 130, 246))
-    dc.ellipse([20, 20, 30, 30], fill=(255, 255, 255))
-    dc.ellipse([34, 20, 44, 30], fill=(255, 255, 255))
-    dc.arc([15, 25, 49, 50], 0, 180, fill=(255, 255, 255), width=3)
-    
-    return image
+    icon_path = get_resource_path('icon.ico')
+    try:
+        image = PILImage.open(icon_path)
+        return image
+    except Exception as e:
+        print(f"Error loading icon.ico: {e}")
+        width = 64
+        height = 64
+        image = PILImage.new('RGB', (width, height), (255, 255, 255))
+        dc = ImageDraw.Draw(image)
+        
+        dc.ellipse([10, 10, 54, 54], fill=(59, 130, 246))
+        dc.ellipse([20, 20, 30, 30], fill=(255, 255, 255))
+        dc.ellipse([34, 20, 44, 30], fill=(255, 255, 255))
+        dc.arc([15, 25, 49, 50], 0, 180, fill=(255, 255, 255), width=3)
+        
+        return image
 
 
 class API:
@@ -1525,9 +1539,11 @@ def main():
     
     api = API(settings)
     
+    ui_html_path = get_resource_path('ui.html')
+    
     window = webview.create_window(
         'Face Recognition Photo Organizer',
-        'ui.html',
+        ui_html_path,
         js_api=api,
         width=settings.get('window_width', 1200),
         height=settings.get('window_height', 800),
