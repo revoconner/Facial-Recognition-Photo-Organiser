@@ -1,5 +1,6 @@
 # face_recognition.spec
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
 
@@ -13,7 +14,7 @@ a = Analysis(
         ('ui_js_script.js', '.'),
         ('icon.ico', '.'),
         ('C:/Users/Astha/.insightface/models/buffalo_l', 'models/buffalo_l'),
-    ],
+    ] + collect_data_files('insightface'),
     hiddenimports=[
         'PIL._tkinter_finder',
         'sklearn.utils._cython_blas',
