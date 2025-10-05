@@ -1,6 +1,3 @@
 make saving databases to %appdata%
 
-
-normal photo viewer in app
-
-help button on status bar - right : if there are no photos to scan add some folders to scan in settings, single click to view photo, double click to view photos in default windows photo viewer app
+No folder to scan - Display a message

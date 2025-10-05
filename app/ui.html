@@ -138,6 +138,13 @@
                     <span id="cudaVersion">CUDA: N/A</span>
                     <span id="faceCount">Found: 0 faces</span>
                 </div>
+                <button class="help-btn" id="openHelpBtn" title="Quick Help">
+                    <svg width="14" height="14" viewBox="0 0 14 14">
+                        <circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M5 5.5 C5 4 6 3.5 7 3.5 C8 3.5 9 4 9 5.5 C9 6.5 8 7 7 7 L7 8.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                        <circle cx="7" cy="10.5" r="0.5" fill="currentColor"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>
@@ -368,6 +375,23 @@
                         <div class="log-entry">Application started</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-overlay" id="helpOverlay">
+        <div class="help-container" id="helpContainer">
+            <div class="help-content">
+                <div class="help-title">Quick Help</div>
+                
+                <div class="help-list">
+                    <div class="help-item">Help 1</div>
+                    <div class="help-item">Help 2</div>
+                    <div class="help-item">Help 3</div>
+                    <div class="help-item">Help 4</div>
+                </div>
+                
+                <button class="close-help-btn" id="closeHelpBtn">Close Quick Help</button>
             </div>
         </div>
     </div>

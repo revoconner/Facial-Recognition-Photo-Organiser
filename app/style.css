@@ -685,6 +685,24 @@
             }
         }
 
+        .help-btn {
+            padding: 6px;
+            background: transparent;
+            border: none;
+            color: #a0a0a0;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            border-radius: 50%;
+        }
+
+        .help-btn:hover {
+            color: #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+
         .settings-overlay {
             position: fixed;
             top: 0;
@@ -1399,4 +1417,68 @@
         .lightbox-action-btn:hover {
             background: rgba(255, 255, 255, 0.2);
             transform: scale(1.1);
+        }
+
+        .help-container {
+            position: relative;
+            width: 500px;
+            max-width: calc(100vw - 80px);
+            background: #1a1a1a;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+            z-index: 99999;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .help-content {
+            padding: 40px 48px;
+        }
+
+        .help-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            color: #ffffff;
+        }
+
+        .help-list {
+            margin-bottom: 32px;
+        }
+
+        .help-item {
+            font-size: 15px;
+            color: #e0e0e0;
+            margin-bottom: 16px;
+            line-height: 1.6;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .help-item::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 10px;
+            width: 4px;
+            height: 4px;
+            background: #3b82f6;
+            border-radius: 50%;
+        }
+
+        .close-help-btn {
+            width: 100%;
+            padding: 12px 32px;
+            background: #3b82f6;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .close-help-btn:hover {
+            background: #2563eb;
         }

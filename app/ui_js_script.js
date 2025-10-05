@@ -815,6 +815,40 @@ let people = [];
             }
         });
 
+        const helpOverlay = document.getElementById('helpOverlay');
+        const helpContainer = document.getElementById('helpContainer');
+        const openHelpBtn = document.getElementById('openHelpBtn');
+        const closeHelpBtn = document.getElementById('closeHelpBtn');
+
+        function openHelp() {
+            helpOverlay.classList.add('active');
+            appContainer.classList.add('blurred');
+        }
+
+        function closeHelp() {
+            helpOverlay.classList.remove('active');
+            appContainer.classList.remove('blurred');
+        }
+
+        openHelpBtn.addEventListener('click', openHelp);
+        closeHelpBtn.addEventListener('click', closeHelp);
+
+        helpOverlay.addEventListener('click', (e) => {
+            if (e.target === helpOverlay) {
+                closeHelp();
+            }
+        });
+
+        helpContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && helpOverlay.classList.contains('active')) {
+                closeHelp();
+            }
+        });
+
         const navItems = document.querySelectorAll('.nav-item');
         const panels = document.querySelectorAll('.content-panel');
         const thresholdSlider = document.getElementById('thresholdSlider');
