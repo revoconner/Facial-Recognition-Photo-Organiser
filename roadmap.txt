@@ -1,1 +1,5 @@
 make rename prettier
+make saving databases to %appdata%
+make hidden photo better
+normal photo viewer in app
+help button on status bar - right : if there are no photos to scan add some folders to scan in settings, single click to view photo, double click to view photos in default windows photo viewer app

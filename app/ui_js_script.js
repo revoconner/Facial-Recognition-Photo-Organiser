@@ -11,6 +11,7 @@ let people = [];
         let currentPhotoContext = null;
         let currentSortMode = 'names_asc';
         let menuCloseTimeout = null;
+        let renameContext = null;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -957,36 +958,86 @@ let people = [];
             }
         });
 
-        async function renamePerson(clusteringId, personId, currentName) {
-            closeAllMenus();
-            
+        function showRenameDialog(clusteringId, personId, currentName) {
             const cleanName = currentName.replace(' (hidden)', '');
             
-            const newName = prompt('Enter new name for this person:', cleanName);
+            renameContext = {
+                clusteringId: clusteringId,
+                personId: personId
+            };
             
-            if (newName === null) {
-                return;
-            }
+            const renameOverlay = document.getElementById('renameOverlay');
+            const renameInput = document.getElementById('renameInput');
             
-            if (newName.trim() === '') {
+            renameInput.value = cleanName;
+            renameOverlay.classList.add('active');
+            appContainer.classList.add('blurred');
+            
+            setTimeout(() => {
+                renameInput.focus();
+                renameInput.select();
+            }, 100);
+        }
+
+        function closeRenameDialog() {
+            const renameOverlay = document.getElementById('renameOverlay');
+            renameOverlay.classList.remove('active');
+            appContainer.classList.remove('blurred');
+            renameContext = null;
+            document.getElementById('renameInput').value = '';
+        }
+
+        async function confirmRename() {
+            if (!renameContext) return;
+            
+            const newName = document.getElementById('renameInput').value;
+            
+            if (!newName || newName.trim() === '') {
                 addLogEntry('ERROR: Person name cannot be empty');
-                alert('Name cannot be empty');
+                closeRenameDialog();
                 return;
             }
             
             try {
-                const result = await pywebview.api.rename_person(clusteringId, personId, newName.trim());
+                const result = await pywebview.api.rename_person(
+                    renameContext.clusteringId,
+                    renameContext.personId,
+                    newName.trim()
+                );
+                
                 if (result.success) {
                     addLogEntry(`Person renamed to "${newName.trim()}" - ${result.faces_tagged} faces tagged`);
                 } else {
                     addLogEntry('ERROR: ' + result.message);
-                    alert('Error: ' + result.message);
                 }
             } catch (error) {
                 console.error('Error renaming person:', error);
                 addLogEntry('Error renaming person: ' + error);
-                alert('Error renaming person');
             }
+            
+            closeRenameDialog();
+        }
+
+        document.getElementById('renameConfirmBtn').addEventListener('click', confirmRename);
+        document.getElementById('renameCancelBtn').addEventListener('click', closeRenameDialog);
+
+        document.getElementById('renameOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('renameOverlay')) {
+                closeRenameDialog();
+            }
+        });
+
+        document.getElementById('renameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                confirmRename();
+            } else if (e.key === 'Escape') {
+                closeRenameDialog();
+            }
+        });
+
+        async function renamePerson(clusteringId, personId, currentName) {
+            closeAllMenus();
+            showRenameDialog(clusteringId, personId, currentName);
         }
 
         async function untagPerson(clusteringId, personId) {
@@ -1051,12 +1102,10 @@ let people = [];
                     addLogEntry(`Primary photo set for ${cleanName}`);
                 } else {
                     addLogEntry('ERROR: ' + result.message);
-                    alert(result.message);
                 }
             } catch (error) {
                 console.error('Error setting primary photo:', error);
                 addLogEntry('Error setting primary photo: ' + error);
-                alert('Error setting primary photo');
             }
             
             currentPhotoContext = null;

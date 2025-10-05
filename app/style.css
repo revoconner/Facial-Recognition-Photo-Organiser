@@ -1242,3 +1242,11 @@
             color: #ffffff;
             text-align: center;
         }
+
+        .rename-input-container {
+            margin-top: 24px;
+        }
+
+        #renameInput {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
