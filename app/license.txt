@@ -1,0 +1,15 @@
+Facial Recognition Photo Organiser - License Agreement
+
+By installing and using this app, you agree to the following terms:
+
+* Free for Personal Use: This app is provided at no cost for personal, non-commercial use only. You may not install this app on a computer that is used for commercial purpose, even if the app itself is intended to be used for personal purpose. 
+
+* Source Code Access: You may view the source code, but you may NOT modify, redistribute, or use it for any purposes, except modifying it for the sole purpose of personal usage.
+
+* No Redistribution: You may not share, sell, or distribute the app or its code in any form.
+
+* No Warranty: This app is provided "as is" without any guarantees. Use it at your own risk.
+
+* Privacy Notice: The app uses facial recognition to organize your photos. You are responsible for complying with applicable privacy laws and obtaining consent from individuals whose images are processed.
+
+If you do not agree to these terms, please do not install or use the app.

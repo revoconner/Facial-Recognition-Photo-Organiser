@@ -6,3 +6,4 @@ app/FacialRecognitionOrganiserSetup.msi
 app/license.rtf
 app/build/
 *.wixpdb
+app/output/
