@@ -6,6 +6,8 @@ let people = [];
         let showHidden = false;
         let showHiddenPhotos = false;
         let showDevOptions = false;
+        let minPhotosEnabled = false;
+        let minPhotosCount = 2;
         let currentPhotoContext = null;
         let currentSortMode = 'names_asc';
         let menuCloseTimeout = null;
@@ -97,6 +99,9 @@ let people = [];
                 if (person.id === 0 && !showUnmatched) {
                     return false;
                 }
+                if (minPhotosEnabled && person.count < minPhotosCount) {
+                    return false;
+                }
                 return true;
             });
             
@@ -147,6 +152,9 @@ let people = [];
             
             const filteredPeople = people.filter(person => {
                 if (person.id === 0 && !showUnmatched) {
+                    return false;
+                }
+                if (minPhotosEnabled && person.count < minPhotosCount) {
                     return false;
                 }
                 return true;
@@ -463,6 +471,15 @@ let people = [];
                 showDevOptions = showDevOptionsSetting;
                 document.getElementById('showDevOptionsToggle').checked = showDevOptionsSetting;
                 
+                const minPhotosEnabledSetting = await pywebview.api.get_min_photos_enabled();
+                minPhotosEnabled = minPhotosEnabledSetting;
+                document.getElementById('minPhotosToggle').checked = minPhotosEnabledSetting;
+                
+                const minPhotosCountSetting = await pywebview.api.get_min_photos_count();
+                minPhotosCount = minPhotosCountSetting;
+                document.getElementById('minPhotosInput').value = minPhotosCountSetting;
+                document.getElementById('minPhotosInput').disabled = !minPhotosEnabledSetting;
+                
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 document.getElementById('photoGrid').style.gridTemplateColumns = 
@@ -528,6 +545,36 @@ let people = [];
                 addLogEntry('ERROR: Initialization failed - ' + error);
             }
         }
+
+        document.getElementById('minPhotosToggle').addEventListener('change', async (e) => {
+            minPhotosEnabled = e.target.checked;
+            document.getElementById('minPhotosInput').disabled = !minPhotosEnabled;
+            await pywebview.api.set_min_photos_enabled(minPhotosEnabled);
+            
+            if (isAlphabetMode) {
+                renderAlphabetList();
+            } else {
+                renderPeopleList();
+            }
+            
+            addLogEntry('Minimum photos filter: ' + (minPhotosEnabled ? `enabled (${minPhotosCount} photos)` : 'disabled'));
+        });
+
+        document.getElementById('minPhotosInput').addEventListener('change', async (e) => {
+            const value = parseInt(e.target.value);
+            if (value >= 0 && value <= 999) {
+                minPhotosCount = value;
+                await pywebview.api.set_min_photos_count(minPhotosCount);
+                
+                if (isAlphabetMode) {
+                    renderAlphabetList();
+                } else {
+                    renderPeopleList();
+                }
+                
+                addLogEntry(`Minimum photos threshold changed to: ${minPhotosCount}`);
+            }
+        });
 
         document.getElementById('filterBtn').addEventListener('click', () => {
             closeAllMenus();

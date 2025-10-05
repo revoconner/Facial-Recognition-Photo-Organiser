@@ -46,6 +46,8 @@ class Settings:
             'show_hidden': False,
             'show_hidden_photos': False,
             'show_dev_options': False,
+            'min_photos_enabled': False,
+            'min_photos_count': 2,
             'grid_size': 180,
             'window_width': 1200,
             'window_height': 800,
@@ -1340,6 +1342,18 @@ class API:
     
     def set_show_dev_options(self, enabled):
         self._settings.set('show_dev_options', enabled)
+    
+    def get_min_photos_enabled(self):
+        return self._settings.get('min_photos_enabled', False)
+    
+    def set_min_photos_enabled(self, enabled):
+        self._settings.set('min_photos_enabled', enabled)
+    
+    def get_min_photos_count(self):
+        return self._settings.get('min_photos_count', 2)
+    
+    def set_min_photos_count(self, count):
+        self._settings.set('min_photos_count', count)
     
     def get_grid_size(self):
         return self._settings.get('grid_size', 180)

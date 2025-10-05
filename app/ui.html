@@ -12,6 +12,34 @@
             -ms-user-select: none;
             user-select: none;
         }
+        
+        .min-photos-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .min-photos-input {
+            width: 80px;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #e0e0e0;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        
+        .min-photos-input:focus {
+            border-color: #3b82f6;
+            background: #0d0d0d;
+        }
+        
+        .min-photos-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -184,6 +212,25 @@
                                 <input type="checkbox" id="showUnmatchedToggle">
                                 <span class="toggle-slider"></span>
                             </label>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Hide persons with less than</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Hide persons from the list who have fewer than the specified number of photos. Useful to filter out people who only appear once or twice. Set to 0 to disable. Default Off with 0 photos</div>
+                                </span>
+                            </div>
+                            <div class="min-photos-control">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="minPhotosToggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <input type="number" class="min-photos-input" id="minPhotosInput" 
+                                       min="0" max="999" value="2" disabled>
+                                <span style="color: #a0a0a0; font-size: 13px;">photos</span>
+                            </div>
                         </div>
                         
                         <div class="setting-row">
