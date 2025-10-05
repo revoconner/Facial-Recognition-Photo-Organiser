@@ -32,6 +32,14 @@ GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
 
 
+def get_appdata_path():
+    appdata = os.environ.get('APPDATA')
+    if appdata:
+        return Path(appdata) / "facial_recognition" / "face_data"
+    else:
+        return Path.home() / "AppData" / "Roaming" / "facial_recognition" / "face_data"
+
+
 class Settings:
     def __init__(self, settings_path: str):
         self.settings_path = Path(settings_path)
@@ -883,8 +891,7 @@ class API:
         self._settings = settings
         self._threshold = settings.get('threshold', 50)
         
-        script_dir = Path(__file__).parent.resolve()
-        db_path = script_dir / "face_data"
+        db_path = get_appdata_path()
         print(f"Database location: {db_path}")
         
         self._db = FaceDatabase(str(db_path))
@@ -1506,8 +1513,7 @@ def main():
         print(f"GPU device: {torch.cuda.get_device_name(0)}")
     print("=" * 60)
     
-    script_dir = Path(__file__).parent.resolve()
-    settings_path = script_dir / "face_data"
+    settings_path = get_appdata_path()
     settings = Settings(str(settings_path))
     
     print(f"Settings loaded from: {settings.settings_file}")
