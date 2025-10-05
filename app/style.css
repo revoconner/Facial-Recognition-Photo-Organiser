@@ -1482,3 +1482,62 @@
         .close-help-btn:hover {
             background: #2563eb;
         }
+
+        .no-folders-container {
+            position: relative;
+            width: 520px;
+            max-width: calc(100vw - 80px);
+            background: #1a1a1a;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+            z-index: 99999;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .no-folders-content {
+            padding: 48px 56px;
+            text-align: center;
+        }
+
+        .no-folders-icon {
+            margin: 0 auto 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .no-folders-icon svg {
+            opacity: 0.8;
+        }
+
+        .no-folders-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        .no-folders-message {
+            font-size: 15px;
+            color: #a0a0a0;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+
+        .no-folders-btn {
+            width: 100%;
+            padding: 14px 32px;
+            background: #3b82f6;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .no-folders-btn:hover {
+            background: #2563eb;
+        }

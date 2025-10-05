@@ -620,6 +620,19 @@ let people = [];
             }
         }
 
+        function checkNoFolders() {
+            const folders = includeFolders || [];
+            if (folders.length === 0) {
+                document.getElementById('noFoldersOverlay').classList.add('active');
+                document.getElementById('appContainer').classList.add('blurred');
+            }
+        }
+
+        function closeNoFoldersOverlay() {
+            document.getElementById('noFoldersOverlay').classList.remove('active');
+            document.getElementById('appContainer').classList.remove('blurred');
+        }
+
         async function initialize() {
             try {
                 addLogEntry('Application started');
@@ -633,6 +646,8 @@ let people = [];
                 addLogEntry(`System: PyTorch ${sysInfo.pytorch_version}, ${sysInfo.gpu_available ? 'GPU' : 'CPU'}, CUDA ${sysInfo.cuda_version}`);
                 
                 await loadAllSettings();
+                
+                checkNoFolders();
                 
                 document.getElementById('progressSection').style.display = 'flex';
                 
@@ -813,6 +828,31 @@ let people = [];
             if (e.key === 'Escape' && settingsOverlay.classList.contains('active')) {
                 closeSettings();
             }
+        });
+
+        const noFoldersOverlay = document.getElementById('noFoldersOverlay');
+        const noFoldersContainer = document.getElementById('noFoldersContainer');
+        const goToFoldersBtn = document.getElementById('goToFoldersBtn');
+
+        goToFoldersBtn.addEventListener('click', () => {
+            closeNoFoldersOverlay();
+            openSettings();
+            
+            document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+            document.querySelector('[data-panel="folders"]').classList.add('active');
+            
+            document.querySelectorAll('.content-panel').forEach(panel => panel.classList.remove('active'));
+            document.getElementById('folders-panel').classList.add('active');
+        });
+
+        noFoldersOverlay.addEventListener('click', (e) => {
+            if (e.target === noFoldersOverlay) {
+                closeNoFoldersOverlay();
+            }
+        });
+
+        noFoldersContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
 
         const helpOverlay = document.getElementById('helpOverlay');
@@ -1013,6 +1053,7 @@ let people = [];
                         await pywebview.api.set_include_folders(includeFolders);
                         renderIncludeFolders();
                         addLogEntry('Added include folder: ' + folder);
+                        closeNoFoldersOverlay();
                     } else {
                         addLogEntry('Folder already in list: ' + folder);
                     }
@@ -1030,6 +1071,7 @@ let people = [];
                 await pywebview.api.set_include_folders(includeFolders);
                 renderIncludeFolders();
                 addLogEntry('Removed include folder: ' + removed);
+                checkNoFolders();
             } else {
                 addLogEntry('No folder selected to remove');
             }
