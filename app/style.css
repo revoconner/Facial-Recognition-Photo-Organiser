@@ -1421,7 +1421,7 @@
 
         .help-container {
             position: relative;
-            width: 500px;
+            width: 1000px;
             max-width: calc(100vw - 80px);
             background: #1a1a1a;
             border-radius: 12px;

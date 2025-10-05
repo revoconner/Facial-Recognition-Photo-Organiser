@@ -180,7 +180,7 @@
                 
                 <div class="settings-footer">
                     <button class="close-settings-btn" id="closeSettingsBtn">Close Settings</button>
-                    <div class="footer-credit">Made by RO</div>
+                    <div class="footer-credit">For personal use only - Free license</br>Version: 0.1.0.b</div>
                 </div>
             </div>
             
@@ -214,7 +214,7 @@
                                 <span>Use system resources dynamically</span>
                                 <span class="info-icon">
                                     i
-                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage to 5% when app runs in background. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
+                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage when app is minimised to system tray, and uses all resources when cpu is running in desktop mode. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
                                 </span>
                             </div>
                             <label class="toggle-switch">
@@ -242,7 +242,7 @@
                                 <span>Hide persons with less than</span>
                                 <span class="info-icon">
                                     i
-                                    <div class="tooltip">Hide persons from the list who have fewer than the specified number of photos. Useful to filter out people who only appear once or twice. Set to 0 to disable. Default Off with 0 photos</div>
+                                    <div class="tooltip">Hide persons from the list who have fewer than the specified number of photos. Useful to filter out people who only appear once or twice. Set to 0 or toggle off, to disable. Default Off with 2 photos</div>
                                 </span>
                             </div>
                             <div class="min-photos-control">
@@ -289,7 +289,7 @@
                                 <span>Show hidden photos</span>
                                 <span class="info-icon">
                                     i
-                                    <div class="tooltip">Photos hidden by the user will be shown at 70% opacity when this toggle is on. You can unhide individual photos from the photo grid menu once visible. Default Off</div>
+                                    <div class="tooltip">Photos hidden by the user will be shown with diagonal grid lines when this toggle is on. You can unhide individual photos from the photo grid menu once visible. Default Off</div>
                                 </span>
                             </div>
                             <label class="toggle-switch">
@@ -322,7 +322,7 @@
                             <span>Include folders for scanning</span>
                             <span class="info-icon">
                                 i
-                                <div class="tooltip">Include all folders that will be scanned for photos. Default is the user's photos library on Windows.</div>
+                                <div class="tooltip">Include all folders that will be scanned for photos. Add folders here that contains photos. Supported: jpg, png, bmp, gif, heic, heif</div>
                             </span>
                         </div>
                         <div class="folder-list-container" id="includeFolders">
@@ -345,7 +345,7 @@
                             <span>Exclude subfolders from scanning</span>
                             <span class="info-icon">
                                 i
-                                <div class="tooltip">Exclude subfolders of "included folders" above, that are not to be scanned. This takes precedence over include folders.</div>
+                                <div class="tooltip">Exclude subfolders of "included folders" above, that are not to be scanned. This takes precedence over include folders, so if you add the same folder to both, they will not be scanned</div>
                             </span>
                         </div>
                         <div class="folder-list-container" id="excludeFolders">
@@ -401,10 +401,17 @@
                 <div class="help-title">Quick Help</div>
                 
                 <div class="help-list">
-                    <div class="help-item">Help 1</div>
-                    <div class="help-item">Help 2</div>
-                    <div class="help-item">Help 3</div>
-                    <div class="help-item">Help 4</div>
+                    <div class="help-item">Single click the image to bring up a preview inside the app</div>
+                    <div class="help-item">Double click the image to open it in your default image viewer app</div>
+                    <div class="help-item">By default the person's detected are named person 1, person 2 and so on.</br>Use rename option in the person's menu to rename them</div>
+                    <div class="help-item">Once renamed their default preview photo can be changed</div>
+                    <div class="help-item">If you want to see the person that is tagged in the image (say in a group photo) use the drop down above</div>
+                    <div class="help-item">You can hide a person from the list, to unhide, show all hidden person in general settings</div>
+                    <div class="help-item">You can hide a photo from the grid, to unhide, show all hidden photos in general settings</div>
+                    <div class="help-item">Photo scan be CPU intensive task, to reduce cpu usage, close to tray during scan</div>
+                    <div class="help-item">To add more folders or remove folders, as well as exclude subfolders where photos are, do so in the settings</div>
+                    <div class="help-item">Any images that are added to disk, or removed from disk will be scanned at next restart</div>
+                    <div class="help-item">This is the first release and in beta, while there may be some bugs, none of the bugs will delete your photos</br>This app does not edit the photos on disk directly</div>
                 </div>
                 
                 <button class="close-help-btn" id="closeHelpBtn">Close Quick Help</button>
