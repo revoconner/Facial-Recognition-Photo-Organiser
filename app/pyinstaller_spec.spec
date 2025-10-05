@@ -12,6 +12,7 @@ a = Analysis(
         ('style.css', '.'),
         ('ui_js_script.js', '.'),
         ('icon.ico', '.'),
+        ('C:/Users/Astha/.insightface/models/buffalo_l', 'models/buffalo_l'),
     ],
     hiddenimports=[
         'PIL._tkinter_finder',

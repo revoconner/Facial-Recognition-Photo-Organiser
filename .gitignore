@@ -4,3 +4,5 @@ New folder/
 app/dist/
 app/FacialRecognitionOrganiserSetup.msi
 app/license.rtf
+app/build/
+*.wixpdb

@@ -48,6 +48,19 @@ def get_appdata_path():
         return Path.home() / "AppData" / "Roaming" / "facial_recognition" / "face_data"
 
 
+def get_insightface_root():
+    """
+    Get the InsightFace model root path.
+    When running as EXE, use bundled models.
+    When running as script, use default cache.
+    """
+    if getattr(sys, 'frozen', False):
+        base_path = Path(sys._MEIPASS)
+        return str(base_path)
+    else:
+        return str(Path.home() / '.insightface')
+
+
 class Settings:
     def __init__(self, settings_path: str):
         self.settings_path = Path(settings_path)
@@ -609,11 +622,18 @@ class ScanWorker(threading.Thread):
         else:
             image = cv2.imread(file_path)
             return image
-    
+
     def run(self):
         try:
             self.api.update_status("Initializing InsightFace model...")
-            self.face_app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+            
+            model_root = get_insightface_root()
+            
+            self.face_app = FaceAnalysis(
+                name='buffalo_l',
+                root=model_root,
+                providers=['CPUExecutionProvider']
+            )
             self.face_app.prepare(ctx_id=-1, det_size=(640, 640))
             self.api.update_status("Model loaded")
         except Exception as e:
