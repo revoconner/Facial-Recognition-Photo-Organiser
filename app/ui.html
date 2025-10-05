@@ -372,6 +372,41 @@
         </div>
     </div>
 
+    <div class="lightbox-overlay" id="lightboxOverlay">
+        <button class="lightbox-close" id="lightboxClose">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+                <path d="M2 2 L22 22 M22 2 L2 22" stroke="currentColor" stroke-width="2"/>
+            </svg>
+        </button>
+        
+        <button class="lightbox-nav lightbox-prev" id="lightboxPrev">
+            <svg width="32" height="32" viewBox="0 0 32 32">
+                <path d="M20 4 L8 16 L20 28" stroke="currentColor" stroke-width="3" fill="none"/>
+            </svg>
+        </button>
+        
+        <div class="lightbox-content" id="lightboxContent">
+            <img src="" alt="Preview" id="lightboxImage">
+        </div>
+        
+        <button class="lightbox-nav lightbox-next" id="lightboxNext">
+            <svg width="32" height="32" viewBox="0 0 32 32">
+                <path d="M12 4 L24 16 L12 28" stroke="currentColor" stroke-width="3" fill="none"/>
+            </svg>
+        </button>
+        
+        <div class="lightbox-counter" id="lightboxCounter">1 of 1</div>
+        
+        <div class="lightbox-actions">
+            <button class="lightbox-action-btn" id="lightboxOpenExternal" title="Open in default app">
+                <svg width="20" height="20" viewBox="0 0 20 20">
+                    <path d="M10 2 L10 12 M10 2 L6 6 M10 2 L14 6" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <rect x="2" y="12" width="16" height="6" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
     <div class="cleanup-overlay" id="cleanupOverlay">
         <div class="cleanup-message">
             <div class="cleanup-title">Cleaning up and quitting</div>

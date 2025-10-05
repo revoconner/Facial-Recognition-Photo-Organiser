@@ -12,6 +12,8 @@ let people = [];
         let currentSortMode = 'names_asc';
         let menuCloseTimeout = null;
         let renameContext = null;
+        let lightboxPhotos = [];
+        let lightboxCurrentIndex = 0;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -300,15 +302,19 @@ let people = [];
                     return;
                 }
                 
-                photos.forEach(photo => {
+                lightboxPhotos = photos;
+                
+                photos.forEach((photo, index) => {
                     const photoItem = document.createElement('div');
                     photoItem.className = 'photo-item';
                     photoItem.setAttribute('data-face-id', photo.face_id);
+                    photoItem.setAttribute('data-index', index);
                     
-                    const opacityStyle = photo.is_hidden ? 'opacity: 0.5; filter: grayscale(100%);' : '';
+                    const hiddenOverlay = photo.is_hidden ? '<div class="hidden-overlay"></div>' : '';
                     
                     photoItem.innerHTML = `
-                        <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover; ${opacityStyle}">
+                        <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
+                        ${hiddenOverlay}
                         <button class="kebab-menu">
                             <span class="kebab-dot"></span>
                             <span class="kebab-dot"></span>
@@ -333,8 +339,17 @@ let people = [];
                     
                     document.body.appendChild(contextMenu);
                     
-                    photoItem.addEventListener('dblclick', () => {
-                        pywebview.api.open_photo(photo.path);
+                    photoItem.addEventListener('click', (e) => {
+                        if (!e.target.closest('.kebab-menu')) {
+                            const photoIndex = parseInt(photoItem.getAttribute('data-index'));
+                            openLightbox(photoIndex);
+                        }
+                    });
+                    
+                    photoItem.addEventListener('dblclick', (e) => {
+                        if (!e.target.closest('.kebab-menu')) {
+                            pywebview.api.open_photo(photo.path);
+                        }
                     });
                     
                     photoGrid.appendChild(photoItem);
@@ -402,6 +417,78 @@ let people = [];
                 photoGrid.innerHTML = '<div style="color: #ff6b6b; padding: 20px;">Error loading photos</div>';
             }
         }
+
+        function openLightbox(index) {
+            lightboxCurrentIndex = index;
+            updateLightbox();
+            document.getElementById('lightboxOverlay').classList.add('active');
+            document.getElementById('appContainer').classList.add('blurred');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightboxOverlay').classList.remove('active');
+            document.getElementById('appContainer').classList.remove('blurred');
+        }
+
+        function nextLightboxImage() {
+            if (lightboxCurrentIndex < lightboxPhotos.length - 1) {
+                lightboxCurrentIndex++;
+                updateLightbox();
+            }
+        }
+
+        function prevLightboxImage() {
+            if (lightboxCurrentIndex > 0) {
+                lightboxCurrentIndex--;
+                updateLightbox();
+            }
+        }
+
+        function updateLightbox() {
+            const photo = lightboxPhotos[lightboxCurrentIndex];
+            document.getElementById('lightboxImage').src = photo.thumbnail;
+            document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} of ${lightboxPhotos.length}`;
+            
+            document.getElementById('lightboxPrev').style.display = lightboxCurrentIndex > 0 ? 'flex' : 'none';
+            document.getElementById('lightboxNext').style.display = lightboxCurrentIndex < lightboxPhotos.length - 1 ? 'flex' : 'none';
+        }
+
+        document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+
+        document.getElementById('lightboxOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('lightboxOverlay')) {
+                closeLightbox();
+            }
+        });
+
+        document.getElementById('lightboxPrev').addEventListener('click', (e) => {
+            e.stopPropagation();
+            prevLightboxImage();
+        });
+
+        document.getElementById('lightboxNext').addEventListener('click', (e) => {
+            e.stopPropagation();
+            nextLightboxImage();
+        });
+
+        document.getElementById('lightboxOpenExternal').addEventListener('click', () => {
+            const photo = lightboxPhotos[lightboxCurrentIndex];
+            pywebview.api.open_photo(photo.path);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const lightboxOverlay = document.getElementById('lightboxOverlay');
+            
+            if (lightboxOverlay.classList.contains('active')) {
+                if (e.key === 'Escape') {
+                    closeLightbox();
+                } else if (e.key === 'ArrowLeft') {
+                    prevLightboxImage();
+                } else if (e.key === 'ArrowRight') {
+                    nextLightboxImage();
+                }
+            }
+        });
 
         async function reloadCurrentPhotos() {
             if (currentPerson) {
