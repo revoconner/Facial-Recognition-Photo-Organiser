@@ -1517,6 +1517,9 @@ class API:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--minimized', action='store_true', help='Start minimized to tray')
+    args = parser.parse_args()
     print("=" * 60)
     print("Face Recognition Photo Organizer")
     print("=" * 60)
@@ -1549,7 +1552,8 @@ def main():
         height=settings.get('window_height', 800),
         resizable=True,
         frameless=True,
-        easy_drag=False
+        easy_drag=False,
+        hidden=args.minimized
     )
     
     api.set_window(window)
