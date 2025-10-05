@@ -444,13 +444,24 @@ let people = [];
             }
         }
 
-        function updateLightbox() {
+        async function updateLightbox() {
             const photo = lightboxPhotos[lightboxCurrentIndex];
-            document.getElementById('lightboxImage').src = photo.thumbnail;
             document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} of ${lightboxPhotos.length}`;
             
             document.getElementById('lightboxPrev').style.display = lightboxCurrentIndex > 0 ? 'flex' : 'none';
             document.getElementById('lightboxNext').style.display = lightboxCurrentIndex < lightboxPhotos.length - 1 ? 'flex' : 'none';
+            
+            try {
+                const fullSizePreview = await pywebview.api.get_full_size_preview(photo.path);
+                if (fullSizePreview) {
+                    document.getElementById('lightboxImage').src = fullSizePreview;
+                } else {
+                    document.getElementById('lightboxImage').src = photo.thumbnail;
+                }
+            } catch (error) {
+                console.error('Error loading full size preview:', error);
+                document.getElementById('lightboxImage').src = photo.thumbnail;
+            }
         }
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);

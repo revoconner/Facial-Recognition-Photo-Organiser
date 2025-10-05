@@ -1216,6 +1216,23 @@ class API:
         
         return photos
     
+    def get_full_size_preview(self, image_path: str) -> Optional[str]:
+        try:
+            img = Image.open(image_path)
+            
+            max_size = 1200
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            img_rgb = img.convert('RGB')
+            
+            buffer = BytesIO()
+            img_rgb.save(buffer, format='JPEG', quality=90)
+            img_base64 = base64.b64encode(buffer.getvalue()).decode()
+            
+            return f"data:image/jpeg;base64,{img_base64}"
+        except Exception as e:
+            print(f"Error creating full size preview: {e}")
+            return None
+    
     def create_thumbnail(self, image_path: str, size: int = 150, bbox: Optional[List[float]] = None) -> Optional[str]:
         try:
             img = Image.open(image_path)
