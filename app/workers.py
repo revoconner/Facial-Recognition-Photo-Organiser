@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Tuple, List
 import numpy as np
 import cv2
-from PIL import Image
+from PIL import Image, ImageOps
 from insightface.app import FaceAnalysis
 import networkx as nx
 import torch
@@ -76,18 +76,21 @@ class ScanWorker(threading.Thread):
     def load_image(self, file_path: str) -> Optional[np.ndarray]:
         file_ext = Path(file_path).suffix.lower()
         
-        if file_ext in {'.heic', '.heif'}:
-            try:
-                pil_image = Image.open(file_path)
-                image_rgb = np.array(pil_image.convert('RGB'))
-                image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
-                return image_bgr
-            except Exception as e:
-                self.api.update_status(f"ERROR: Cannot read HEIF image - {os.path.basename(file_path)}: {str(e)}")
-                return None
-        else:
-            image = cv2.imread(file_path)
-            return image
+        try:
+            # Use PIL for all formats to handle EXIF orientation correctly
+            pil_image = Image.open(file_path)
+            
+            # Apply EXIF orientation if present
+            pil_image = ImageOps.exif_transpose(pil_image)
+            
+            # Convert to RGB then BGR for OpenCV
+            image_rgb = np.array(pil_image.convert('RGB'))
+            image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+            return image_bgr
+            
+        except Exception as e:
+            self.api.update_status(f"ERROR: Cannot read image - {os.path.basename(file_path)}: {str(e)}")
+            return None
 
     def run(self):
         try:

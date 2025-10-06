@@ -2,7 +2,7 @@ import os
 import base64
 from pathlib import Path
 from typing import Optional, List, Dict
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
 
 
@@ -72,6 +72,9 @@ class ThumbnailCache:
         
         try:
             img = Image.open(image_path)
+            
+            # Apply EXIF orientation if present
+            img = ImageOps.exif_transpose(img)
             
             if bbox is not None:
                 x1, y1, x2, y2 = bbox

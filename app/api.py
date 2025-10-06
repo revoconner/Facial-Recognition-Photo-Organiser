@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from typing import Optional, List
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageOps
 import torch
 import webview
 import pystray
@@ -374,6 +374,9 @@ class API:
         try:
             img = Image.open(image_path)
             
+            # Apply EXIF orientation if present
+            img = ImageOps.exif_transpose(img)
+            
             max_size = 1200
             img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
             img_rgb = img.convert('RGB')
@@ -393,6 +396,9 @@ class API:
         
         try:
             img = Image.open(image_path)
+            
+            # Apply EXIF orientation if present
+            img = ImageOps.exif_transpose(img)
             
             if bbox is not None:
                 x1, y1, x2, y2 = bbox
