@@ -7,3 +7,4 @@ app/license.rtf
 app/build/
 *.wixpdb
 app/output/
+app/__pycache__/
