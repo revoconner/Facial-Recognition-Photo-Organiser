@@ -7,13 +7,19 @@ While there are tools that already do this, they all need some kind of internet 
 
 ## Features
 - User friendly GUI
-- Drag and drop support
+- Hide people from list
+- Rename people
+- Hide photos
+- Preview photos or open them in your default photos app
+- Hide people with less than X photos
+- Change thumbnail for people's list
+- Sort by name of number of photos
+- Quickly jump to a person
+- Finds new photos or deleted photos on disk autmatically
+- Exclusion by wildcard or subfolder
 - Doesn't change your folder structure, the faces only work inside the app and is kept in a separate database. So if you have organised your folders in a certain way, it won't mess with that.
-- Lets user decide the threshold percentage, anything beyond that will be grouped as another person
-- Lets user name the person
-- Lets user search the person
-- Lets user override which photo belongs to which person
+- Lets user decide the threshold percentage, for facial matching
 - Allocates system resources dynamically so as not to bog down your system.
 
 
-# Coming when it's ready
+## User Guide will be available soon
