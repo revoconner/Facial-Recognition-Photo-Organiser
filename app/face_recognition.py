@@ -1,7 +1,7 @@
 import sys
 import os
 import argparse
-import duckdb
+import sqlite3
 import lmdb
 import pickle
 import hashlib
@@ -49,6 +49,11 @@ def get_appdata_path():
 
 
 def get_insightface_root():
+    """
+    Get the InsightFace model root path.
+    When running as EXE, use bundled models.
+    When running as script, use default cache.
+    """
     if getattr(sys, 'frozen', False):
         base_path = Path(sys._MEIPASS)
         return str(base_path)
@@ -119,12 +124,9 @@ class FaceDatabase:
         self.db_folder = Path(db_folder)
         self.db_folder.mkdir(parents=True, exist_ok=True)
         
-        self.db_path = self.db_folder / "metadata.duckdb"
-        self.conn = duckdb.connect(str(self.db_path))
-        
-        cpu_count = os.cpu_count() or 4
-        self.conn.execute(f"SET threads TO {cpu_count}")
-        self.conn.execute("SET memory_limit = '4GB'")
+        self.sqlite_path = self.db_folder / "metadata.db"
+        self.conn = sqlite3.connect(self.sqlite_path, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
         
         self.lmdb_path = self.db_folder / "encodings.lmdb"
         self.env = lmdb.open(
@@ -134,186 +136,190 @@ class FaceDatabase:
         )
         
         self._init_tables()
-        self._lock = threading.Lock()
     
     def _init_tables(self):
-        self.conn.execute('''
+        cursor = self.conn.cursor()
+        
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS photos (
-                photo_id INTEGER PRIMARY KEY,
-                file_path VARCHAR UNIQUE NOT NULL,
-                file_hash VARCHAR,
-                scan_status VARCHAR DEFAULT 'pending',
-                date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                photo_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_path TEXT UNIQUE NOT NULL,
+                file_hash TEXT,
+                scan_status TEXT DEFAULT 'pending',
+                date_added REAL DEFAULT (julianday('now'))
             )
         ''')
         
-        self.conn.execute('''
-            CREATE SEQUENCE IF NOT EXISTS photos_seq START 1
-        ''')
-        
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS faces (
-                face_id INTEGER PRIMARY KEY,
+                face_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 photo_id INTEGER NOT NULL,
-                bbox_x1 DOUBLE,
-                bbox_y1 DOUBLE,
-                bbox_x2 DOUBLE,
-                bbox_y2 DOUBLE
+                bbox_x1 REAL,
+                bbox_y1 REAL,
+                bbox_x2 REAL,
+                bbox_y2 REAL,
+                FOREIGN KEY (photo_id) REFERENCES photos(photo_id)
             )
         ''')
         
-        self.conn.execute('''
-            CREATE SEQUENCE IF NOT EXISTS faces_seq START 1
-        ''')
-        
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS clusterings (
-                clustering_id INTEGER PRIMARY KEY,
-                threshold DOUBLE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_active BOOLEAN DEFAULT false
+                clustering_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                threshold REAL NOT NULL,
+                created_at REAL DEFAULT (julianday('now')),
+                is_active BOOLEAN DEFAULT 0
             )
         ''')
         
-        self.conn.execute('''
-            CREATE SEQUENCE IF NOT EXISTS clusterings_seq START 1
-        ''')
-        
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS cluster_assignments (
                 face_id INTEGER NOT NULL,
                 clustering_id INTEGER NOT NULL,
                 person_id INTEGER NOT NULL,
-                confidence_score DOUBLE,
-                PRIMARY KEY (face_id, clustering_id)
+                confidence_score REAL,
+                PRIMARY KEY (face_id, clustering_id),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id),
+                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
             )
         ''')
         
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS hidden_persons (
                 clustering_id INTEGER NOT NULL,
                 person_id INTEGER NOT NULL,
-                hidden_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (clustering_id, person_id)
+                hidden_at REAL DEFAULT (julianday('now')),
+                PRIMARY KEY (clustering_id, person_id),
+                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
             )
         ''')
         
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS hidden_photos (
                 face_id INTEGER PRIMARY KEY,
-                hidden_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                hidden_at REAL DEFAULT (julianday('now')),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id)
             )
         ''')
         
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS face_tags (
                 face_id INTEGER PRIMARY KEY,
-                tag_name VARCHAR NOT NULL,
-                tagged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                tag_name TEXT NOT NULL,
+                tagged_at REAL DEFAULT (julianday('now')),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id)
             )
         ''')
         
-        self.conn.execute('''
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS tag_primary_photos (
-                tag_name VARCHAR PRIMARY KEY,
+                tag_name TEXT PRIMARY KEY,
                 face_id INTEGER NOT NULL,
-                set_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                set_at REAL DEFAULT (julianday('now')),
+                FOREIGN KEY (face_id) REFERENCES faces(face_id)
             )
         ''')
         
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_hidden_photos ON hidden_photos(face_id)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
-        self.conn.execute('CREATE INDEX IF NOT EXISTS idx_tag_primary_photos ON tag_primary_photos(tag_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_photos ON hidden_photos(face_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_tag_primary_photos ON tag_primary_photos(tag_name)')
+        
+        self.conn.commit()
     
     def add_photo(self, file_path: str, file_hash: str) -> Optional[int]:
-        with self._lock:
-            try:
-                result = self.conn.execute('''
-                    INSERT INTO photos (photo_id, file_path, file_hash)
-                    SELECT nextval('photos_seq'), ?, ?
-                    WHERE NOT EXISTS (SELECT 1 FROM photos WHERE file_path = ?)
-                    RETURNING photo_id
-                ''', [file_path, file_hash, file_path]).fetchone()
-                
-                if result:
-                    return result[0]
-                
-                return self.get_photo_id(file_path)
-            except Exception as e:
-                print(f"Database error in add_photo: {e}")
-                return None
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT OR IGNORE INTO photos (file_path, file_hash)
+                VALUES (?, ?)
+            ''', (file_path, file_hash))
+            self.conn.commit()
+            
+            if cursor.lastrowid:
+                return cursor.lastrowid
+            
+            return self.get_photo_id(file_path)
+        except Exception as e:
+            print(f"Database error in add_photo: {e}")
+            self.conn.rollback()
+            return None
     
     def get_photo_id(self, file_path: str) -> Optional[int]:
-        result = self.conn.execute('SELECT photo_id FROM photos WHERE file_path = ?', [file_path]).fetchone()
-        return result[0] if result else None
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT photo_id FROM photos WHERE file_path = ?', (file_path,))
+        row = cursor.fetchone()
+        return row[0] if row else None
     
     def get_all_scanned_paths(self) -> Set[str]:
-        results = self.conn.execute('SELECT file_path FROM photos WHERE scan_status = ?', ['completed']).fetchall()
-        return {row[0] for row in results}
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT file_path FROM photos WHERE scan_status = "completed"')
+        return {row[0] for row in cursor.fetchall()}
     
     def get_pending_and_error_paths(self) -> List[str]:
-        results = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT file_path FROM photos 
-            WHERE scan_status IN ('pending', 'error')
-        ''').fetchall()
-        return [row[0] for row in results]
+            WHERE scan_status IN ("pending", "error")
+        ''')
+        return [row[0] for row in cursor.fetchall()]
     
     def remove_deleted_photos(self, existing_paths: Set[str]) -> int:
-        with self._lock:
-            all_db_photos = self.conn.execute('SELECT photo_id, file_path FROM photos').fetchall()
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT photo_id, file_path FROM photos')
+        all_db_photos = cursor.fetchall()
+        
+        deleted_count = 0
+        deleted_photo_ids = []
+        for photo_id, file_path in all_db_photos:
+            if file_path not in existing_paths:
+                deleted_photo_ids.append(photo_id)
+                deleted_count += 1
+        
+        if deleted_photo_ids:
+            placeholders = ','.join('?' * len(deleted_photo_ids))
             
-            deleted_count = 0
-            deleted_photo_ids = []
-            for photo_id, file_path in all_db_photos:
-                if file_path not in existing_paths:
-                    deleted_photo_ids.append(photo_id)
-                    deleted_count += 1
+            cursor.execute(f'SELECT face_id FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+            deleted_face_ids = [row[0] for row in cursor.fetchall()]
             
-            if deleted_photo_ids:
-                deleted_face_ids = self.conn.execute(f'''
-                    SELECT face_id FROM faces 
-                    WHERE photo_id IN ({','.join(['?'] * len(deleted_photo_ids))})
-                ''', deleted_photo_ids).fetchall()
-                deleted_face_ids = [row[0] for row in deleted_face_ids]
-                
-                if deleted_face_ids:
-                    face_placeholders = ','.join(['?'] * len(deleted_face_ids))
-                    self.conn.execute(f'DELETE FROM face_tags WHERE face_id IN ({face_placeholders})', deleted_face_ids)
-                    self.conn.execute(f'DELETE FROM tag_primary_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
-                    self.conn.execute(f'DELETE FROM hidden_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
-                
-                photo_placeholders = ','.join(['?'] * len(deleted_photo_ids))
-                self.conn.execute(f'DELETE FROM faces WHERE photo_id IN ({photo_placeholders})', deleted_photo_ids)
-                self.conn.execute(f'DELETE FROM photos WHERE photo_id IN ({photo_placeholders})', deleted_photo_ids)
+            if deleted_face_ids:
+                face_placeholders = ','.join('?' * len(deleted_face_ids))
+                cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({face_placeholders})', deleted_face_ids)
+                cursor.execute(f'DELETE FROM tag_primary_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
+                cursor.execute(f'DELETE FROM hidden_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
             
-            return deleted_count
+            cursor.execute(f'DELETE FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+            cursor.execute(f'DELETE FROM photos WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+        
+        self.conn.commit()
+        return deleted_count
     
     def get_photos_needing_scan(self) -> int:
-        result = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT COUNT(*) FROM photos 
-            WHERE scan_status IN ('pending', 'error')
-        ''').fetchone()
-        return result[0]
+            WHERE scan_status IN ("pending", "error")
+        ''')
+        return cursor.fetchone()[0]
     
     def add_face(self, photo_id: int, embedding: np.ndarray, bbox: List[float]) -> int:
-        with self._lock:
-            face_id = self.conn.execute('''
-                INSERT INTO faces (face_id, photo_id, bbox_x1, bbox_y1, bbox_x2, bbox_y2) 
-                VALUES (nextval('faces_seq'), ?, ?, ?, ?, ?)
-                RETURNING face_id
-            ''', [photo_id, bbox[0], bbox[1], bbox[2], bbox[3]]).fetchone()[0]
-            
-            with self.env.begin(write=True) as txn:
-                key = str(face_id).encode()
-                value = pickle.dumps(embedding)
-                txn.put(key, value)
-            
-            return face_id
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT INTO faces (photo_id, bbox_x1, bbox_y1, bbox_x2, bbox_y2) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (photo_id, bbox[0], bbox[1], bbox[2], bbox[3]))
+        self.conn.commit()
+        face_id = cursor.lastrowid
+        
+        with self.env.begin(write=True) as txn:
+            key = str(face_id).encode()
+            value = pickle.dumps(embedding)
+            txn.put(key, value)
+        
+        return face_id
     
     def get_face_embedding(self, face_id: int) -> Optional[np.ndarray]:
         with self.env.begin() as txn:
@@ -324,8 +330,9 @@ class FaceDatabase:
         return None
     
     def get_all_embeddings(self) -> Tuple[List[int], np.ndarray]:
-        face_ids = self.conn.execute('SELECT face_id FROM faces ORDER BY face_id').fetchall()
-        face_ids = [row[0] for row in face_ids]
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT face_id FROM faces ORDER BY face_id')
+        face_ids = [row[0] for row in cursor.fetchall()]
         
         embeddings = []
         valid_face_ids = []
@@ -340,178 +347,170 @@ class FaceDatabase:
         return [], np.array([])
     
     def create_clustering(self, threshold: float) -> int:
-        with self._lock:
-            self.conn.execute('UPDATE clusterings SET is_active = false')
-            clustering_id = self.conn.execute('''
-                INSERT INTO clusterings (clustering_id, threshold, is_active) 
-                VALUES (nextval('clusterings_seq'), ?, true)
-                RETURNING clustering_id
-            ''', [threshold]).fetchone()[0]
-            return clustering_id
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE clusterings SET is_active = 0')
+        cursor.execute('INSERT INTO clusterings (threshold, is_active) VALUES (?, 1)', (threshold,))
+        self.conn.commit()
+        return cursor.lastrowid
     
     def save_cluster_assignments(self, clustering_id: int, face_ids: List[int], 
                                  person_ids: List[int], confidences: List[float]):
-        with self._lock:
-            data = [(fid, clustering_id, pid, conf) 
-                    for fid, pid, conf in zip(face_ids, person_ids, confidences)]
-            
-            self.conn.executemany('''
-                INSERT OR REPLACE INTO cluster_assignments 
-                (face_id, clustering_id, person_id, confidence_score)
-                VALUES (?, ?, ?, ?)
-            ''', data)
+        cursor = self.conn.cursor()
+        data = [(fid, clustering_id, pid, conf) 
+                for fid, pid, conf in zip(face_ids, person_ids, confidences)]
+        cursor.executemany('''
+            INSERT OR REPLACE INTO cluster_assignments 
+            (face_id, clustering_id, person_id, confidence_score)
+            VALUES (?, ?, ?, ?)
+        ''', data)
+        self.conn.commit()
     
     def get_active_clustering(self) -> Optional[dict]:
-        result = self.conn.execute('SELECT * FROM clusterings WHERE is_active = true').fetchone()
-        if result:
-            return {
-                'clustering_id': result[0],
-                'threshold': result[1],
-                'created_at': result[2],
-                'is_active': result[3]
-            }
-        return None
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM clusterings WHERE is_active = 1')
+        row = cursor.fetchone()
+        return dict(row) if row else None
     
     def get_persons_in_clustering(self, clustering_id: int) -> List[dict]:
-        results = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT person_id, COUNT(*) as face_count
             FROM cluster_assignments
             WHERE clustering_id = ?
             GROUP BY person_id
             ORDER BY person_id
-        ''', [clustering_id]).fetchall()
-        return [{'person_id': row[0], 'face_count': row[1]} for row in results]
+        ''', (clustering_id,))
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_face_ids_for_person(self, clustering_id: int, person_id: int) -> List[int]:
-        results = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT face_id FROM cluster_assignments
             WHERE clustering_id = ? AND person_id = ?
-        ''', [clustering_id, person_id]).fetchall()
-        return [row[0] for row in results]
+        ''', (clustering_id, person_id))
+        return [row[0] for row in cursor.fetchall()]
     
     def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[dict]:
-        results = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
             FROM photos p
             JOIN faces f ON p.photo_id = f.photo_id
             JOIN cluster_assignments ca ON f.face_id = ca.face_id
             WHERE ca.clustering_id = ? AND ca.person_id = ?
-        ''', [clustering_id, person_id]).fetchall()
-        return [{
-            'file_path': row[0],
-            'face_id': row[1],
-            'bbox_x1': row[2],
-            'bbox_y1': row[3],
-            'bbox_x2': row[4],
-            'bbox_y2': row[5]
-        } for row in results]
+        ''', (clustering_id, person_id))
+        return [dict(row) for row in cursor.fetchall()]
     
     def get_face_data(self, face_id: int) -> Optional[dict]:
-        result = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT f.face_id, f.photo_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2, p.file_path
             FROM faces f
             JOIN photos p ON f.photo_id = p.photo_id
             WHERE f.face_id = ?
-        ''', [face_id]).fetchone()
-        if result:
-            return {
-                'face_id': result[0],
-                'photo_id': result[1],
-                'bbox_x1': result[2],
-                'bbox_y1': result[3],
-                'bbox_x2': result[4],
-                'bbox_y2': result[5],
-                'file_path': result[6]
-            }
-        return None
+        ''', (face_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
     
     def hide_person(self, clustering_id: int, person_id: int):
-        with self._lock:
-            self.conn.execute('''
-                INSERT OR IGNORE INTO hidden_persons (clustering_id, person_id)
-                VALUES (?, ?)
-            ''', [clustering_id, person_id])
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR IGNORE INTO hidden_persons (clustering_id, person_id)
+            VALUES (?, ?)
+        ''', (clustering_id, person_id))
+        self.conn.commit()
     
     def unhide_person(self, clustering_id: int, person_id: int):
-        with self._lock:
-            self.conn.execute('''
-                DELETE FROM hidden_persons 
-                WHERE clustering_id = ? AND person_id = ?
-            ''', [clustering_id, person_id])
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM hidden_persons 
+            WHERE clustering_id = ? AND person_id = ?
+        ''', (clustering_id, person_id))
+        self.conn.commit()
     
     def get_hidden_persons(self, clustering_id: int) -> Set[int]:
-        results = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT person_id FROM hidden_persons
             WHERE clustering_id = ?
-        ''', [clustering_id]).fetchall()
-        return {row[0] for row in results}
+        ''', (clustering_id,))
+        return {row[0] for row in cursor.fetchall()}
     
     def hide_photo(self, face_id: int):
-        with self._lock:
-            self.conn.execute('''
-                INSERT OR IGNORE INTO hidden_photos (face_id)
-                VALUES (?)
-            ''', [face_id])
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR IGNORE INTO hidden_photos (face_id)
+            VALUES (?)
+        ''', (face_id,))
+        self.conn.commit()
     
     def unhide_photo(self, face_id: int):
-        with self._lock:
-            self.conn.execute('''
-                DELETE FROM hidden_photos 
-                WHERE face_id = ?
-            ''', [face_id])
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM hidden_photos 
+            WHERE face_id = ?
+        ''', (face_id,))
+        self.conn.commit()
     
     def get_hidden_photos(self) -> Set[int]:
-        results = self.conn.execute('SELECT face_id FROM hidden_photos').fetchall()
-        return {row[0] for row in results}
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT face_id FROM hidden_photos')
+        return {row[0] for row in cursor.fetchall()}
     
     def set_primary_photo_for_tag(self, tag_name: str, face_id: int):
-        with self._lock:
-            self.conn.execute('''
-                INSERT OR REPLACE INTO tag_primary_photos (tag_name, face_id)
-                VALUES (?, ?)
-            ''', [tag_name, face_id])
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO tag_primary_photos (tag_name, face_id)
+            VALUES (?, ?)
+        ''', (tag_name, face_id))
+        self.conn.commit()
     
     def get_primary_photo_for_tag(self, tag_name: str) -> Optional[int]:
-        result = self.conn.execute('''
+        cursor = self.conn.cursor()
+        cursor.execute('''
             SELECT face_id FROM tag_primary_photos
             WHERE tag_name = ?
-        ''', [tag_name]).fetchone()
-        if result:
-            face_id = result[0]
+        ''', (tag_name,))
+        row = cursor.fetchone()
+        if row:
+            face_id = row[0]
             face_data = self.get_face_data(face_id)
             if face_data:
                 return face_id
             else:
-                with self._lock:
-                    self.conn.execute('DELETE FROM tag_primary_photos WHERE tag_name = ?', [tag_name])
+                cursor.execute('DELETE FROM tag_primary_photos WHERE tag_name = ?', (tag_name,))
+                self.conn.commit()
                 return None
         return None
     
     def tag_faces(self, face_ids: List[int], tag_name: str):
-        with self._lock:
-            data = [(fid, tag_name) for fid in face_ids]
-            self.conn.executemany('''
-                INSERT OR REPLACE INTO face_tags (face_id, tag_name)
-                VALUES (?, ?)
-            ''', data)
+        cursor = self.conn.cursor()
+        data = [(fid, tag_name) for fid in face_ids]
+        cursor.executemany('''
+            INSERT OR REPLACE INTO face_tags (face_id, tag_name)
+            VALUES (?, ?)
+        ''', data)
+        self.conn.commit()
     
     def untag_faces(self, face_ids: List[int]):
-        with self._lock:
-            if face_ids:
-                placeholders = ','.join(['?'] * len(face_ids))
-                self.conn.execute(f'DELETE FROM face_tags WHERE face_id IN ({placeholders})', face_ids)
+        cursor = self.conn.cursor()
+        if face_ids:
+            placeholders = ','.join('?' * len(face_ids))
+            cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({placeholders})', face_ids)
+            self.conn.commit()
     
     def get_face_tags(self, face_ids: List[int]) -> Dict[int, str]:
+        cursor = self.conn.cursor()
         if not face_ids:
             return {}
         
-        placeholders = ','.join(['?'] * len(face_ids))
-        results = self.conn.execute(f'''
+        placeholders = ','.join('?' * len(face_ids))
+        cursor.execute(f'''
             SELECT face_id, tag_name FROM face_tags
             WHERE face_id IN ({placeholders})
-        ''', face_ids).fetchall()
+        ''', face_ids)
         
-        return {row[0]: row[1] for row in results}
+        return {row[0]: row[1] for row in cursor.fetchall()}
     
     def get_person_tag_summary(self, face_ids: List[int]) -> Optional[Dict]:
         if not face_ids:
@@ -533,17 +532,20 @@ class FaceDatabase:
         }
     
     def update_photo_status(self, photo_id: int, status: str):
-        with self._lock:
-            self.conn.execute('UPDATE photos SET scan_status = ? WHERE photo_id = ?', 
-                          [status, photo_id])
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE photos SET scan_status = ? WHERE photo_id = ?', 
+                      (status, photo_id))
+        self.conn.commit()
     
     def get_total_faces(self) -> int:
-        result = self.conn.execute('SELECT COUNT(*) FROM faces').fetchone()
-        return result[0]
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM faces')
+        return cursor.fetchone()[0]
     
     def get_total_photos(self) -> int:
-        result = self.conn.execute('SELECT COUNT(*) FROM photos WHERE scan_status = ?', ['completed']).fetchone()
-        return result[0]
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM photos WHERE scan_status = "completed"')
+        return cursor.fetchone()[0]
     
     def close(self):
         self.conn.close()
@@ -764,7 +766,7 @@ class ScanWorker(threading.Thread):
             
             status_row = self.db.conn.execute(
                 'SELECT scan_status FROM photos WHERE photo_id = ?', 
-                [photo_id]
+                (photo_id,)
             ).fetchone()
             
             if not status_row:
