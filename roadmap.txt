@@ -1,3 +1,11 @@
-make saving databases to %appdata%
 
 
+
+project/
+├── face_recognition.py    # Main entry point (50 lines)
+├── utils.py              # Utility functions (50 lines)
+├── settings.py           # Settings management (60 lines)
+├── thumbnail_cache.py    # Thumbnail caching (150 lines)
+├── database.py           # Database operations (450 lines)
+├── workers.py            # Background workers (300 lines)
+└── api.py                # API interface (500 lines)
