@@ -60,6 +60,138 @@ def get_insightface_root():
     else:
         return str(Path.home() / '.insightface')
 
+class ThumbnailCache:
+    """Disk-based thumbnail cache for fast photo grid loading"""
+    
+    def __init__(self, cache_folder: str):
+        self.cache_folder = Path(cache_folder)
+        self.cache_folder.mkdir(parents=True, exist_ok=True)
+        
+    def _get_cache_key(self, face_id: int, bbox: Optional[List[float]], size: int) -> str:
+        """Generate cache filename"""
+        mode = "zoom" if bbox else "entire"
+        return f"face_{face_id}_{mode}_{size}.jpg"
+    
+    def _get_cache_path(self, cache_key: str) -> Path:
+        """Get full path for cache file"""
+        return self.cache_folder / cache_key
+    
+    def get_cached_thumbnail(self, face_id: int, image_path: str, 
+                           bbox: Optional[List[float]], size: int) -> Optional[str]:
+        """Try to get thumbnail from cache"""
+        cache_key = self._get_cache_key(face_id, bbox, size)
+        cache_path = self._get_cache_path(cache_key)
+        
+        if cache_path.exists():
+            try:
+                # Check if source image has been modified
+                source_mtime = os.path.getmtime(image_path)
+                cache_mtime = cache_path.stat().st_mtime
+                
+                if source_mtime > cache_mtime:
+                    # Source is newer, invalidate cache
+                    cache_path.unlink()
+                    return None
+                
+                # Read cached thumbnail
+                with open(cache_path, 'rb') as f:
+                    img_bytes = f.read()
+                    img_base64 = base64.b64encode(img_bytes).decode()
+                    return f"data:image/jpeg;base64,{img_base64}"
+                    
+            except Exception as e:
+                print(f"Cache read error for {cache_key}: {e}")
+                return None
+        
+        return None
+    
+    def save_to_cache(self, face_id: int, bbox: Optional[List[float]], 
+                     size: int, thumbnail_bytes: bytes) -> bool:
+        """Save thumbnail to cache"""
+        try:
+            cache_key = self._get_cache_key(face_id, bbox, size)
+            cache_path = self._get_cache_path(cache_key)
+            
+            with open(cache_path, 'wb') as f:
+                f.write(thumbnail_bytes)
+            
+            return True
+        except Exception as e:
+            print(f"Cache write error: {e}")
+            return False
+    
+    def create_thumbnail_with_cache(self, face_id: int, image_path: str, 
+                                   size: int = 150, bbox: Optional[List[float]] = None) -> Optional[str]:
+        """Create thumbnail with caching"""
+        # Try to get from cache first
+        cached = self.get_cached_thumbnail(face_id, image_path, bbox, size)
+        if cached:
+            return cached
+        
+        # Generate new thumbnail
+        try:
+            img = Image.open(image_path)
+            
+            # Crop to bbox if provided
+            if bbox is not None:
+                x1, y1, x2, y2 = bbox
+                padding = 20
+                
+                x1 = max(0, x1 - padding)
+                y1 = max(0, y1 - padding)
+                x2 = min(img.width, x2 + padding)
+                y2 = min(img.height, y2 + padding)
+                
+                img = img.crop((int(x1), int(y1), int(x2), int(y2)))
+            
+            # Create thumbnail
+            img.thumbnail((size, size), Image.Resampling.LANCZOS)
+            img_rgb = img.convert('RGB')
+            
+            # Save to memory buffer
+            buffer = BytesIO()
+            img_rgb.save(buffer, format='JPEG', quality=85)
+            img_bytes = buffer.getvalue()
+            
+            # Save to cache
+            self.save_to_cache(face_id, bbox, size, img_bytes)
+            
+            # Return base64
+            img_base64 = base64.b64encode(img_bytes).decode()
+            return f"data:image/jpeg;base64,{img_base64}"
+            
+        except Exception as e:
+            print(f"Error creating thumbnail: {e}")
+            return None
+    
+    def get_cache_size(self) -> Dict[str, any]:
+        """Get cache statistics"""
+        total_size = 0
+        file_count = 0
+        
+        for file_path in self.cache_folder.glob("*.jpg"):
+            total_size += file_path.stat().st_size
+            file_count += 1
+        
+        return {
+            'size_bytes': total_size,
+            'size_mb': round(total_size / (1024 * 1024), 2),
+            'file_count': file_count,
+            'avg_size_kb': round((total_size / file_count / 1024) if file_count > 0 else 0, 2)
+        }
+    
+    def clear_cache(self) -> Dict[str, any]:
+        """Clear all cached thumbnails"""
+        stats = self.get_cache_size()
+        
+        for file_path in self.cache_folder.glob("*.jpg"):
+            try:
+                file_path.unlink()
+            except Exception as e:
+                print(f"Error deleting {file_path}: {e}")
+        
+        return stats
+    
 
 class Settings:
     def __init__(self, settings_path: str):
@@ -1035,7 +1167,12 @@ class API:
         self._quit_flag = False
         self._dynamic_resources = settings.get('dynamic_resources', True)
         self._window_foreground = True
-    
+
+        # Initialize thumbnail cache
+        cache_path = db_path.parent / "thumbnail_cache"
+        self._thumbnail_cache = ThumbnailCache(str(cache_path))
+        print(f"Thumbnail cache location: {cache_path}")
+
     def set_window(self, window):
         self._window = window
         self._setup_window_events()
@@ -1124,6 +1261,17 @@ class API:
         if self._window:
             percent = (current / total) * 100 if total > 0 else 0
             self._window.evaluate_js(f'updateProgress({current}, {total}, {percent})')
+
+    def get_cache_stats(self):
+        """Get cache statistics for UI"""
+        return self._thumbnail_cache.get_cache_size()
+    
+    def clear_thumbnail_cache(self):
+        """Clear thumbnail cache and return stats"""
+        stats = self._thumbnail_cache.clear_cache()
+        if self._window:
+            self._window.evaluate_js('loadPeople()')
+        return stats
     
     def scan_complete(self):
         total_faces = self._db.get_total_faces()
@@ -1243,7 +1391,7 @@ class API:
                 if face_data:
                     bbox = [face_data['bbox_x1'], face_data['bbox_y1'], 
                            face_data['bbox_x2'], face_data['bbox_y2']]
-                    thumbnail = self.create_thumbnail(face_data['file_path'], size=80, bbox=bbox)
+                    thumbnail = self.create_thumbnail(face_data['file_path'], size=80, bbox=bbox, face_id=primary_face_id)
             
             result.append({
                 'id': person_id,
@@ -1329,6 +1477,7 @@ class API:
         photos = []
         
         view_mode = self._settings.get('view_mode', 'entire_photo')
+        grid_size = self._settings.get('grid_size', 180)
         
         for data in photo_data:
             face_id = data['face_id']
@@ -1343,7 +1492,8 @@ class API:
             if view_mode == 'zoom_to_faces':
                 bbox = [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']]
             
-            thumbnail = self.create_thumbnail(path, bbox=bbox)
+            # Pass face_id to enable caching
+            thumbnail = self.create_thumbnail(path, size=grid_size, bbox=bbox, face_id=face_id)
             if thumbnail:
                 photos.append({
                     'path': path,
@@ -1372,7 +1522,12 @@ class API:
             print(f"Error creating full size preview: {e}")
             return None
     
-    def create_thumbnail(self, image_path: str, size: int = 150, bbox: Optional[List[float]] = None) -> Optional[str]:
+    def create_thumbnail(self, image_path: str, size: int = 150, bbox: Optional[List[float]] = None, face_id: Optional[int] = None) -> Optional[str]:
+        """Create thumbnail using cache system when face_id provided"""
+        if face_id:
+            return self._thumbnail_cache.create_thumbnail_with_cache(face_id, image_path, size, bbox)
+        
+        # Fallback for non-face thumbnails
         try:
             img = Image.open(image_path)
             
@@ -1397,7 +1552,8 @@ class API:
             return f"data:image/jpeg;base64,{img_base64}"
         except Exception as e:
             return None
-    
+        
+
     def open_photo(self, path):
         try:
             if sys.platform == 'win32':

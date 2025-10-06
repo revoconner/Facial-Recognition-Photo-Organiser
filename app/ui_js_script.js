@@ -49,6 +49,8 @@ let people = [];
             menu.style.left = left + 'px';
         }
 
+
+
         function sortPeople(peopleArray, mode) {
             const sorted = [...peopleArray];
             
@@ -133,6 +135,44 @@ let people = [];
                 
                 peopleList.appendChild(item);
             });
+        }
+
+        async function updateCacheSize() {
+            try {
+                const stats = await pywebview.api.get_cache_stats();
+                const sizeText = stats.file_count > 0 
+                    ? `${stats.size_mb} MB (${stats.file_count} files)`
+                    : 'Cache empty';
+                document.getElementById('cacheSize').textContent = sizeText;
+            } catch (error) {
+                document.getElementById('cacheSize').textContent = 'Unable to calculate';
+            }
+        }
+
+        async function clearThumbnailCache() {
+            const confirmClear = confirm('Clear all cached thumbnails? This will free up disk space but photos will need to be regenerated on next view.');
+            
+            if (confirmClear) {
+                const clearBtn = document.getElementById('clearCacheBtn');
+                clearBtn.disabled = true;
+                clearBtn.textContent = 'Clearing...';
+                
+                try {
+                    const stats = await pywebview.api.clear_thumbnail_cache();
+                    addLogEntry(`Thumbnail cache cleared: ${stats.size_mb} MB freed (${stats.file_count} files removed)`);
+                    
+                    document.getElementById('cacheSize').textContent = 'Cache empty';
+                    
+                    alert(`Successfully cleared ${stats.size_mb} MB of cached thumbnails!`);
+                    
+                } catch (error) {
+                    addLogEntry(`Error clearing cache: ${error}`);
+                    alert('Error clearing cache. Please try again.');
+                } finally {
+                    clearBtn.disabled = false;
+                    clearBtn.textContent = 'Clear Cache';
+                }
+            }
         }
 
         async function loadPeople() {
@@ -600,6 +640,8 @@ let people = [];
                 const wildcards = await pywebview.api.get_wildcard_exclusions();
                 document.getElementById('wildcardInput').value = wildcards;
                 
+                await updateCacheSize();
+
                 addLogEntry('Settings loaded successfully');
             } catch (error) {
                 console.error('Error loading settings:', error);
@@ -902,6 +944,9 @@ let people = [];
                 const panelId = item.getAttribute('data-panel') + '-panel';
                 panels.forEach(panel => panel.classList.remove('active'));
                 document.getElementById(panelId).classList.add('active');
+
+                if (item.getAttribute('data-panel') === 'general') {
+                updateCacheSize(); }
             });
         });
 
