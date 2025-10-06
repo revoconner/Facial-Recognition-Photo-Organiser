@@ -1,6 +1,7 @@
 import sqlite3
 import lmdb
 import pickle
+import threading
 from pathlib import Path
 from typing import List, Optional, Tuple, Set, Dict
 from collections import Counter
@@ -13,18 +14,58 @@ class FaceDatabase:
         self.db_folder.mkdir(parents=True, exist_ok=True)
         
         self.sqlite_path = self.db_folder / "metadata.db"
-        self.conn = sqlite3.connect(self.sqlite_path, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+        
+        # Thread-local storage for connections
+        self._local = threading.local()
+        
+        # Initialize primary connection with optimizations
+        self.conn = self._create_connection()
         
         self.lmdb_path = self.db_folder / "encodings.lmdb"
         self.env = lmdb.open(
             str(self.lmdb_path),
             map_size=10*1024*1024*1024,
-            max_dbs=1
+            max_dbs=1,
+            readahead=True,      # Enable readahead for speed
+            metasync=False,      # Faster writes
+            sync=False,          # Async writes
+            writemap=True        # Direct memory mapping
         )
         
         self._init_tables()
         self._temp_table_counter = 0
+        
+        # Memory cache for frequently accessed data
+        self._cache = {
+            'active_clustering': None,
+            'persons_list': None,
+            'cache_timestamp': 0
+        }
+    
+    def _create_connection(self):
+        """Create optimized SQLite connection"""
+        conn = sqlite3.connect(self.sqlite_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        
+        # Apply performance optimizations
+        cursor = conn.cursor()
+        cursor.executescript('''
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA cache_size = -64000;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA mmap_size = 268435456;
+            PRAGMA page_size = 4096;
+        ''')
+        conn.commit()
+        
+        return conn
+    
+    def _get_connection(self):
+        """Get thread-local connection"""
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            self._local.conn = self._create_connection()
+        return self._local.conn
     
     def _init_tables(self):
         cursor = self.conn.cursor()
@@ -110,11 +151,14 @@ class FaceDatabase:
         
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_hash ON photos(file_hash)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_face ON cluster_assignments(clustering_id, person_id, face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_photos ON hidden_photos(face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_combined ON face_tags(tag_name, face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tag_primary_photos ON tag_primary_photos(tag_name)')
         
         self.conn.commit()
@@ -319,6 +363,10 @@ class FaceDatabase:
             print(f"Migrated hidden persons from clustering {old_clustering_id} to {new_clustering_id}")
         
         self.conn.commit()
+        
+        # Invalidate cache after clustering change
+        self.invalidate_cache()
+        
         return new_clustering_id
     
     def save_cluster_assignments(self, clustering_id: int, face_ids: List[int], 
@@ -334,10 +382,31 @@ class FaceDatabase:
         self.conn.commit()
     
     def get_active_clustering(self) -> Optional[dict]:
+        """Get active clustering with caching"""
+        import time
+        current_time = time.time()
+        
+        # Cache for 5 seconds
+        if (self._cache['active_clustering'] is not None and 
+            current_time - self._cache['cache_timestamp'] < 5):
+            return self._cache['active_clustering']
+        
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM clusterings WHERE is_active = 1')
         row = cursor.fetchone()
-        return dict(row) if row else None
+        result = dict(row) if row else None
+        
+        # Update cache
+        self._cache['active_clustering'] = result
+        self._cache['cache_timestamp'] = current_time
+        
+        return result
+    
+    def invalidate_cache(self):
+        """Invalidate memory cache (call after clustering changes)"""
+        self._cache['active_clustering'] = None
+        self._cache['persons_list'] = None
+        self._cache['cache_timestamp'] = 0
     
     def get_persons_in_clustering(self, clustering_id: int) -> List[dict]:
         cursor = self.conn.cursor()
@@ -535,5 +604,16 @@ class FaceDatabase:
         return cursor.fetchone()[0]
     
     def close(self):
-        self.conn.close()
-        self.env.close()
+        """Close all database connections"""
+        # Close main connection
+        if hasattr(self, 'conn') and self.conn:
+            self.conn.close()
+        
+        # Close thread-local connections
+        if hasattr(self, '_local') and hasattr(self._local, 'conn'):
+            if self._local.conn:
+                self._local.conn.close()
+        
+        # Close LMDB
+        if hasattr(self, 'env') and self.env:
+            self.env.close()
