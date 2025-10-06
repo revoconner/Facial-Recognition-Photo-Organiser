@@ -36,7 +36,7 @@ def get_resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, relative_path)
 
 
@@ -118,6 +118,8 @@ class Settings:
         self.settings.update(updates)
         self.save()
 
+# Replace the FaceDatabase class in face_recognition.py with this fixed version
+# This handles the SQLite 999 variable limit by using temporary tables and JOINs
 
 class FaceDatabase:
     def __init__(self, db_folder: str):
@@ -136,6 +138,7 @@ class FaceDatabase:
         )
         
         self._init_tables()
+        self._temp_table_counter = 0  # For unique temp table names
     
     def _init_tables(self):
         cursor = self.conn.cursor()
@@ -230,6 +233,74 @@ class FaceDatabase:
         
         self.conn.commit()
     
+    def _get_temp_table_name(self) -> str:
+        """Generate unique temp table name"""
+        self._temp_table_counter += 1
+        return f"temp_ids_{self._temp_table_counter}"
+    
+    def _execute_with_temp_table(self, cursor, ids: List[int], query_template: str, 
+                                  params: tuple = (), id_column: str = 'id') -> sqlite3.Cursor:
+        """
+        Execute a query using a temporary table for large ID lists to avoid SQLite's 999 variable limit.
+        
+        Args:
+            cursor: SQLite cursor
+            ids: List of IDs to use in the query
+            query_template: SQL query with {temp_table} placeholder
+            params: Additional parameters for the query
+            id_column: Name of the ID column in temp table
+        
+        Returns:
+            Cursor with results
+        """
+        if not ids:
+            # Return empty result
+            cursor.execute("SELECT * FROM (SELECT 1) WHERE 0=1")
+            return cursor
+        
+        # For small lists, use the IN clause directly
+        if len(ids) <= 900:
+            placeholders = ','.join('?' * len(ids))
+            query = query_template.replace('{temp_table}', f'(SELECT value AS {id_column} FROM (VALUES {",".join(["(?)"] * len(ids))}))')
+            # Simpler approach - just use IN clause for small lists
+            simple_query = query_template.replace(
+                f'JOIN {{temp_table}} tt ON ft.face_id = tt.{id_column}',
+                f'WHERE ft.face_id IN ({placeholders})'
+            ).replace(
+                f'JOIN {{temp_table}} tt ON f.face_id = tt.{id_column}',
+                f'WHERE f.face_id IN ({placeholders})'
+            )
+            cursor.execute(simple_query, ids + list(params))
+            return cursor
+        
+        # For large lists, use temporary table
+        temp_table = self._get_temp_table_name()
+        
+        try:
+            # Create temporary table
+            cursor.execute(f'CREATE TEMP TABLE {temp_table} ({id_column} INTEGER)')
+            
+            # Insert IDs in batches
+            batch_size = 900
+            for i in range(0, len(ids), batch_size):
+                batch = ids[i:i+batch_size]
+                placeholders = ','.join(['(?)'] * len(batch))
+                cursor.execute(f'INSERT INTO {temp_table} VALUES {placeholders}', batch)
+            
+            # Execute the actual query
+            final_query = query_template.replace('{temp_table}', temp_table)
+            cursor.execute(final_query, params)
+            
+            return cursor
+        finally:
+            # Clean up temp table
+            try:
+                cursor.execute(f'DROP TABLE IF EXISTS {temp_table}')
+            except:
+                pass  # Ignore cleanup errors
+    
+    # Original methods remain the same until we get to the problem methods...
+    
     def add_photo(self, file_path: str, file_hash: str) -> Optional[int]:
         cursor = self.conn.cursor()
         try:
@@ -280,17 +351,27 @@ class FaceDatabase:
                 deleted_count += 1
         
         if deleted_photo_ids:
-            placeholders = ','.join('?' * len(deleted_photo_ids))
-            
-            cursor.execute(f'SELECT face_id FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
+            # Get all face IDs for deleted photos
+            cursor.execute(f'SELECT face_id FROM faces WHERE photo_id IN ({",".join("?" * len(deleted_photo_ids))})', deleted_photo_ids)
             deleted_face_ids = [row[0] for row in cursor.fetchall()]
             
             if deleted_face_ids:
-                face_placeholders = ','.join('?' * len(deleted_face_ids))
-                cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({face_placeholders})', deleted_face_ids)
-                cursor.execute(f'DELETE FROM tag_primary_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
-                cursor.execute(f'DELETE FROM hidden_photos WHERE face_id IN ({face_placeholders})', deleted_face_ids)
+                # Use temp table for large deletes
+                self._execute_with_temp_table(
+                    cursor, deleted_face_ids,
+                    'DELETE FROM face_tags WHERE face_id IN (SELECT id FROM {temp_table})'
+                )
+                self._execute_with_temp_table(
+                    cursor, deleted_face_ids,
+                    'DELETE FROM tag_primary_photos WHERE face_id IN (SELECT id FROM {temp_table})'
+                )
+                self._execute_with_temp_table(
+                    cursor, deleted_face_ids,
+                    'DELETE FROM hidden_photos WHERE face_id IN (SELECT id FROM {temp_table})'
+                )
             
+            # Delete faces and photos
+            placeholders = ','.join('?' * len(deleted_photo_ids))
             cursor.execute(f'DELETE FROM faces WHERE photo_id IN ({placeholders})', deleted_photo_ids)
             cursor.execute(f'DELETE FROM photos WHERE photo_id IN ({placeholders})', deleted_photo_ids)
         
@@ -493,30 +574,48 @@ class FaceDatabase:
         self.conn.commit()
     
     def untag_faces(self, face_ids: List[int]):
+        """Fixed version using temp table for large lists"""
+        if not face_ids:
+            return
+        
         cursor = self.conn.cursor()
-        if face_ids:
-            placeholders = ','.join('?' * len(face_ids))
-            cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({placeholders})', face_ids)
-            self.conn.commit()
+        self._execute_with_temp_table(
+            cursor, face_ids,
+            'DELETE FROM face_tags WHERE face_id IN (SELECT id FROM {temp_table})'
+        )
+        self.conn.commit()
     
     def get_face_tags(self, face_ids: List[int]) -> Dict[int, str]:
-        cursor = self.conn.cursor()
+        """Fixed version using temp table for large lists"""
         if not face_ids:
             return {}
         
-        placeholders = ','.join('?' * len(face_ids))
-        cursor.execute(f'''
-            SELECT face_id, tag_name FROM face_tags
-            WHERE face_id IN ({placeholders})
-        ''', face_ids)
+        cursor = self.conn.cursor()
+        
+        # Use temp table for large lists
+        if len(face_ids) <= 900:
+            placeholders = ','.join('?' * len(face_ids))
+            cursor.execute(f'''
+                SELECT face_id, tag_name FROM face_tags
+                WHERE face_id IN ({placeholders})
+            ''', face_ids)
+        else:
+            self._execute_with_temp_table(
+                cursor, face_ids,
+                '''SELECT ft.face_id, ft.tag_name 
+                   FROM face_tags ft
+                   JOIN {temp_table} tt ON ft.face_id = tt.id''',
+                id_column='id'
+            )
         
         return {row[0]: row[1] for row in cursor.fetchall()}
     
     def get_person_tag_summary(self, face_ids: List[int]) -> Optional[Dict]:
+        """Fixed version - handles large face_id lists"""
         if not face_ids:
             return None
         
-        tags = self.get_face_tags(face_ids)
+        tags = self.get_face_tags(face_ids)  # Now handles large lists
         
         if not tags:
             return None
@@ -550,7 +649,6 @@ class FaceDatabase:
     def close(self):
         self.conn.close()
         self.env.close()
-
 
 class ScanWorker(threading.Thread):
     def __init__(self, db: FaceDatabase, api):
