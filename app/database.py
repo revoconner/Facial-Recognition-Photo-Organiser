@@ -125,11 +125,17 @@ class FaceDatabase:
         return f"temp_ids_{self._temp_table_counter}"
     
     def _execute_with_temp_table(self, cursor, ids: List[int], query_template: str, 
-                                  params: tuple = (), id_column: str = 'id') -> sqlite3.Cursor:
-        """Execute a query using a temporary table for large ID lists"""
+                                  params: tuple = (), id_column: str = 'id',
+                                  fetch_results: bool = False):
+        """Execute a query using a temporary table for large ID lists
+        
+        Args:
+            fetch_results: If True, fetch and return results before dropping table.
+                          Required for SELECT queries to avoid temp table cleanup issues.
+        """
         if not ids:
             cursor.execute("SELECT * FROM (SELECT 1) WHERE 0=1")
-            return cursor
+            return [] if fetch_results else cursor
         
         if len(ids) <= 900:
             placeholders = ','.join('?' * len(ids))
@@ -141,7 +147,7 @@ class FaceDatabase:
                 f'WHERE f.face_id IN ({placeholders})'
             )
             cursor.execute(simple_query, ids + list(params))
-            return cursor
+            return cursor.fetchall() if fetch_results else cursor
         
         temp_table = self._get_temp_table_name()
         
@@ -157,7 +163,11 @@ class FaceDatabase:
             final_query = query_template.replace('{temp_table}', temp_table)
             cursor.execute(final_query, params)
             
-            return cursor
+            # Fetch results BEFORE dropping table if needed
+            if fetch_results:
+                results = cursor.fetchall()
+            
+            return results if fetch_results else cursor
         finally:
             try:
                 cursor.execute(f'DROP TABLE IF EXISTS {temp_table}')
@@ -289,10 +299,27 @@ class FaceDatabase:
     
     def create_clustering(self, threshold: float) -> int:
         cursor = self.conn.cursor()
+        
+        # Get old clustering ID before deactivating
+        cursor.execute('SELECT clustering_id FROM clusterings WHERE is_active = 1')
+        old_clustering = cursor.fetchone()
+        old_clustering_id = old_clustering[0] if old_clustering else None
+        
         cursor.execute('UPDATE clusterings SET is_active = 0')
         cursor.execute('INSERT INTO clusterings (threshold, is_active) VALUES (?, 1)', (threshold,))
+        new_clustering_id = cursor.lastrowid
+        
+        # Migrate hidden persons from old clustering to new one
+        if old_clustering_id:
+            cursor.execute('''
+                INSERT OR IGNORE INTO hidden_persons (clustering_id, person_id)
+                SELECT ?, person_id FROM hidden_persons
+                WHERE clustering_id = ?
+            ''', (new_clustering_id, old_clustering_id))
+            print(f"Migrated hidden persons from clustering {old_clustering_id} to {new_clustering_id}")
+        
         self.conn.commit()
-        return cursor.lastrowid
+        return new_clustering_id
     
     def save_cluster_assignments(self, clustering_id: int, face_ids: List[int], 
                                  person_ids: List[int], confidences: List[float]):
@@ -446,7 +473,7 @@ class FaceDatabase:
         self.conn.commit()
     
     def get_face_tags(self, face_ids: List[int]) -> Dict[int, str]:
-        """Fixed version using temp table for large lists"""
+        """Get tags for a list of face IDs. Handles large lists using temp tables."""
         if not face_ids:
             return {}
         
@@ -458,16 +485,18 @@ class FaceDatabase:
                 SELECT face_id, tag_name FROM face_tags
                 WHERE face_id IN ({placeholders})
             ''', face_ids)
+            rows = cursor.fetchall()
         else:
-            self._execute_with_temp_table(
+            rows = self._execute_with_temp_table(
                 cursor, face_ids,
                 '''SELECT ft.face_id, ft.tag_name 
                    FROM face_tags ft
                    JOIN {temp_table} tt ON ft.face_id = tt.id''',
-                id_column='id'
+                id_column='id',
+                fetch_results=True
             )
         
-        return {row[0]: row[1] for row in cursor.fetchall()}
+        return {row[0]: row[1] for row in rows}
     
     def get_person_tag_summary(self, face_ids: List[int]) -> Optional[Dict]:
         """Fixed version - handles large face_id lists"""
