@@ -1541,3 +1541,105 @@
         .no-folders-btn:hover {
             background: #2563eb;
         }
+
+/* overlay for transfer people*/
+        .transfer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100002;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            animation: fadeInOverlay 0.3s ease;
+        }
+
+        .transfer-overlay.active {
+            display: flex;
+        }
+
+        .transfer-dialog {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 24px;
+            width: 400px;
+            height: 700px;
+            max-height: 750px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .transfer-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        .transfer-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .transfer-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transfer-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .transfer-list::-webkit-scrollbar-thumb {
+            background: #3a3a3a;
+            border-radius: 3px;
+        }
+
+        .transfer-option {
+            padding: 14px 16px;
+            margin-bottom: 6px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            color: #e0e0e0;
+        }
+
+        .transfer-option:hover {
+            background: #3a3a3a;
+            transform: translateX(4px);
+        }
+
+        .transfer-option.remove {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            font-weight: 500;
+        }
+
+        .transfer-option.remove:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .transfer-cancel {
+            padding: 12px;
+            background: #2a2a2a;
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .transfer-cancel:hover {
+            background: #3a3a3a;
+        }
+
+    

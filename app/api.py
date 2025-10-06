@@ -422,6 +422,35 @@ class API:
         except Exception as e:
             return None
     
+    def get_named_people_for_transfer(self, clustering_id):
+        """Get list of named people for transfer menu"""
+        try:
+            people = self._db.get_all_named_people(clustering_id)
+            return {'success': True, 'people': people}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+    
+    def transfer_face_to_person(self, face_id, target_name):
+        """Transfer a face to a different person (manual ground truth)"""
+        try:
+            self._db.transfer_face_to_person(face_id, target_name)
+            if self._window:
+                self._window.evaluate_js('loadPeople()')
+                self._window.evaluate_js('reloadCurrentPhotos()')
+            return {'success': True, 'message': f'Face transferred to {target_name}'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+    
+    def remove_face_permanently(self, face_id):
+        """Remove a face from all groups permanently"""
+        try:
+            self._db.hide_photo(face_id)
+            if self._window:
+                self._window.evaluate_js('reloadCurrentPhotos()')
+            return {'success': True, 'message': 'Face removed from this person'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+    
     def open_photo(self, path):
         try:
             if sys.platform == 'win32':

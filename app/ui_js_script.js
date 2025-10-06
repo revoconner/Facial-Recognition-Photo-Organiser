@@ -14,6 +14,7 @@ let people = [];
         let renameContext = null;
         let lightboxPhotos = [];
         let lightboxCurrentIndex = 0;
+        let transferContext = null;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -48,8 +49,6 @@ let people = [];
             menu.style.top = top + 'px';
             menu.style.left = left + 'px';
         }
-
-
 
         function sortPeople(peopleArray, mode) {
             const sorted = [...peopleArray];
@@ -373,6 +372,7 @@ let people = [];
                     } else {
                         contextMenu.innerHTML = `
                             <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                            <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag</div>
                             <div class="context-menu-item" data-action="hide-photo">Hide photo</div>
                         `;
                     }
@@ -435,6 +435,8 @@ let people = [];
                                 hidePhoto();
                             } else if (action === 'unhide-photo') {
                                 unhidePhoto();
+                            } else if (action === 'transfer-tag') {
+                                openTransferDialog();
                             }
                         }
                     });
@@ -538,6 +540,130 @@ let people = [];
                 } else if (e.key === 'ArrowRight') {
                     nextLightboxImage();
                 }
+            }
+        });
+
+        async function openTransferDialog() {
+            if (!currentPhotoContext) {
+                console.error('No photo context - context was:', currentPhotoContext);
+                addLogEntry('ERROR: No photo context available');
+                closeAllMenus();
+                return;
+            }
+            
+            if (!currentPhotoContext.face_id) {
+                console.error('Photo context missing face_id:', currentPhotoContext);
+                addLogEntry('ERROR: Invalid photo context');
+                closeAllMenus();
+                return;
+            }
+            
+            transferContext = {
+                face_id: currentPhotoContext.face_id,
+                current_person: currentPhotoContext.person_name
+            };
+            
+            closeAllMenus();
+            
+            try {
+                if (!currentPerson || !currentPerson.clustering_id) {
+                    addLogEntry('ERROR: No current person selected');
+                    return;
+                }
+                
+                const result = await pywebview.api.get_named_people_for_transfer(currentPerson.clustering_id);
+                
+                if (result.success) {
+                    showTransferDialog(result.people);
+                } else {
+                    addLogEntry('ERROR: Failed to load people list - ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error loading people for transfer:', error);
+                addLogEntry('Error loading people for transfer: ' + error);
+            }
+        }
+        
+        function showTransferDialog(people) {
+            const transferList = document.getElementById('transferList');
+            transferList.innerHTML = '';
+            
+            const removeOption = document.createElement('div');
+            removeOption.className = 'transfer-option remove';
+            removeOption.textContent = '🗑️ Remove from this person';
+            removeOption.addEventListener('click', () => {
+                executeRemoveFace();
+            });
+            transferList.appendChild(removeOption);
+            
+            people.forEach(person => {
+                const option = document.createElement('div');
+                option.className = 'transfer-option';
+                option.textContent = `→ ${person.name}`;
+                option.addEventListener('click', () => {
+                    executeTransferFace(person.name);
+                });
+                transferList.appendChild(option);
+            });
+            
+            document.getElementById('transferOverlay').classList.add('active');
+            document.getElementById('appContainer').classList.add('blurred');
+        }
+        
+        function closeTransferDialog() {
+            document.getElementById('transferOverlay').classList.remove('active');
+            document.getElementById('appContainer').classList.remove('blurred');
+            transferContext = null;
+        }
+        
+        async function executeRemoveFace() {
+            if (!transferContext) return;
+            
+            const faceId = transferContext.face_id;
+            const personName = transferContext.current_person;
+            
+            closeTransferDialog();
+            
+            try {
+                const result = await pywebview.api.remove_face_permanently(faceId);
+                if (result.success) {
+                    addLogEntry(`Face removed from ${personName}`);
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error removing face:', error);
+                addLogEntry('Error removing face: ' + error);
+            }
+        }
+        
+        async function executeTransferFace(targetName) {
+            if (!transferContext) return;
+            
+            const faceId = transferContext.face_id;
+            const sourceName = transferContext.current_person;
+            
+            closeTransferDialog();
+            
+            try {
+                const result = await pywebview.api.transfer_face_to_person(faceId, targetName);
+                
+                if (result.success) {
+                    addLogEntry(`Face transferred from ${sourceName} to ${targetName}`);
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error transferring face:', error);
+                addLogEntry('Error transferring face: ' + error);
+            }
+        }
+        
+        document.getElementById('transferCancelBtn').addEventListener('click', closeTransferDialog);
+        
+        document.getElementById('transferOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('transferOverlay')) {
+                closeTransferDialog();
             }
         });
 
@@ -1310,12 +1436,10 @@ let people = [];
             }
             
             const cleanName = currentPhotoContext.person_name.replace(' (hidden)', '');
+            const faceId = currentPhotoContext.face_id;
             
             try {
-                const result = await pywebview.api.set_primary_photo(
-                    cleanName,
-                    currentPhotoContext.face_id
-                );
+                const result = await pywebview.api.set_primary_photo(cleanName, faceId);
                 
                 if (result.success) {
                     addLogEntry(`Primary photo set for ${cleanName}`);
@@ -1326,8 +1450,6 @@ let people = [];
                 console.error('Error setting primary photo:', error);
                 addLogEntry('Error setting primary photo: ' + error);
             }
-            
-            currentPhotoContext = null;
         }
 
         async function hidePhoto() {
@@ -1338,17 +1460,17 @@ let people = [];
                 return;
             }
             
+            const faceId = currentPhotoContext.face_id;
+            
             try {
-                const result = await pywebview.api.hide_photo(currentPhotoContext.face_id);
+                const result = await pywebview.api.hide_photo(faceId);
                 if (result.success) {
-                    addLogEntry(`Photo hidden: face_id ${currentPhotoContext.face_id}`);
+                    addLogEntry(`Photo hidden: face_id ${faceId}`);
                 }
             } catch (error) {
                 console.error('Error hiding photo:', error);
                 addLogEntry('Error hiding photo: ' + error);
             }
-            
-            currentPhotoContext = null;
         }
 
         async function unhidePhoto() {
@@ -1359,17 +1481,17 @@ let people = [];
                 return;
             }
             
+            const faceId = currentPhotoContext.face_id;
+            
             try {
-                const result = await pywebview.api.unhide_photo(currentPhotoContext.face_id);
+                const result = await pywebview.api.unhide_photo(faceId);
                 if (result.success) {
-                    addLogEntry(`Photo unhidden: face_id ${currentPhotoContext.face_id}`);
+                    addLogEntry(`Photo unhidden: face_id ${faceId}`);
                 }
             } catch (error) {
                 console.error('Error unhiding photo:', error);
                 addLogEntry('Error unhiding photo: ' + error);
             }
-            
-            currentPhotoContext = null;
         }
 
         function closeAllMenus() {
@@ -1393,7 +1515,10 @@ let people = [];
         });
 
         document.querySelectorAll('.info-icon').forEach(icon => {
-            icon.addEventListener('mouseenter', function() {
+            icon.addEventListener('mouseenter', function(e) {
+                // Only handle actual info-icon elements, not their children
+                if (!this.classList.contains('info-icon')) return;
+                
                 const tooltip = this.querySelector('.tooltip');
                 if (!tooltip) return;
                 
