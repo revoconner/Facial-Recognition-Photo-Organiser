@@ -23,3 +23,11 @@ While there are tools that already do this, they all need some kind of internet 
 
 
 ## User Guide will be available soon
+
+<img width="1791" height="1146" alt="image" src="https://github.com/user-attachments/assets/78303298-915a-4594-aa3a-16b9d28760cd" /> </br>
+<img width="387" height="1086" alt="image" src="https://github.com/user-attachments/assets/1b66b311-6763-4369-b067-7ead5ed7d19e" /></br>
+<img width="546" height="1083" alt="image" src="https://github.com/user-attachments/assets/386814d4-0c52-49ec-a06e-d9046970bb25" /></br>
+<img width="390" height="573" alt="image" src="https://github.com/user-attachments/assets/d2d6e5d4-b02e-42b6-8e9a-9567c2e117e7" /></br>
+<img width="2364" height="1518" alt="image" src="https://github.com/user-attachments/assets/4b1407ff-7e5b-46b6-b862-3e34f5af6b9b" /></br>
+<img width="2664" height="1629" alt="image" src="https://github.com/user-attachments/assets/0bf04aa2-2abc-410d-908a-b322f089c3d5" /></br>
+<img width="2217" height="1512" alt="image" src="https://github.com/user-attachments/assets/95e66a8a-cf4f-413f-b59d-e85cc14da02a" /></br>
