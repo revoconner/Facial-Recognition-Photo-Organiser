@@ -1,9 +1,17 @@
-# Sort by Faces
+# Organise Photos by Faces
 A program that recognises faces in all your photos, and groups them by faces, without changing the underlying file path or structure.
 
 The photos stored in your computer are seldom stored by what people are in those photos. Users usually tend to group them into one folder, or organise them depending on dates or events. But what if you need to find all photos of a certain person, say you broke up with your ex and needs to delete all of their photos, or maybe you need to make a collage for your best friend's birthday. 
 
 While there are tools that already do this, they all need some kind of internet connectivity and sends your data to some cloud (which is just a computer running in some datacenter). Now you can do this locally on your pc, with a great GUI program. And it doesn't even mess up the way you originally organised your photos.
+
+## Table of content
+- [Features](##Features)
+- [Screenshots](##Screenshots)
+- [Known bugs](##Known-Bugs)
+- [User Guide](#User-Guide)
+- [License and Usage](##License-and-Usage)
+- [Version Info](##Version-Information)
 
 ## Features
 - User friendly GUI, built by professional for everyday users!
@@ -23,7 +31,6 @@ While there are tools that already do this, they all need some kind of internet 
 - Allocates system resources dynamically so as not to bog down your system.
 
 ### Click this or scroll down for User Guide
-[USER GUIDE](#User-Guide)
 
 ## Screenshots
 
@@ -40,6 +47,7 @@ While there are tools that already do this, they all need some kind of internet 
 ## Known Bugs:
 - Initial start might take a bit of time. Do not worry your computer did not crash.
 - Clicking on a person's name with very large number of photos might take a bit of time to load all the images. Consecutive displays will be faster as thumbnails are cached.
+- Sluggish start and thumbnail performance on very large databases (more than a million faces)
 
 
 ----
@@ -443,6 +451,8 @@ When "Show development options" is enabled in Settings, you will see additional 
 - Removes all name tags, reverting person back to "Person X"
 - Use this if you want to start fresh with naming
 
+----
+
 ## License and Usage
 
 This app is provided free for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is for personal use.
@@ -451,9 +461,9 @@ The app uses facial recognition technology. You are responsible for complying wi
 
 ## Version Information
 
-Current Version: 0.1.0 (Beta)
+Current Version: 0.2.1 (Beta)
 
-This is the first release and is in beta testing. While there may be bugs, none of them will delete or modify your original photos. The app does not edit photos on disk directly.
+This is the second release and is in beta testing. While there may be bugs, none of them will delete or modify your original photos. The app does not edit photos on disk directly.
 
 ## Getting Help
 
