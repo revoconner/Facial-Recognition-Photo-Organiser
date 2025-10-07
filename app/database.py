@@ -757,12 +757,47 @@ class FaceDatabase:
         
         return results
     
-    def transfer_face_to_person(self, face_id: int, target_name: str):
+    def transfer_face_to_person(self, clustering_id: int, face_id: int, target_name: str):
         cursor = self.conn.cursor()
+        
+        # Find which person_id has this target_name
+        cursor.execute('''
+            SELECT ca.person_id
+            FROM cluster_assignments ca
+            JOIN face_tags ft ON ca.face_id = ft.face_id
+            WHERE ca.clustering_id = ? AND ft.tag_name = ?
+            LIMIT 1
+        ''', (clustering_id, target_name))
+        
+        row = cursor.fetchone()
+        
+        if row:
+            target_person_id = row[0]
+        else:
+            # If target_name doesn't exist yet, create a new person_id
+            cursor.execute('''
+                SELECT person_id FROM cluster_assignments
+                WHERE clustering_id = ? AND person_id > 0
+                ORDER BY person_id DESC
+                LIMIT 1
+            ''', (clustering_id,))
+            
+            max_row = cursor.fetchone()
+            target_person_id = (max_row[0] + 1) if max_row else 1
+        
+        # Move the face to the target person's cluster
+        cursor.execute('''
+            UPDATE cluster_assignments
+            SET person_id = ?
+            WHERE clustering_id = ? AND face_id = ?
+        ''', (target_person_id, clustering_id, face_id))
+        
+        # Tag the face with the target name
         cursor.execute('''
             INSERT OR REPLACE INTO face_tags (face_id, tag_name, is_manual)
             VALUES (?, ?, 1)
         ''', (face_id, target_name))
+        
         self.conn.commit()
     
     def get_total_faces(self) -> int:

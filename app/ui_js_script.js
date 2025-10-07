@@ -718,23 +718,24 @@ let people = [];
             closeTransferDialog();
             
             try {
-                const clustering = await pywebview.api.get_people();
-                if (clustering && clustering.length > 0) {
-                    const clusteringId = clustering[0].clustering_id;
-                    
-                    const result = await pywebview.api.remove_face_to_unmatched(clusteringId, faceId);
-                    if (result.success) {
-                        addLogEntry(`Face moved from ${personName} to Unmatched Faces`);
-                    } else {
-                        addLogEntry('ERROR: ' + result.message);
-                    }
+                if (!currentPerson || !currentPerson.clustering_id) {
+                    addLogEntry('ERROR: No current person selected');
+                    return;
+                }
+                
+                const result = await pywebview.api.remove_face_to_unmatched(currentPerson.clustering_id, faceId);
+                if (result.success) {
+                    addLogEntry(`Face moved from ${personName} to Unmatched Faces`);
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
                 }
             } catch (error) {
                 console.error('Error removing face:', error);
                 addLogEntry('Error removing face: ' + error);
             }
-        }
-        
+        }        
+
+
         async function executeTransferFace(targetName) {
             if (!transferContext) return;
             
@@ -744,7 +745,12 @@ let people = [];
             closeTransferDialog();
             
             try {
-                const result = await pywebview.api.transfer_face_to_person(faceId, targetName);
+                if (!currentPerson || !currentPerson.clustering_id) {
+                    addLogEntry('ERROR: No current person selected');
+                    return;
+                }
+                
+                const result = await pywebview.api.transfer_face_to_person(currentPerson.clustering_id, faceId, targetName);
                 
                 if (result.success) {
                     addLogEntry(`Face transferred from ${sourceName} to ${targetName}`);
@@ -756,7 +762,8 @@ let people = [];
                 addLogEntry('Error transferring face: ' + error);
             }
         }
-        
+
+
         document.getElementById('transferCancelBtn').addEventListener('click', closeTransferDialog);
         
         document.getElementById('transferOverlay').addEventListener('click', (e) => {

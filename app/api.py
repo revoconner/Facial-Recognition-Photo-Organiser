@@ -269,13 +269,30 @@ class API:
         
         return result
     
+    def transfer_face_to_person(self, clustering_id, face_id, target_name):
+        try:
+            self._db.transfer_face_to_person(clustering_id, face_id, target_name)
+            if self._window:
+                self._window.evaluate_js('loadPeople()')
+                self._window.evaluate_js('reloadCurrentPhotos()')
+            return {'success': True, 'message': f'Face transferred to {target_name}'}
+        except Exception as e:
+            print(f"Error in transfer_face_to_person: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'message': str(e)}
+        
     def remove_face_to_unmatched(self, clustering_id, face_id):
         try:
             self._db.move_face_to_unmatched(clustering_id, face_id)
             if self._window:
+                self._window.evaluate_js('loadPeople()')
                 self._window.evaluate_js('reloadCurrentPhotos()')
             return {'success': True, 'message': 'Face moved to Unmatched Faces'}
         except Exception as e:
+            print(f"Error in remove_face_to_unmatched: {e}")
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'message': str(e)}
 
     def get_hide_unnamed_persons(self):
@@ -451,15 +468,6 @@ class API:
         except Exception as e:
             return {'success': False, 'message': str(e)}
     
-    def transfer_face_to_person(self, face_id, target_name):
-        try:
-            self._db.transfer_face_to_person(face_id, target_name)
-            if self._window:
-                self._window.evaluate_js('loadPeople()')
-                self._window.evaluate_js('reloadCurrentPhotos()')
-            return {'success': True, 'message': f'Face transferred to {target_name}'}
-        except Exception as e:
-            return {'success': False, 'message': str(e)}
     
     def remove_face_permanently(self, face_id):
         try:
