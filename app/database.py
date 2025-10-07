@@ -486,11 +486,14 @@ class FaceDatabase:
         
         if not person_name.startswith("Person ") and person_name != "Unmatched Faces":
             cursor.execute('''
-                SELECT COUNT(DISTINCT f.face_id)
-                FROM faces f
-                JOIN face_tags ft ON f.face_id = ft.face_id
-                WHERE ft.tag_name = ? AND ft.is_manual = 1
-            ''', (person_name,))
+                SELECT COUNT(DISTINCT ft.face_id)
+                FROM face_tags ft
+                JOIN cluster_assignments ca ON ft.face_id = ca.face_id
+                WHERE ft.tag_name = ? 
+                AND ft.is_manual = 1
+                AND ca.clustering_id = ?
+                AND ca.person_id != ?
+            ''', (person_name, clustering_id, person_id))
             
             manual_count = cursor.fetchone()[0]
             count += manual_count
@@ -500,8 +503,9 @@ class FaceDatabase:
     def get_person_photo_count(self, clustering_id: int, person_id: int) -> int:
         return self.get_person_photo_count_fast(clustering_id, person_id)
     
+
     def get_photos_by_person_paginated(self, clustering_id: int, person_id: int, 
-                                      limit: int = 100, offset: int = 0) -> Tuple[List[dict], int]:
+                                    limit: int = 100, offset: int = 0) -> Tuple[List[dict], int]:
         cursor = self.conn.cursor()
         
         person_name = self.get_person_name_fast(clustering_id, person_id)
@@ -525,7 +529,7 @@ class FaceDatabase:
         
         if not person_name.startswith("Person ") and person_name != "Unmatched Faces":
             remaining_limit = limit - len(result)
-            manual_offset = max(0, offset - (total_count - self.get_manual_photo_count(person_name)))
+            manual_offset = max(0, offset - (total_count - self.get_manual_photo_count_outside_cluster(person_name, clustering_id, person_id)))
             
             if remaining_limit > 0:
                 cursor.execute('''
@@ -533,20 +537,34 @@ class FaceDatabase:
                     FROM photos p
                     JOIN faces f ON p.photo_id = f.photo_id
                     JOIN face_tags ft ON f.face_id = ft.face_id
-                    WHERE ft.tag_name = ? AND ft.is_manual = 1
+                    JOIN cluster_assignments ca ON f.face_id = ca.face_id
+                    WHERE ft.tag_name = ? 
+                    AND ft.is_manual = 1
+                    AND ca.clustering_id = ?
+                    AND ca.person_id != ?
                     ORDER BY f.face_id
                     LIMIT ? OFFSET ?
-                ''', (person_name, remaining_limit, manual_offset))
+                ''', (person_name, clustering_id, person_id, remaining_limit, manual_offset))
                 
                 manual_photos = [dict(row) for row in cursor.fetchall()]
-                
-                existing_face_ids = {photo['face_id'] for photo in result}
-                for photo in manual_photos:
-                    if photo['face_id'] not in existing_face_ids:
-                        result.append(photo)
+                result.extend(manual_photos)
         
         return result, total_count
-    
+
+
+    def get_manual_photo_count_outside_cluster(self, person_name: str, clustering_id: int, person_id: int) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(DISTINCT ft.face_id)
+            FROM face_tags ft
+            JOIN cluster_assignments ca ON ft.face_id = ca.face_id
+            WHERE ft.tag_name = ? 
+            AND ft.is_manual = 1
+            AND ca.clustering_id = ?
+            AND ca.person_id != ?
+        ''', (person_name, clustering_id, person_id))
+        return cursor.fetchone()[0]
+
     def get_manual_photo_count(self, person_name: str) -> int:
         cursor = self.conn.cursor()
         cursor.execute('''
