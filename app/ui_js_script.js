@@ -19,6 +19,7 @@ let people = [];
         const PAGE_SIZE = 100;
         let isLoadingMore = false;
         let hasMorePhotos = true;
+        let scrollCheckInterval = null;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -318,6 +319,7 @@ let people = [];
             currentPage = 1;
             hasMorePhotos = true;
             lightboxPhotos = [];
+            isLoadingMore = false;
             
             document.getElementById('contentTitle').textContent = `${person.name}'s Photos`;
             
@@ -345,36 +347,53 @@ let people = [];
                 currentPage = 1;
                 hasMorePhotos = true;
                 lightboxPhotos = [];
+                isLoadingMore = false;
             }
             
-            if (isLoadingMore || !hasMorePhotos) {
+            if (isLoadingMore) {
+                console.log('Already loading, skipping...');
+                return;
+            }
+            
+            if (!hasMorePhotos) {
+                console.log('No more photos to load');
                 return;
             }
             
             isLoadingMore = true;
+            console.log(`Loading photos: page ${currentPage}, person ${person_id}`);
             
             const existingIndicator = document.getElementById('loading-indicator');
             if (existingIndicator) {
-                existingIndicator.remove();
+                existingIndicator.textContent = 'Loading more photos...';
             }
             
             try {
-                console.log(`Loading photos: clustering_id=${clustering_id}, person_id=${person_id}, page=${currentPage}, page_size=${PAGE_SIZE}`);
-                
                 const result = await pywebview.api.get_photos(clustering_id, person_id, currentPage, PAGE_SIZE);
                 
-                console.log('Photos loaded successfully:', result);
+                console.log(`Loaded page ${currentPage}:`, {
+                    photos: result.photos.length,
+                    total: result.total_count,
+                    has_more: result.has_more
+                });
                 
                 if (resetGrid) {
                     photoGrid.innerHTML = '';
+                } else {
+                    const oldIndicator = document.getElementById('loading-indicator');
+                    if (oldIndicator) {
+                        oldIndicator.remove();
+                    }
                 }
                 
                 if (!result || typeof result !== 'object') {
-                    throw new Error('Invalid response from get_photos: ' + JSON.stringify(result));
+                    throw new Error('Invalid response from get_photos');
                 }
                 
                 if (result.total_count === 0) {
                     photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos found</div>';
+                    hasMorePhotos = false;
+                    isLoadingMore = false;
                     return;
                 }
                 
@@ -502,30 +521,37 @@ let people = [];
                 if (hasMorePhotos) {
                     const loadingIndicator = document.createElement('div');
                     loadingIndicator.id = 'loading-indicator';
-                    loadingIndicator.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 20px; color: #a0a0a0; font-size: 13px;';
+                    loadingIndicator.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 20px; color: #3b82f6; font-size: 13px; font-weight: 500;';
                     
                     if (result.total_count > 1000) {
-                        loadingIndicator.textContent = `Loaded ${lightboxPhotos.length} of ${result.total_count} photos. Scroll for more...`;
+                        loadingIndicator.textContent = `Loaded ${lightboxPhotos.length} of ${result.total_count} photos`;
                     } else {
-                        loadingIndicator.textContent = 'Scroll for more...';
+                        loadingIndicator.textContent = `${lightboxPhotos.length} of ${result.total_count} photos loaded`;
                     }
                     
                     photoGrid.appendChild(loadingIndicator);
+                } else {
+                    console.log('All photos loaded');
+                    const finalIndicator = document.createElement('div');
+                    finalIndicator.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 20px; color: #a0a0a0; font-size: 13px;';
+                    finalIndicator.textContent = `All ${result.total_count} photos loaded`;
+                    photoGrid.appendChild(finalIndicator);
                 }
                 
             } catch (error) {
                 console.error('Error loading photos:', error);
-                console.error('Error stack:', error.stack);
                 addLogEntry('ERROR loading photos: ' + error.toString());
                 
                 if (resetGrid) {
-                    photoGrid.innerHTML = `<div style="color: #ff6b6b; padding: 20px;">Error loading photos:<br>${error.toString()}<br><br>Check console (F12) for details</div>`;
+                    photoGrid.innerHTML = `<div style="color: #ff6b6b; padding: 20px;">Error loading photos: ${error.toString()}</div>`;
                 }
+                
+                hasMorePhotos = false;
             } finally {
                 isLoadingMore = false;
+                console.log(`Load complete. isLoadingMore=${isLoadingMore}, hasMorePhotos=${hasMorePhotos}`);
             }
         }
-
         function openLightbox(index) {
             lightboxCurrentIndex = index;
             updateLightbox();
@@ -735,7 +761,11 @@ let people = [];
 
         async function reloadCurrentPhotos() {
             if (currentPerson) {
-                await loadPhotos(currentPerson.clustering_id, currentPerson.id);
+                currentPage = 1;
+                hasMorePhotos = true;
+                lightboxPhotos = [];
+                isLoadingMore = false;
+                await loadPhotos(currentPerson.clustering_id, currentPerson.id, true);
             }
         }
 
@@ -865,6 +895,51 @@ let people = [];
         function closeNoFoldersOverlay() {
             document.getElementById('noFoldersOverlay').classList.remove('active');
             document.getElementById('appContainer').classList.remove('blurred');
+        }
+
+        function checkScrollPosition() {
+            if (!currentPerson || !hasMorePhotos || isLoadingMore) {
+                return;
+            }
+            
+            const photoGridContainer = document.querySelector('.photo-grid-container');
+            if (!photoGridContainer) return;
+            
+            const scrollTop = photoGridContainer.scrollTop;
+            const scrollHeight = photoGridContainer.scrollHeight;
+            const clientHeight = photoGridContainer.clientHeight;
+            
+            const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+            
+            if (distanceFromBottom < 800) {
+                console.log(`Triggering load: ${distanceFromBottom}px from bottom`);
+                loadPhotos(currentPerson.clustering_id, currentPerson.id, false);
+            }
+        }
+
+        const photoGridContainer = document.querySelector('.photo-grid-container');
+        if (photoGridContainer) {
+            let scrollTimeout = null;
+            
+            photoGridContainer.addEventListener('scroll', () => {
+                if (scrollTimeout) {
+                    clearTimeout(scrollTimeout);
+                }
+                
+                scrollTimeout = setTimeout(() => {
+                    checkScrollPosition();
+                }, 100);
+            });
+            
+            if (scrollCheckInterval) {
+                clearInterval(scrollCheckInterval);
+            }
+            
+            scrollCheckInterval = setInterval(() => {
+                if (currentPerson && hasMorePhotos && !isLoadingMore) {
+                    checkScrollPosition();
+                }
+            }, 500);
         }
 
         async function initialize() {

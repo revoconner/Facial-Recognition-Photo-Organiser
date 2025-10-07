@@ -596,7 +596,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(90deg, #3b82f6 0%, #a8c4ff 100%);
             width: 35%;
             border-radius: 4px;
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1646,4 +1646,17 @@
         .transfer-dialog .tooltip,
         .transfer-overlay .tooltip {
             display: none !important;
+        }
+        /* Loading for scroll for more photos in grid */
+        #loading-indicator {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
         }
