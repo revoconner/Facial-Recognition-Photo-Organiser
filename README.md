@@ -43,6 +43,40 @@ While there are tools that already do this, they all need some kind of internet 
 
 # User Guide
 
+## Table of content
+
+- [What Is This App?](#what-is-this-app)
+- [How It Works](#how-it-works)
+- [Getting Started](#getting-started)
+  - [First Launch](#first-launch)
+  - [Adding Photo Folders](#adding-photo-folders)
+- [Understanding the Interface](#understanding-the-interface)
+  - [Main Window Layout](#main-window-layout)
+  - [Top Controls](#top-controls)
+- [Working with People](#working-with-people)
+  - [Viewing Someone's Photos](#viewing-someones-photos)
+  - [Renaming a Person](#renaming-a-person)
+  - [Setting a Primary Photo](#setting-a-primary-photo)
+  - [Hiding a Person](#hiding-a-person)
+  - [Hiding Individual Photos](#hiding-individual-photos)
+  - [Remove/Transfer Tag](#removetransfer-tag)
+- [Settings Explained](#settings-explained)
+  - [General Settings](#general-settings)
+  - [Folders to Scan](#folders-to-scan)
+  - [View Log](#view-log)
+- [Tips and Best Practices](#tips-and-best-practices)
+  - [Getting the Best Results](#getting-the-best-results)
+  - [Working with Large Photo Collections](#working-with-large-photo-collections)
+  - [Adding New Photos](#adding-new-photos)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Common Questions](#common-questions)
+- [Troubleshooting](#troubleshooting)
+- [Advanced Features](#advanced-features)
+  - [Development Options](#development-options)
+- [License and Usage](#license-and-usage)
+- [Version Information](#version-information)
+- [Getting Help](#getting-help)
+
 ## What Is This App?
 
 Face Recognition Photo Organizer is a desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
