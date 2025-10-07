@@ -12,6 +12,7 @@ While there are tools that already do this, they all need some kind of internet 
 - [User Guide](#User-Guide)
 - [License and Usage](##License-and-Usage)
 - [Version Info](##Version-Information)
+- [Performance Figures](##Performance-Stats)
 
 ## Features
 - User friendly GUI, built by professional for everyday users!
@@ -464,6 +465,12 @@ The app uses facial recognition technology. You are responsible for complying wi
 Current Version: 0.2.1 (Beta)
 
 This is the second release and is in beta testing. While there may be bugs, none of them will delete or modify your original photos. The app does not edit photos on disk directly.
+
+## Performance Stats
+1. [10/7/2025, 5:46:28 AM] - [10/7/2025, 10:50:24 AM] - Scan complete: 104577 faces in 90491 photos
+2. Took almost 5 hours to scan 90,000 photos for 100,000 faces from a Seagate Exos HDD, running on AMD Threadripper 7960x
+3. [10/7/2025, 10:46:38 AM] - [10/7/2025, 10:50:24 AM] - Custering to person identification
+4. Took 4 minutes on Nvidia RTX 4090 for face clustering and identification
 
 ## Getting Help
 
