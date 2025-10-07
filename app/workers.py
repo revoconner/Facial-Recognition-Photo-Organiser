@@ -25,6 +25,7 @@ class ScanWorker(threading.Thread):
         self.api = api
         self.face_app = None
         self.daemon = True
+        self.batch_size = 25
     
     def should_exclude_path(self, path: str) -> bool:
         include_folders = self.api.get_include_folders()
@@ -77,13 +78,8 @@ class ScanWorker(threading.Thread):
         file_ext = Path(file_path).suffix.lower()
         
         try:
-            # Use PIL for all formats to handle EXIF orientation correctly
             pil_image = Image.open(file_path)
-            
-            # Apply EXIF orientation if present
             pil_image = ImageOps.exif_transpose(pil_image)
-            
-            # Convert to RGB then BGR for OpenCV
             image_rgb = np.array(pil_image.convert('RGB'))
             image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
             return image_bgr
@@ -191,38 +187,45 @@ class ScanWorker(threading.Thread):
             if len(pending_list) > 10:
                 self.api.update_status(f"  ... and {len(pending_list) - 10} more")
         
-        self.api.update_status(f"Starting scan of {total} photos...")
+        self.api.update_status(f"Starting scan of {total} photos in batches of {self.batch_size}...")
         
-        for idx, file_path in enumerate(photos_to_scan):
-            current_overall = scanned_count + idx + 1
+        for batch_start in range(0, total, self.batch_size):
+            batch_end = min(batch_start + self.batch_size, total)
+            batch = photos_to_scan[batch_start:batch_end]
+            
+            self.process_batch(batch, scanned_count + batch_start, total_photos, new_photos)
+            
+            should_throttle = self.api.get_dynamic_resources() and not self.api.is_window_foreground()
+            if should_throttle:
+                time.sleep(0.5)
+        
+        self.api.scan_complete()
+    
+    def process_batch(self, batch: List[str], start_idx: int, total_photos: int, new_photos: set):
+        batch_data = []
+        
+        for idx, file_path in enumerate(batch):
+            current_overall = start_idx + idx + 1
             self.api.update_progress(current_overall, total_photos)
             
             is_new = file_path in new_photos
             status_prefix = "NEW" if is_new else "RETRY"
             
-            if (idx + 1) % 10 == 0 or idx == 0 or (idx + 1) == total:
-                self.api.update_status(f"Scanning {status_prefix}: {os.path.basename(file_path)} ({idx + 1}/{total})")
+            if (idx + 1) % 5 == 0 or idx == 0 or (idx + 1) == len(batch):
+                self.api.update_status(f"Scanning {status_prefix}: {os.path.basename(file_path)} (batch {idx + 1}/{len(batch)})")
             
-            process_start = time.time()
-            self.process_photo(file_path)
-            process_time = time.time() - process_start
-            
-            should_throttle = self.api.get_dynamic_resources() and not self.api.is_window_foreground()
-            
-            if should_throttle:
-                sleep_time = process_time * 19
-                time.sleep(sleep_time)
+            photo_data = self.process_photo_no_commit(file_path)
+            if photo_data:
+                batch_data.append(photo_data)
         
-        self.api.scan_complete()
+        if batch_data:
+            self.commit_batch(batch_data)
     
-    def process_photo(self, file_path: str):
+    def process_photo_no_commit(self, file_path: str) -> Optional[dict]:
         try:
             if not os.path.exists(file_path):
                 self.api.update_status(f"ERROR: File not found - {os.path.basename(file_path)}")
-                photo_id = self.db.get_photo_id(file_path)
-                if photo_id:
-                    self.db.update_photo_status(photo_id, 'error')
-                return
+                return {'file_path': file_path, 'status': 'error', 'faces': []}
             
             with open(file_path, 'rb') as f:
                 file_hash = hashlib.md5(f.read()).hexdigest()
@@ -231,7 +234,7 @@ class ScanWorker(threading.Thread):
             
             if not photo_id:
                 self.api.update_status(f"ERROR: Failed to add photo to database - {os.path.basename(file_path)}")
-                return
+                return None
             
             status_row = self.db.conn.execute(
                 'SELECT scan_status FROM photos WHERE photo_id = ?', 
@@ -239,19 +242,18 @@ class ScanWorker(threading.Thread):
             ).fetchone()
             
             if not status_row:
-                self.api.update_status(f"ERROR: Photo record not found after insert - {os.path.basename(file_path)}")
-                return
+                self.api.update_status(f"ERROR: Photo record not found - {os.path.basename(file_path)}")
+                return None
             
             existing_status = status_row[0]
             
             if existing_status == 'completed':
-                return
+                return None
             
             image = self.load_image(file_path)
             if image is None:
                 self.api.update_status(f"ERROR: Cannot read image - {os.path.basename(file_path)}")
-                self.db.update_photo_status(photo_id, 'error')
-                return
+                return {'file_path': file_path, 'photo_id': photo_id, 'status': 'error', 'faces': []}
             
             faces = self.face_app.get(image)
             
@@ -260,18 +262,49 @@ class ScanWorker(threading.Thread):
             else:
                 self.api.update_status(f"INFO: Found {len(faces)} face(s) - {os.path.basename(file_path)}")
             
+            face_data = []
             for face in faces:
                 embedding = face.embedding
                 embedding_norm = embedding / np.linalg.norm(embedding)
                 bbox = face.bbox.tolist()
-                self.db.add_face(photo_id, embedding_norm, bbox)
+                face_data.append({'embedding': embedding_norm, 'bbox': bbox})
             
-            self.db.update_photo_status(photo_id, 'completed')
+            return {
+                'file_path': file_path,
+                'photo_id': photo_id,
+                'status': 'completed',
+                'faces': face_data
+            }
             
         except Exception as e:
             self.api.update_status(f"ERROR: Exception processing {os.path.basename(file_path)}: {str(e)}")
-            if 'photo_id' in locals() and photo_id:
-                self.db.update_photo_status(photo_id, 'error')
+            return {'file_path': file_path, 'photo_id': photo_id if 'photo_id' in locals() else None, 'status': 'error', 'faces': []}
+    
+    def commit_batch(self, batch_data: List[dict]):
+        try:
+            cursor = self.db.conn.cursor()
+            
+            for photo_data in batch_data:
+                photo_id = photo_data['photo_id']
+                
+                for face_data in photo_data['faces']:
+                    face_id = self.db.add_face(photo_id, face_data['embedding'], face_data['bbox'])
+                
+                self.db.update_photo_status(photo_id, photo_data['status'])
+            
+            self.db.conn.commit()
+            
+        except Exception as e:
+            self.api.update_status(f"ERROR: Batch commit failed: {str(e)}")
+            self.db.conn.rollback()
+            
+            for photo_data in batch_data:
+                if photo_data.get('photo_id'):
+                    try:
+                        self.db.update_photo_status(photo_data['photo_id'], 'error')
+                        self.db.conn.commit()
+                    except:
+                        pass
 
 
 class ClusterWorker(threading.Thread):

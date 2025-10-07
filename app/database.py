@@ -186,13 +186,18 @@ class FaceDatabase:
         
         if len(ids) <= 900:
             placeholders = ','.join('?' * len(ids))
+            
             simple_query = query_template.replace(
                 f'JOIN {{temp_table}} tt ON ft.face_id = tt.{id_column}',
                 f'WHERE ft.face_id IN ({placeholders})'
             ).replace(
                 f'JOIN {{temp_table}} tt ON f.face_id = tt.{id_column}',
                 f'WHERE f.face_id IN ({placeholders})'
+            ).replace(
+                f'IN (SELECT {id_column} FROM {{temp_table}})',
+                f'IN ({placeholders})'
             )
+            
             cursor.execute(simple_query, ids + list(params))
             return cursor.fetchall() if fetch_results else cursor
         
@@ -778,7 +783,6 @@ class FaceDatabase:
     def transfer_face_to_person(self, clustering_id: int, face_id: int, target_name: str):
         cursor = self.conn.cursor()
         
-        # Find which person_id has this target_name
         cursor.execute('''
             SELECT ca.person_id
             FROM cluster_assignments ca
@@ -792,7 +796,6 @@ class FaceDatabase:
         if row:
             target_person_id = row[0]
         else:
-            # If target_name doesn't exist yet, create a new person_id
             cursor.execute('''
                 SELECT person_id FROM cluster_assignments
                 WHERE clustering_id = ? AND person_id > 0
@@ -803,14 +806,12 @@ class FaceDatabase:
             max_row = cursor.fetchone()
             target_person_id = (max_row[0] + 1) if max_row else 1
         
-        # Move the face to the target person's cluster
         cursor.execute('''
             UPDATE cluster_assignments
             SET person_id = ?
             WHERE clustering_id = ? AND face_id = ?
         ''', (target_person_id, clustering_id, face_id))
         
-        # Tag the face with the target name
         cursor.execute('''
             INSERT OR REPLACE INTO face_tags (face_id, tag_name, is_manual)
             VALUES (?, ?, 1)
