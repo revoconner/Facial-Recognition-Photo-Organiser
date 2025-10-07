@@ -15,10 +15,8 @@ class FaceDatabase:
         
         self.sqlite_path = self.db_folder / "metadata.db"
         
-        # Thread-local storage for connections
         self._local = threading.local()
         
-        # Initialize primary connection with optimizations
         self.conn = self._create_connection()
         
         self.lmdb_path = self.db_folder / "encodings.lmdb"
@@ -26,16 +24,15 @@ class FaceDatabase:
             str(self.lmdb_path),
             map_size=10*1024*1024*1024,
             max_dbs=1,
-            readahead=True,      # Enable readahead for speed
-            metasync=False,      # Faster writes
-            sync=False,          # Async writes
-            writemap=True        # Direct memory mapping
+            readahead=True,
+            metasync=False,
+            sync=False,
+            writemap=True
         )
         
         self._init_tables()
         self._temp_table_counter = 0
         
-        # Memory cache for frequently accessed data
         self._cache = {
             'active_clustering': None,
             'persons_list': None,
@@ -43,11 +40,9 @@ class FaceDatabase:
         }
     
     def _create_connection(self):
-        """Create optimized SQLite connection"""
         conn = sqlite3.connect(self.sqlite_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         
-        # Apply performance optimizations
         cursor = conn.cursor()
         cursor.executescript('''
             PRAGMA journal_mode = WAL;
@@ -62,7 +57,6 @@ class FaceDatabase:
         return conn
     
     def _get_connection(self):
-        """Get thread-local connection"""
         if not hasattr(self._local, 'conn') or self._local.conn is None:
             self._local.conn = self._create_connection()
         return self._local.conn
@@ -164,13 +158,10 @@ class FaceDatabase:
         
         self.conn.commit()
         
-        # Migrate existing databases: Add is_manual column if it doesn't exist
         self._migrate_add_is_manual_column(cursor)
     
     def _migrate_add_is_manual_column(self, cursor):
-        """Add is_manual column to face_tags if it doesn't exist"""
         try:
-            # Check if column exists
             cursor.execute("PRAGMA table_info(face_tags)")
             columns = [row[1] for row in cursor.fetchall()]
             
@@ -183,19 +174,12 @@ class FaceDatabase:
             print(f"Migration error (non-critical): {e}")
     
     def _get_temp_table_name(self) -> str:
-        """Generate unique temp table name"""
         self._temp_table_counter += 1
         return f"temp_ids_{self._temp_table_counter}"
     
     def _execute_with_temp_table(self, cursor, ids: List[int], query_template: str, 
                                   params: tuple = (), id_column: str = 'id',
                                   fetch_results: bool = False):
-        """Execute a query using a temporary table for large ID lists
-        
-        Args:
-            fetch_results: If True, fetch and return results before dropping table.
-                          Required for SELECT queries to avoid temp table cleanup issues.
-        """
         if not ids:
             cursor.execute("SELECT * FROM (SELECT 1) WHERE 0=1")
             return [] if fetch_results else cursor
@@ -226,16 +210,18 @@ class FaceDatabase:
             final_query = query_template.replace('{temp_table}', temp_table)
             cursor.execute(final_query, params)
             
-            # Fetch results BEFORE dropping table if needed
             if fetch_results:
                 results = cursor.fetchall()
             
             return results if fetch_results else cursor
+        except Exception as e:
+            print(f"Error in temp table operation: {e}")
+            raise
         finally:
             try:
                 cursor.execute(f'DROP TABLE IF EXISTS {temp_table}')
-            except:
-                pass
+            except Exception as e:
+                print(f"Warning: Failed to drop temp table {temp_table}: {e}")
     
     def add_photo(self, file_path: str, file_hash: str) -> Optional[int]:
         cursor = self.conn.cursor()
@@ -363,7 +349,6 @@ class FaceDatabase:
     def create_clustering(self, threshold: float) -> int:
         cursor = self.conn.cursor()
         
-        # Get old clustering ID before deactivating
         cursor.execute('SELECT clustering_id FROM clusterings WHERE is_active = 1')
         old_clustering = cursor.fetchone()
         old_clustering_id = old_clustering[0] if old_clustering else None
@@ -372,7 +357,6 @@ class FaceDatabase:
         cursor.execute('INSERT INTO clusterings (threshold, is_active) VALUES (?, 1)', (threshold,))
         new_clustering_id = cursor.lastrowid
         
-        # Migrate hidden persons from old clustering to new one
         if old_clustering_id:
             cursor.execute('''
                 INSERT OR IGNORE INTO hidden_persons (clustering_id, person_id)
@@ -383,7 +367,6 @@ class FaceDatabase:
         
         self.conn.commit()
         
-        # Invalidate cache after clustering change
         self.invalidate_cache()
         
         return new_clustering_id
@@ -401,11 +384,9 @@ class FaceDatabase:
         self.conn.commit()
     
     def get_active_clustering(self) -> Optional[dict]:
-        """Get active clustering with caching"""
         import time
         current_time = time.time()
         
-        # Cache for 5 seconds
         if (self._cache['active_clustering'] is not None and 
             current_time - self._cache['cache_timestamp'] < 5):
             return self._cache['active_clustering']
@@ -415,14 +396,12 @@ class FaceDatabase:
         row = cursor.fetchone()
         result = dict(row) if row else None
         
-        # Update cache
         self._cache['active_clustering'] = result
         self._cache['cache_timestamp'] = current_time
         
         return result
     
     def invalidate_cache(self):
-        """Invalidate memory cache (call after clustering changes)"""
         self._cache['active_clustering'] = None
         self._cache['persons_list'] = None
         self._cache['cache_timestamp'] = 0
@@ -438,83 +417,149 @@ class FaceDatabase:
         ''', (clustering_id,))
         return [dict(row) for row in cursor.fetchall()]
     
-    def get_face_ids_for_person(self, clustering_id: int, person_id: int) -> List[int]:
+    def get_face_ids_for_person(self, clustering_id: int, person_id: int, limit: int = None) -> List[int]:
         cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT face_id FROM cluster_assignments
-            WHERE clustering_id = ? AND person_id = ?
-        ''', (clustering_id, person_id))
+        
+        if limit:
+            cursor.execute('''
+                SELECT face_id FROM cluster_assignments
+                WHERE clustering_id = ? AND person_id = ?
+                LIMIT ?
+            ''', (clustering_id, person_id, limit))
+        else:
+            cursor.execute('''
+                SELECT face_id FROM cluster_assignments
+                WHERE clustering_id = ? AND person_id = ?
+            ''', (clustering_id, person_id))
+        
         return [row[0] for row in cursor.fetchall()]
     
-    def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[dict]:
-        """Get photos for a person, respecting manual tag overrides"""
+    def get_person_name_fast(self, clustering_id: int, person_id: int) -> str:
         cursor = self.conn.cursor()
         
-        # First, determine this person's name
-        face_ids = self.get_face_ids_for_person(clustering_id, person_id)
-        tag_summary = self.get_person_tag_summary(face_ids)
+        cursor.execute('''
+            SELECT ft.tag_name, COUNT(*) as cnt
+            FROM cluster_assignments ca
+            JOIN face_tags ft ON ca.face_id = ft.face_id
+            WHERE ca.clustering_id = ? AND ca.person_id = ?
+            GROUP BY ft.tag_name
+            ORDER BY cnt DESC
+            LIMIT 1
+        ''', (clustering_id, person_id))
         
-        if tag_summary:
-            person_name = tag_summary['name']
+        row = cursor.fetchone()
+        if row:
+            return row[0]
         elif person_id > 0:
-            person_name = f"Person {person_id}"
+            return f"Person {person_id}"
         else:
-            person_name = "Unmatched Faces"
+            return "Unmatched Faces"
+    
+    def get_person_tagged_count_fast(self, clustering_id: int, person_id: int) -> int:
+        cursor = self.conn.cursor()
         
-        # Get photos based on cluster assignments
+        cursor.execute('''
+            SELECT COUNT(DISTINCT ca.face_id)
+            FROM cluster_assignments ca
+            JOIN face_tags ft ON ca.face_id = ft.face_id
+            WHERE ca.clustering_id = ? AND ca.person_id = ?
+        ''', (clustering_id, person_id))
+        
+        result = cursor.fetchone()
+        return result[0] if result else 0
+    
+    def get_person_photo_count_fast(self, clustering_id: int, person_id: int) -> int:
+        cursor = self.conn.cursor()
+        
+        person_name = self.get_person_name_fast(clustering_id, person_id)
+        
+        cursor.execute('''
+            SELECT COUNT(DISTINCT ca.face_id)
+            FROM cluster_assignments ca
+            LEFT JOIN face_tags ft ON ca.face_id = ft.face_id
+            WHERE ca.clustering_id = ? 
+            AND ca.person_id = ?
+            AND (ft.face_id IS NULL OR ft.is_manual = 0 OR ft.tag_name = ?)
+        ''', (clustering_id, person_id, person_name))
+        
+        count = cursor.fetchone()[0]
+        
+        if not person_name.startswith("Person ") and person_name != "Unmatched Faces":
+            cursor.execute('''
+                SELECT COUNT(DISTINCT f.face_id)
+                FROM faces f
+                JOIN face_tags ft ON f.face_id = ft.face_id
+                WHERE ft.tag_name = ? AND ft.is_manual = 1
+            ''', (person_name,))
+            
+            manual_count = cursor.fetchone()[0]
+            count += manual_count
+        
+        return count
+    
+    def get_person_photo_count(self, clustering_id: int, person_id: int) -> int:
+        return self.get_person_photo_count_fast(clustering_id, person_id)
+    
+    def get_photos_by_person_paginated(self, clustering_id: int, person_id: int, 
+                                      limit: int = 100, offset: int = 0) -> Tuple[List[dict], int]:
+        cursor = self.conn.cursor()
+        
+        person_name = self.get_person_name_fast(clustering_id, person_id)
+        total_count = self.get_person_photo_count_fast(clustering_id, person_id)
+        
         cursor.execute('''
             SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
             FROM photos p
             JOIN faces f ON p.photo_id = f.photo_id
             JOIN cluster_assignments ca ON f.face_id = ca.face_id
-            WHERE ca.clustering_id = ? AND ca.person_id = ?
-        ''', (clustering_id, person_id))
+            LEFT JOIN face_tags ft ON f.face_id = ft.face_id
+            WHERE ca.clustering_id = ? 
+            AND ca.person_id = ?
+            AND (ft.face_id IS NULL OR ft.is_manual = 0 OR ft.tag_name = ?)
+            ORDER BY f.face_id
+            LIMIT ? OFFSET ?
+        ''', (clustering_id, person_id, person_name, limit, offset))
         
         cluster_photos = [dict(row) for row in cursor.fetchall()]
+        result = list(cluster_photos)
         
-        # Filter out faces that have manual tags pointing to a DIFFERENT person
-        result = []
-        for photo in cluster_photos:
-            face_id = photo['face_id']
-            
-            # Check if this face has a manual tag
-            cursor.execute('''
-                SELECT tag_name, is_manual FROM face_tags
-                WHERE face_id = ?
-            ''', (face_id,))
-            
-            tag_row = cursor.fetchone()
-            
-            if tag_row:
-                tag_name = tag_row[0]
-                is_manual = tag_row[1]
-                
-                # If manually tagged with a different name, exclude it
-                if is_manual and tag_name != person_name:
-                    continue
-            
-            result.append(photo)
-        
-        # Also include faces that are manually tagged with THIS person's name
-        # even if they're in a different cluster
         if not person_name.startswith("Person ") and person_name != "Unmatched Faces":
-            cursor.execute('''
-                SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
-                FROM photos p
-                JOIN faces f ON p.photo_id = f.photo_id
-                JOIN face_tags ft ON f.face_id = ft.face_id
-                WHERE ft.tag_name = ? AND ft.is_manual = 1
-            ''', (person_name,))
+            remaining_limit = limit - len(result)
+            manual_offset = max(0, offset - (total_count - self.get_manual_photo_count(person_name)))
             
-            manual_photos = [dict(row) for row in cursor.fetchall()]
-            
-            # Add manual photos that aren't already in the result
-            existing_face_ids = {photo['face_id'] for photo in result}
-            for photo in manual_photos:
-                if photo['face_id'] not in existing_face_ids:
-                    result.append(photo)
+            if remaining_limit > 0:
+                cursor.execute('''
+                    SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
+                    FROM photos p
+                    JOIN faces f ON p.photo_id = f.photo_id
+                    JOIN face_tags ft ON f.face_id = ft.face_id
+                    WHERE ft.tag_name = ? AND ft.is_manual = 1
+                    ORDER BY f.face_id
+                    LIMIT ? OFFSET ?
+                ''', (person_name, remaining_limit, manual_offset))
+                
+                manual_photos = [dict(row) for row in cursor.fetchall()]
+                
+                existing_face_ids = {photo['face_id'] for photo in result}
+                for photo in manual_photos:
+                    if photo['face_id'] not in existing_face_ids:
+                        result.append(photo)
         
-        return result
+        return result, total_count
+    
+    def get_manual_photo_count(self, person_name: str) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(DISTINCT f.face_id)
+            FROM faces f
+            JOIN face_tags ft ON f.face_id = ft.face_id
+            WHERE ft.tag_name = ? AND ft.is_manual = 1
+        ''', (person_name,))
+        return cursor.fetchone()[0]
+    
+    def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[dict]:
+        photos, _ = self.get_photos_by_person_paginated(clustering_id, person_id, limit=999999, offset=0)
+        return photos
     
     def get_face_data(self, face_id: int) -> Optional[dict]:
         cursor = self.conn.cursor()
@@ -599,29 +644,47 @@ class FaceDatabase:
         return None
     
     def tag_faces(self, face_ids: List[int], tag_name: str, is_manual: bool = False):
-        """Tag faces with a name. Set is_manual=True for user-initiated tags."""
         cursor = self.conn.cursor()
-        data = [(fid, tag_name, is_manual) for fid in face_ids]
-        cursor.executemany('''
-            INSERT OR REPLACE INTO face_tags (face_id, tag_name, is_manual)
-            VALUES (?, ?, ?)
-        ''', data)
+        
+        if len(face_ids) <= 500:
+            data = [(fid, tag_name, is_manual) for fid in face_ids]
+            cursor.executemany('''
+                INSERT OR REPLACE INTO face_tags (face_id, tag_name, is_manual)
+                VALUES (?, ?, ?)
+            ''', data)
+        else:
+            batch_size = 500
+            for i in range(0, len(face_ids), batch_size):
+                batch = face_ids[i:i+batch_size]
+                data = [(fid, tag_name, is_manual) for fid in batch]
+                cursor.executemany('''
+                    INSERT OR REPLACE INTO face_tags (face_id, tag_name, is_manual)
+                    VALUES (?, ?, ?)
+                ''', data)
+                self.conn.commit()
+            return
+        
         self.conn.commit()
     
     def untag_faces(self, face_ids: List[int]):
-        """Fixed version using temp table for large lists"""
         if not face_ids:
             return
         
         cursor = self.conn.cursor()
-        self._execute_with_temp_table(
-            cursor, face_ids,
-            'DELETE FROM face_tags WHERE face_id IN (SELECT id FROM {temp_table})'
-        )
+        
+        if len(face_ids) <= 900:
+            placeholders = ','.join('?' * len(face_ids))
+            cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({placeholders})', face_ids)
+        else:
+            batch_size = 900
+            for i in range(0, len(face_ids), batch_size):
+                batch = face_ids[i:i+batch_size]
+                placeholders = ','.join('?' * len(batch))
+                cursor.execute(f'DELETE FROM face_tags WHERE face_id IN ({placeholders})', batch)
+        
         self.conn.commit()
     
     def get_face_tags(self, face_ids: List[int]) -> Dict[int, str]:
-        """Get tags for a list of face IDs. Handles large lists using temp tables."""
         if not face_ids:
             return {}
         
@@ -647,7 +710,6 @@ class FaceDatabase:
         return {row[0]: row[1] for row in rows}
     
     def get_person_tag_summary(self, face_ids: List[int]) -> Optional[Dict]:
-        """Fixed version - handles large face_id lists"""
         if not face_ids:
             return None
         
@@ -673,10 +735,8 @@ class FaceDatabase:
         self.conn.commit()
     
     def get_all_named_people(self, clustering_id: int) -> List[Dict]:
-        """Get all people who have custom names (not 'Person X')"""
         cursor = self.conn.cursor()
         
-        # Get all unique tag names from face_tags
         cursor.execute('''
             SELECT DISTINCT ft.tag_name, COUNT(DISTINCT ca.person_id) as person_count
             FROM face_tags ft
@@ -689,7 +749,6 @@ class FaceDatabase:
         results = []
         for row in cursor.fetchall():
             tag_name = row[0]
-            # Exclude default "Person X" names and "Unmatched Faces"
             if not tag_name.startswith('Person ') and tag_name != 'Unmatched Faces':
                 results.append({
                     'name': tag_name,
@@ -699,7 +758,6 @@ class FaceDatabase:
         return results
     
     def transfer_face_to_person(self, face_id: int, target_name: str):
-        """Transfer a face to a different person (manual ground truth)"""
         cursor = self.conn.cursor()
         cursor.execute('''
             INSERT OR REPLACE INTO face_tags (face_id, tag_name, is_manual)
@@ -716,26 +774,14 @@ class FaceDatabase:
         cursor = self.conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM photos WHERE scan_status = "completed"')
         return cursor.fetchone()[0]
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM faces')
-        return cursor.fetchone()[0]
-    
-    def get_total_photos(self) -> int:
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM photos WHERE scan_status = "completed"')
-        return cursor.fetchone()[0]
     
     def close(self):
-        """Close all database connections"""
-        # Close main connection
         if hasattr(self, 'conn') and self.conn:
             self.conn.close()
         
-        # Close thread-local connections
         if hasattr(self, '_local') and hasattr(self._local, 'conn'):
             if self._local.conn:
                 self._local.conn.close()
         
-        # Close LMDB
         if hasattr(self, 'env') and self.env:
             self.env.close()

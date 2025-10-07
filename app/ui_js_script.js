@@ -15,6 +15,10 @@ let people = [];
         let lightboxPhotos = [];
         let lightboxCurrentIndex = 0;
         let transferContext = null;
+        let currentPage = 1;
+        const PAGE_SIZE = 100;
+        let isLoadingMore = false;
+        let hasMorePhotos = true;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -311,6 +315,10 @@ let people = [];
 
         async function selectPerson(person) {
             currentPerson = person;
+            currentPage = 1;
+            hasMorePhotos = true;
+            lightboxPhotos = [];
+            
             document.getElementById('contentTitle').textContent = `${person.name}'s Photos`;
             
             document.querySelectorAll('.person-item').forEach(item => {
@@ -325,29 +333,63 @@ let people = [];
                 }
             });
             
-            await loadPhotos(person.clustering_id, person.id);
+            await loadPhotos(person.clustering_id, person.id, true);
         }
 
-        async function loadPhotos(clustering_id, person_id) {
+
+        async function loadPhotos(clustering_id, person_id, resetGrid = false) {
             const photoGrid = document.getElementById('photoGrid');
-            photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">Loading photos...</div>';
+            
+            if (resetGrid) {
+                photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">Loading photos...</div>';
+                currentPage = 1;
+                hasMorePhotos = true;
+                lightboxPhotos = [];
+            }
+            
+            if (isLoadingMore || !hasMorePhotos) {
+                return;
+            }
+            
+            isLoadingMore = true;
+            
+            const existingIndicator = document.getElementById('loading-indicator');
+            if (existingIndicator) {
+                existingIndicator.remove();
+            }
             
             try {
-                const photos = await pywebview.api.get_photos(clustering_id, person_id);
-                photoGrid.innerHTML = '';
+                console.log(`Loading photos: clustering_id=${clustering_id}, person_id=${person_id}, page=${currentPage}, page_size=${PAGE_SIZE}`);
                 
-                if (photos.length === 0) {
+                const result = await pywebview.api.get_photos(clustering_id, person_id, currentPage, PAGE_SIZE);
+                
+                console.log('Photos loaded successfully:', result);
+                
+                if (resetGrid) {
+                    photoGrid.innerHTML = '';
+                }
+                
+                if (!result || typeof result !== 'object') {
+                    throw new Error('Invalid response from get_photos: ' + JSON.stringify(result));
+                }
+                
+                if (result.total_count === 0) {
                     photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos found</div>';
                     return;
                 }
                 
-                lightboxPhotos = photos;
+                hasMorePhotos = result.has_more;
                 
-                photos.forEach((photo, index) => {
+                const startIndex = lightboxPhotos.length;
+                lightboxPhotos = lightboxPhotos.concat(result.photos);
+                
+                result.photos.forEach((photo, relativeIndex) => {
+                    const absoluteIndex = startIndex + relativeIndex;
+                    
                     const photoItem = document.createElement('div');
                     photoItem.className = 'photo-item';
                     photoItem.setAttribute('data-face-id', photo.face_id);
-                    photoItem.setAttribute('data-index', index);
+                    photoItem.setAttribute('data-index', absoluteIndex);
                     
                     const hiddenOverlay = photo.is_hidden ? '<div class="hidden-overlay"></div>' : '';
                     
@@ -454,9 +496,33 @@ let people = [];
                         }, 200);
                     });
                 });
+                
+                currentPage++;
+                
+                if (hasMorePhotos) {
+                    const loadingIndicator = document.createElement('div');
+                    loadingIndicator.id = 'loading-indicator';
+                    loadingIndicator.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 20px; color: #a0a0a0; font-size: 13px;';
+                    
+                    if (result.total_count > 1000) {
+                        loadingIndicator.textContent = `Loaded ${lightboxPhotos.length} of ${result.total_count} photos. Scroll for more...`;
+                    } else {
+                        loadingIndicator.textContent = 'Scroll for more...';
+                    }
+                    
+                    photoGrid.appendChild(loadingIndicator);
+                }
+                
             } catch (error) {
                 console.error('Error loading photos:', error);
-                photoGrid.innerHTML = '<div style="color: #ff6b6b; padding: 20px;">Error loading photos</div>';
+                console.error('Error stack:', error.stack);
+                addLogEntry('ERROR loading photos: ' + error.toString());
+                
+                if (resetGrid) {
+                    photoGrid.innerHTML = `<div style="color: #ff6b6b; padding: 20px;">Error loading photos:<br>${error.toString()}<br><br>Check console (F12) for details</div>`;
+                }
+            } finally {
+                isLoadingMore = false;
             }
         }
 

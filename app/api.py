@@ -227,32 +227,23 @@ class API:
             if is_hidden and not show_hidden:
                 continue
             
-            face_ids = self._db.get_face_ids_for_person(clustering_id, person_id)
-            tag_summary = self._db.get_person_tag_summary(face_ids)
-            
-            if tag_summary:
-                name = tag_summary['name']
-                tagged_count = tag_summary['tagged_count']
-            elif person_id > 0:
-                name = f"Person {person_id}"
-                tagged_count = 0
-            else:
-                name = "Unmatched Faces"
-                tagged_count = 0
+            name = self._db.get_person_name_fast(clustering_id, person_id)
             
             if is_hidden:
                 name += " (hidden)"
             
-            # Get ACTUAL photo count after filtering manual transfers
-            actual_photos = self._db.get_photos_by_person(clustering_id, person_id)
-            face_count = len(actual_photos)
+            tagged_count = self._db.get_person_tagged_count_fast(clustering_id, person_id)
+            face_count = self._db.get_person_photo_count_fast(clustering_id, person_id)
             
             primary_face_id = None
-            if tag_summary:
-                primary_face_id = self._db.get_primary_photo_for_tag(tag_summary['name'])
+            if not name.startswith("Person ") and name != "Unmatched Faces":
+                clean_name = name.replace(" (hidden)", "")
+                primary_face_id = self._db.get_primary_photo_for_tag(clean_name)
             
-            if not primary_face_id and actual_photos:
-                primary_face_id = actual_photos[0]['face_id']
+            if not primary_face_id and face_count > 0:
+                first_photos, _ = self._db.get_photos_by_person_paginated(clustering_id, person_id, limit=1, offset=0)
+                if first_photos:
+                    primary_face_id = first_photos[0]['face_id']
             
             thumbnail = None
             if primary_face_id:
@@ -302,7 +293,7 @@ class API:
         
         new_name = new_name.strip()
         
-        face_ids = self._db.get_face_ids_for_person(clustering_id, person_id)
+        face_ids = self._db.get_face_ids_for_person(clustering_id, person_id, limit=10000)
         
         if not face_ids:
             return {'success': False, 'message': 'No faces found for this person'}
@@ -315,7 +306,7 @@ class API:
         return {'success': True, 'faces_tagged': len(face_ids)}
     
     def untag_person(self, clustering_id, person_id):
-        face_ids = self._db.get_face_ids_for_person(clustering_id, person_id)
+        face_ids = self._db.get_face_ids_for_person(clustering_id, person_id, limit=10000)
         
         if not face_ids:
             return {'success': False, 'message': 'No faces found for this person'}
@@ -339,8 +330,13 @@ class API:
         except Exception as e:
             return {'success': False, 'message': str(e)}
     
-    def get_photos(self, clustering_id, person_id):
-        photo_data = self._db.get_photos_by_person(clustering_id, person_id)
+    def get_photos(self, clustering_id, person_id, page=1, page_size=100):
+        offset = (page - 1) * page_size
+        
+        photo_data, total_count = self._db.get_photos_by_person_paginated(
+            clustering_id, person_id, limit=page_size, offset=offset
+        )
+        
         hidden_photos = self._db.get_hidden_photos()
         show_hidden_photos = self._settings.get('show_hidden_photos', False)
         photos = []
@@ -371,13 +367,18 @@ class API:
                     'is_hidden': is_hidden
                 })
         
-        return photos
+        return {
+            'photos': photos,
+            'total_count': total_count,
+            'page': page,
+            'page_size': page_size,
+            'has_more': offset + len(photos) < total_count
+        }
     
     def get_full_size_preview(self, image_path: str) -> Optional[str]:
         try:
             img = Image.open(image_path)
             
-            # Apply EXIF orientation if present
             img = ImageOps.exif_transpose(img)
             
             max_size = 1200
@@ -400,7 +401,6 @@ class API:
         try:
             img = Image.open(image_path)
             
-            # Apply EXIF orientation if present
             img = ImageOps.exif_transpose(img)
             
             if bbox is not None:
@@ -426,7 +426,6 @@ class API:
             return None
     
     def get_named_people_for_transfer(self, clustering_id):
-        """Get list of named people for transfer menu"""
         try:
             people = self._db.get_all_named_people(clustering_id)
             return {'success': True, 'people': people}
@@ -434,7 +433,6 @@ class API:
             return {'success': False, 'message': str(e)}
     
     def transfer_face_to_person(self, face_id, target_name):
-        """Transfer a face to a different person (manual ground truth)"""
         try:
             self._db.transfer_face_to_person(face_id, target_name)
             if self._window:
@@ -445,7 +443,6 @@ class API:
             return {'success': False, 'message': str(e)}
     
     def remove_face_permanently(self, face_id):
-        """Remove a face from all groups permanently"""
         try:
             self._db.hide_photo(face_id)
             if self._window:
