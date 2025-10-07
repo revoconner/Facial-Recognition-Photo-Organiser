@@ -1614,7 +1614,7 @@
 
         .transfer-option:hover {
             background: #3a3a3a;
-            transform: translateX(4px);
+            /*transform: translateX(4px);*/
         }
 
         .transfer-option.remove {
