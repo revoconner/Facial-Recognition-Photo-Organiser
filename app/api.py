@@ -222,7 +222,6 @@ class API:
         
         for person in persons:
             person_id = person['person_id']
-            face_count = person['face_count']
             is_hidden = person_id in hidden_persons
             
             if is_hidden and not show_hidden:
@@ -244,12 +243,16 @@ class API:
             if is_hidden:
                 name += " (hidden)"
             
+            # Get ACTUAL photo count after filtering manual transfers
+            actual_photos = self._db.get_photos_by_person(clustering_id, person_id)
+            face_count = len(actual_photos)
+            
             primary_face_id = None
             if tag_summary:
                 primary_face_id = self._db.get_primary_photo_for_tag(tag_summary['name'])
             
-            if not primary_face_id and face_ids:
-                primary_face_id = face_ids[0]
+            if not primary_face_id and actual_photos:
+                primary_face_id = actual_photos[0]['face_id']
             
             thumbnail = None
             if primary_face_id:

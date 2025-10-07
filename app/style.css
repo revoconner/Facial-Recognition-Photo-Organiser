@@ -1642,4 +1642,8 @@
             background: #3a3a3a;
         }
 
-    
+            /* Prevent tooltips from showing in transfer dialog */
+        .transfer-dialog .tooltip,
+        .transfer-overlay .tooltip {
+            display: none !important;
+        }
