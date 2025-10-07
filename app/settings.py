@@ -25,7 +25,8 @@ class Settings:
             'exclude_folders': [],
             'wildcard_exclusions': '',
             'view_mode': 'entire_photo',
-            'sort_mode': 'names_asc'
+            'sort_mode': 'names_asc',
+            'hide_unnamed_persons': False
         }
         
         self.settings = self.load()

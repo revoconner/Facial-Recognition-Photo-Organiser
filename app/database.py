@@ -775,6 +775,22 @@ class FaceDatabase:
         cursor.execute('SELECT COUNT(*) FROM photos WHERE scan_status = "completed"')
         return cursor.fetchone()[0]
     
+    def move_face_to_unmatched(self, clustering_id: int, face_id: int):
+        cursor = self.conn.cursor()
+        
+        cursor.execute('''
+            UPDATE cluster_assignments
+            SET person_id = 0
+            WHERE clustering_id = ? AND face_id = ?
+        ''', (clustering_id, face_id))
+        
+        cursor.execute('''
+            DELETE FROM face_tags
+            WHERE face_id = ?
+        ''', (face_id,))
+        
+        self.conn.commit()
+    
     def close(self):
         if hasattr(self, 'conn') and self.conn:
             self.conn.close()

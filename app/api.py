@@ -217,6 +217,7 @@ class API:
         persons = self._db.get_persons_in_clustering(clustering_id)
         hidden_persons = self._db.get_hidden_persons(clustering_id)
         show_hidden = self._settings.get('show_hidden', False)
+        hide_unnamed = self._settings.get('hide_unnamed_persons', False)
         
         result = []
         
@@ -228,6 +229,9 @@ class API:
                 continue
             
             name = self._db.get_person_name_fast(clustering_id, person_id)
+            
+            if hide_unnamed and name.startswith("Person "):
+                continue
             
             if is_hidden:
                 name += " (hidden)"
@@ -250,7 +254,7 @@ class API:
                 face_data = self._db.get_face_data(primary_face_id)
                 if face_data:
                     bbox = [face_data['bbox_x1'], face_data['bbox_y1'], 
-                           face_data['bbox_x2'], face_data['bbox_y2']]
+                        face_data['bbox_x2'], face_data['bbox_y2']]
                     thumbnail = self.create_thumbnail(face_data['file_path'], size=80, bbox=bbox, face_id=primary_face_id)
             
             result.append({
@@ -265,10 +269,25 @@ class API:
         
         return result
     
-    def hide_person(self, clustering_id, person_id):
-        self._db.hide_person(clustering_id, person_id)
-        if self._window:
-            self._window.evaluate_js('loadPeople()')
+    def remove_face_to_unmatched(self, clustering_id, face_id):
+        try:
+            self._db.move_face_to_unmatched(clustering_id, face_id)
+            if self._window:
+                self._window.evaluate_js('reloadCurrentPhotos()')
+            return {'success': True, 'message': 'Face moved to Unmatched Faces'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+
+    def get_hide_unnamed_persons(self):
+        return self._settings.get('hide_unnamed_persons', False)
+
+    def set_hide_unnamed_persons(self, enabled):
+        self._settings.set('hide_unnamed_persons', enabled)
+        
+        def hide_person(self, clustering_id, person_id):
+            self._db.hide_person(clustering_id, person_id)
+            if self._window:
+                self._window.evaluate_js('loadPeople()')
     
     def unhide_person(self, clustering_id, person_id):
         self._db.unhide_person(clustering_id, person_id)

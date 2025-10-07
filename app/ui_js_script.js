@@ -20,6 +20,7 @@ let people = [];
         let isLoadingMore = false;
         let hasMorePhotos = true;
         let scrollCheckInterval = null;
+        let hideUnnamedPersons = false;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -717,11 +718,16 @@ let people = [];
             closeTransferDialog();
             
             try {
-                const result = await pywebview.api.remove_face_permanently(faceId);
-                if (result.success) {
-                    addLogEntry(`Face removed from ${personName}`);
-                } else {
-                    addLogEntry('ERROR: ' + result.message);
+                const clustering = await pywebview.api.get_people();
+                if (clustering && clustering.length > 0) {
+                    const clusteringId = clustering[0].clustering_id;
+                    
+                    const result = await pywebview.api.remove_face_to_unmatched(clusteringId, faceId);
+                    if (result.success) {
+                        addLogEntry(`Face moved from ${personName} to Unmatched Faces`);
+                    } else {
+                        addLogEntry('ERROR: ' + result.message);
+                    }
                 }
             } catch (error) {
                 console.error('Error removing face:', error);
@@ -841,6 +847,10 @@ let people = [];
                 document.getElementById('minPhotosInput').value = minPhotosCountSetting;
                 document.getElementById('minPhotosInput').disabled = !minPhotosEnabledSetting;
                 
+                const hideUnnamedSetting = await pywebview.api.get_hide_unnamed_persons();
+                hideUnnamedPersons = hideUnnamedSetting;
+                document.getElementById('hideUnnamedToggle').checked = hideUnnamedSetting;
+                
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 document.getElementById('photoGrid').style.gridTemplateColumns = 
@@ -870,6 +880,13 @@ let people = [];
                 addLogEntry('ERROR: Failed to load settings - ' + error);
             }
         }
+
+        document.getElementById('hideUnnamedToggle').addEventListener('change', async (e) => {
+            hideUnnamedPersons = e.target.checked;
+            await pywebview.api.set_hide_unnamed_persons(hideUnnamedPersons);
+            await loadPeople();
+            addLogEntry('Hide unnamed persons: ' + (hideUnnamedPersons ? 'enabled' : 'disabled'));
+        });
 
         function updateJumpToButtonVisibility() {
             const jumpToBtn = document.getElementById('jumpToBtn');
