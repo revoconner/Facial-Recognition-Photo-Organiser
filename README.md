@@ -22,6 +22,10 @@ While there are tools that already do this, they all need some kind of internet 
 - Lets user decide the threshold percentage, for facial matching (45%-50% recommended)
 - Allocates system resources dynamically so as not to bog down your system.
 
+### Click this or scroll down for User Guide
+[USER GUIDE](#User-Guide)
+
+## Screenshots
 
 <img width="1791" height="1146" alt="image" src="https://github.com/user-attachments/assets/78303298-915a-4594-aa3a-16b9d28760cd" /> </br>
 <img width="auto" height="700" alt="image" src="https://github.com/user-attachments/assets/1b66b311-6763-4369-b067-7ead5ed7d19e" /></br>
