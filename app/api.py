@@ -301,10 +301,10 @@ class API:
     def set_hide_unnamed_persons(self, enabled):
         self._settings.set('hide_unnamed_persons', enabled)
         
-        def hide_person(self, clustering_id, person_id):
-            self._db.hide_person(clustering_id, person_id)
-            if self._window:
-                self._window.evaluate_js('loadPeople()')
+    def hide_person(self, clustering_id, person_id):
+        self._db.hide_person(clustering_id, person_id)
+        if self._window:
+            self._window.evaluate_js('loadPeople()')
     
     def unhide_person(self, clustering_id, person_id):
         self._db.unhide_person(clustering_id, person_id)

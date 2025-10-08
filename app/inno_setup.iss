@@ -1,5 +1,5 @@
 #define MyAppName "Facial Recognition Photo Organiser"
-#define MyAppVersion "0.1.0"
+#define MyAppVersion "0.5.5"
 #define MyAppPublisher "Rév O'Conner"
 #define MyAppExeName "FaceRecognition.exe"
 
