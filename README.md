@@ -6,13 +6,13 @@ The photos stored in your computer are seldom stored by what people are in those
 While there are tools that already do this, they all need some kind of internet connectivity and sends your data to some cloud (which is just a computer running in some datacenter). Now you can do this locally on your pc, with a great GUI program. And it doesn't even mess up the way you originally organised your photos.
 
 ## Table of content
-- [Features](##Features)
-- [Screenshots](##Screenshots)
-- [Known bugs](##Known-Bugs)
+- [Features](#Features)
+- [Screenshots](#Screenshots)
+- [Known bugs](#Known-Bugs)
 - [User Guide](#User-Guide)
-- [License and Usage](##License-and-Usage)
-- [Version Info](##Version-Information)
-- [Performance Figures](##Performance-Stats)
+- [License and Usage](#License-and-Usage)
+- [Version Info](#Version-Information)
+- [Performance Figures](#Performance-Stats)
 
 ## Features
 - User friendly GUI, built by professional for everyday users!
@@ -25,6 +25,7 @@ While there are tools that already do this, they all need some kind of internet 
 - Sort by name of number of photos
 - Quickly jump to a person
 - Transfer face tag to another person to remove it (for false positive; in my testing with 90,980 real everyday photos, false positives were a rarity)
+- Hide unnamed people
 - Finds new photos or deleted photos on disk autmatically
 - Exclusion by wildcard or subfolder
 - Doesn't change your folder structure, the faces only work inside the app and is kept in a separate database. So if you have organised your folders in a certain way, it won't mess with that.
@@ -47,9 +48,6 @@ While there are tools that already do this, they all need some kind of internet 
 
 ## Known Bugs:
 - Initial start might take a bit of time. Do not worry your computer did not crash.
-- Clicking on a person's name with very large number of photos might take a bit of time to load all the images. Consecutive displays will be faster as thumbnails are cached.
-- Sluggish start and thumbnail performance on very large databases (more than a million faces)
-
 
 ----
 
