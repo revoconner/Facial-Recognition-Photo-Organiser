@@ -828,7 +828,7 @@ class API:
             exit_thread.start()
 
     def get_photo_face_tags(self, photo_path: str):
-        """Get face tags for a photo with EXIF-corrected coordinates"""
+        """Get face tags for a photo with preview-scaled coordinates"""
         try:
             photo_id = self._db.get_photo_id(photo_path)
             if not photo_id:
@@ -839,15 +839,27 @@ class API:
             img = Image.open(photo_path)
             img = ImageOps.exif_transpose(img)
             
+            original_width = img.width
+            original_height = img.height
+            
+            max_size = 1200
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            
+            preview_width = img.width
+            preview_height = img.height
+            
+            scale_x = preview_width / original_width
+            scale_y = preview_height / original_height
+            
             tagged_faces = []
             for face in faces:
                 if face['tag_name']:
                     tagged_faces.append({
                         'face_id': face['face_id'],
-                        'bbox_x1': face['bbox_x1'],
-                        'bbox_y1': face['bbox_y1'],
-                        'bbox_x2': face['bbox_x2'],
-                        'bbox_y2': face['bbox_y2'],
+                        'bbox_x1': face['bbox_x1'] * scale_x,
+                        'bbox_y1': face['bbox_y1'] * scale_y,
+                        'bbox_x2': face['bbox_x2'] * scale_x,
+                        'bbox_y2': face['bbox_y2'] * scale_y,
                         'tag_name': face['tag_name']
                     })
             
