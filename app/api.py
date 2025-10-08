@@ -828,16 +828,60 @@ class API:
             exit_thread.start()
 
     def get_photo_face_tags(self, photo_path: str):
-        """Get face tags for a photo by path"""
+        """Get face tags for a photo with EXIF-corrected coordinates"""
         try:
             photo_id = self._db.get_photo_id(photo_path)
             if not photo_id:
                 return {'success': False, 'faces': []}
             
             faces = self._db.get_photo_face_tags(photo_id)
-            return {'success': True, 'faces': faces}
+            
+            img = Image.open(photo_path)
+            original_width = img.width
+            original_height = img.height
+            
+            exif_orientation = 1
+            try:
+                exif = img._getexif()
+                if exif:
+                    exif_orientation = exif.get(0x0112, 1)
+            except:
+                pass
+            
+            corrected_faces = []
+            for face in faces:
+                x1, y1, x2, y2 = face['bbox_x1'], face['bbox_y1'], face['bbox_x2'], face['bbox_y2']
+                
+                if exif_orientation == 2:
+                    x1, x2 = original_width - x2, original_width - x1
+                elif exif_orientation == 3:
+                    x1, x2 = original_width - x2, original_width - x1
+                    y1, y2 = original_height - y2, original_height - y1
+                elif exif_orientation == 4:
+                    y1, y2 = original_height - y2, original_height - y1
+                elif exif_orientation == 5:
+                    x1, y1, x2, y2 = y1, original_width - x2, y2, original_width - x1
+                elif exif_orientation == 6:
+                    x1, y1, x2, y2 = original_height - y2, x1, original_height - y1, x2
+                elif exif_orientation == 7:
+                    x1, y1, x2, y2 = original_height - y2, original_width - x2, original_height - y1, original_width - x1
+                elif exif_orientation == 8:
+                    x1, y1, x2, y2 = y1, x1, y2, x2
+                
+                corrected_faces.append({
+                    'face_id': face['face_id'],
+                    'bbox_x1': x1,
+                    'bbox_y1': y1,
+                    'bbox_x2': x2,
+                    'bbox_y2': y2,
+                    'tag_name': face['tag_name']
+                })
+            
+            return {'success': True, 'faces': corrected_faces}
         except Exception as e:
             print(f"Error getting photo face tags: {e}")
+            import traceback
+            traceback.print_exc()
             return {'success': False, 'faces': []}
 
     def get_show_face_tags_preview(self):
