@@ -501,8 +501,15 @@ let people = [];
                         
                         if (e.ctrlKey || e.metaKey) {
                             togglePhotoSelection(faceId, photoIndex, photoItem);
-                        } else if (e.shiftKey && lastSelectedIndex >= 0) {
-                            selectPhotoRange(lastSelectedIndex, photoIndex);
+                        } else if (e.shiftKey) {
+                            if (lastSelectedIndex >= 0) {
+                                selectPhotoRange(lastSelectedIndex, photoIndex);
+                            } else {
+                                selectedPhotos.add(faceId);
+                                photoItem.classList.add('selected');
+                                lastSelectedIndex = photoIndex;
+                                updateSelectionInfo();
+                            }
                         } else {
                             if (selectedPhotos.size === 0) {
                                 openLightbox(photoIndex);
