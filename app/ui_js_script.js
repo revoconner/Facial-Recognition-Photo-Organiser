@@ -850,6 +850,7 @@ let people = [];
                     } else {
                         lightboxImage.src = photo.thumbnail;
                     }
+                    lightboxImage.onload = null;
                 }
             } catch (error) {
                 console.error('Error loading full size preview:', error);
