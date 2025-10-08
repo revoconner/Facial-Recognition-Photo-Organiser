@@ -7,24 +7,19 @@ from io import BytesIO
 
 
 class ThumbnailCache:
-    """Disk-based thumbnail cache for fast photo grid loading"""
-    
     def __init__(self, cache_folder: str):
         self.cache_folder = Path(cache_folder)
         self.cache_folder.mkdir(parents=True, exist_ok=True)
         
     def _get_cache_key(self, face_id: int, bbox: Optional[List[float]], size: int) -> str:
-        """Generate cache filename"""
         mode = "zoom" if bbox else "entire"
         return f"face_{face_id}_{mode}_{size}.jpg"
     
     def _get_cache_path(self, cache_key: str) -> Path:
-        """Get full path for cache file"""
         return self.cache_folder / cache_key
     
     def get_cached_thumbnail(self, face_id: int, image_path: str, 
                            bbox: Optional[List[float]], size: int) -> Optional[str]:
-        """Try to get thumbnail from cache"""
         cache_key = self._get_cache_key(face_id, bbox, size)
         cache_path = self._get_cache_path(cache_key)
         
@@ -50,7 +45,6 @@ class ThumbnailCache:
     
     def save_to_cache(self, face_id: int, bbox: Optional[List[float]], 
                      size: int, thumbnail_bytes: bytes) -> bool:
-        """Save thumbnail to cache"""
         try:
             cache_key = self._get_cache_key(face_id, bbox, size)
             cache_path = self._get_cache_path(cache_key)
@@ -65,7 +59,6 @@ class ThumbnailCache:
     
     def create_thumbnail_with_cache(self, face_id: int, image_path: str, 
                                    size: int = 150, bbox: Optional[List[float]] = None) -> Optional[str]:
-        """Create thumbnail with caching"""
         cached = self.get_cached_thumbnail(face_id, image_path, bbox, size)
         if cached:
             return cached
@@ -73,19 +66,33 @@ class ThumbnailCache:
         try:
             img = Image.open(image_path)
             
-            # Apply EXIF orientation if present
             img = ImageOps.exif_transpose(img)
             
             if bbox is not None:
                 x1, y1, x2, y2 = bbox
-                padding = 20
                 
-                x1 = max(0, x1 - padding)
-                y1 = max(0, y1 - padding)
-                x2 = min(img.width, x2 + padding)
-                y2 = min(img.height, y2 + padding)
+                x1, x2 = min(x1, x2), max(x1, x2)
+                y1, y2 = min(y1, y2), max(y1, y2)
                 
-                img = img.crop((int(x1), int(y1), int(x2), int(y2)))
+                width = x2 - x1
+                height = y2 - y1
+                
+                if width < 10 or height < 10:
+                    print(f"Invalid bbox size for face {face_id}: {width}x{height}, skipping crop")
+                    bbox = None
+                else:
+                    padding = 20
+                    
+                    x1 = max(0, x1 - padding)
+                    y1 = max(0, y1 - padding)
+                    x2 = min(img.width, x2 + padding)
+                    y2 = min(img.height, y2 + padding)
+                    
+                    if x2 <= x1 or y2 <= y1:
+                        print(f"Invalid bbox after padding for face {face_id}, skipping crop")
+                        bbox = None
+                    else:
+                        img = img.crop((int(x1), int(y1), int(x2), int(y2)))
             
             img.thumbnail((size, size), Image.Resampling.LANCZOS)
             img_rgb = img.convert('RGB')
@@ -104,7 +111,6 @@ class ThumbnailCache:
             return None
     
     def get_cache_size(self) -> Dict[str, any]:
-        """Get cache statistics"""
         total_size = 0
         file_count = 0
         
@@ -120,7 +126,6 @@ class ThumbnailCache:
         }
     
     def clear_cache(self) -> Dict[str, any]:
-        """Clear all cached thumbnails"""
         stats = self.get_cache_size()
         
         for file_path in self.cache_folder.glob("*.jpg"):
