@@ -1847,3 +1847,38 @@
 .conflict-btn.go-back:hover {
     background: #3a3a3a;
 }
+.face-tags-overlay {
+    position: absolute;
+    pointer-events: none;
+    z-index: 100002;
+}
+
+.face-tag-box {
+    position: absolute;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 10px rgba(59, 130, 246, 0.5);
+    pointer-events: none;
+}
+
+.face-tag-label {
+    position: absolute;
+    top: -26px;
+    left: 0;
+    background: rgba(59, 130, 246, 0.95);
+    color: #ffffff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.face-tag-label::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 8px;
+    border: 5px solid transparent;
+    border-top-color: rgba(59, 130, 246, 0.95);
+}

@@ -843,3 +843,26 @@ class FaceDatabase:
         
         if hasattr(self, 'env') and self.env:
             self.env.close()
+
+    def get_photo_face_tags(self, photo_id: int) -> List[Dict]:
+        """Get all faces in a photo with their tags and bboxes"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2, 
+                ft.tag_name
+            FROM faces f
+            LEFT JOIN face_tags ft ON f.face_id = ft.face_id
+            WHERE f.photo_id = ?
+        ''', (photo_id,))
+        
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                'face_id': row[0],
+                'bbox_x1': row[1],
+                'bbox_y1': row[2],
+                'bbox_x2': row[3],
+                'bbox_y2': row[4],
+                'tag_name': row[5] if row[5] else None
+            })
+        return results

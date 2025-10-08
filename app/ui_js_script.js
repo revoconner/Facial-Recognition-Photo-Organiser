@@ -24,6 +24,8 @@ let people = [];
         let selectedPhotos = new Set();
         let lastSelectedIndex = -1;
         let nameConflictData = null;
+        let showFaceTagsPreview = true;
+
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -725,6 +727,11 @@ let people = [];
         }
 
         function closeLightbox() {
+            const overlayContainer = document.getElementById('faceTagsOverlay');
+            overlayContainer.innerHTML = '';
+            overlayContainer.style.width = '0';
+            overlayContainer.style.height = '0';
+            
             document.getElementById('lightboxOverlay').classList.remove('active');
             document.getElementById('appContainer').classList.remove('blurred');
         }
@@ -743,6 +750,51 @@ let people = [];
             }
         }
 
+        function drawFaceTags(faces, imageElement) {
+            const overlayContainer = document.getElementById('faceTagsOverlay');
+            overlayContainer.innerHTML = '';
+            
+            const imgRect = imageElement.getBoundingClientRect();
+            const contentRect = document.getElementById('lightboxContent').getBoundingClientRect();
+            
+            overlayContainer.style.width = imgRect.width + 'px';
+            overlayContainer.style.height = imgRect.height + 'px';
+            overlayContainer.style.left = (imgRect.left - contentRect.left) + 'px';
+            overlayContainer.style.top = (imgRect.top - contentRect.top) + 'px';
+            
+            const imgNaturalWidth = imageElement.naturalWidth;
+            const imgNaturalHeight = imageElement.naturalHeight;
+            
+            const scaleX = imgRect.width / imgNaturalWidth;
+            const scaleY = imgRect.height / imgNaturalHeight;
+            
+            faces.forEach(face => {
+                if (!face.tag_name) return;
+                
+                const x1 = face.bbox_x1 * scaleX;
+                const y1 = face.bbox_y1 * scaleY;
+                const x2 = face.bbox_x2 * scaleX;
+                const y2 = face.bbox_y2 * scaleY;
+                
+                const width = x2 - x1;
+                const height = y2 - y1;
+                
+                const box = document.createElement('div');
+                box.className = 'face-tag-box';
+                box.style.left = x1 + 'px';
+                box.style.top = y1 + 'px';
+                box.style.width = width + 'px';
+                box.style.height = height + 'px';
+                
+                const label = document.createElement('div');
+                label.className = 'face-tag-label';
+                label.textContent = face.tag_name;
+                box.appendChild(label);
+                
+                overlayContainer.appendChild(box);
+            });
+        }
+
         async function updateLightbox() {
             const photo = lightboxPhotos[lightboxCurrentIndex];
             document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} of ${lightboxPhotos.length}`;
@@ -750,18 +802,35 @@ let people = [];
             document.getElementById('lightboxPrev').style.display = lightboxCurrentIndex > 0 ? 'flex' : 'none';
             document.getElementById('lightboxNext').style.display = lightboxCurrentIndex < lightboxPhotos.length - 1 ? 'flex' : 'none';
             
+            const overlayContainer = document.getElementById('faceTagsOverlay');
+            overlayContainer.innerHTML = '';
+            overlayContainer.style.width = '0';
+            overlayContainer.style.height = '0';
+            
             try {
                 const fullSizePreview = await pywebview.api.get_full_size_preview(photo.path);
+                const lightboxImage = document.getElementById('lightboxImage');
+                
                 if (fullSizePreview) {
-                    document.getElementById('lightboxImage').src = fullSizePreview;
+                    lightboxImage.src = fullSizePreview;
                 } else {
-                    document.getElementById('lightboxImage').src = photo.thumbnail;
+                    lightboxImage.src = photo.thumbnail;
+                }
+                
+                if (showFaceTagsPreview) {
+                    lightboxImage.onload = async () => {
+                        const result = await pywebview.api.get_photo_face_tags(photo.path);
+                        if (result.success && result.faces.length > 0) {
+                            drawFaceTags(result.faces, lightboxImage);
+                        }
+                    };
                 }
             } catch (error) {
                 console.error('Error loading full size preview:', error);
                 document.getElementById('lightboxImage').src = photo.thumbnail;
             }
         }
+
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
 
@@ -986,6 +1055,8 @@ let people = [];
             logViewer.scrollTop = logViewer.scrollHeight;
         }
 
+
+
         async function loadAllSettings() {
             try {
                 const threshold = await pywebview.api.get_threshold();
@@ -1029,6 +1100,10 @@ let people = [];
                 const hideUnnamedSetting = await pywebview.api.get_hide_unnamed_persons();
                 hideUnnamedPersons = hideUnnamedSetting;
                 document.getElementById('hideUnnamedToggle').checked = hideUnnamedSetting;
+                
+                const showFaceTagsPreviewSetting = await pywebview.api.get_show_face_tags_preview();
+                showFaceTagsPreview = showFaceTagsPreviewSetting;
+                document.getElementById('showFaceTagsPreviewToggle').checked = showFaceTagsPreviewSetting;
                 
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;

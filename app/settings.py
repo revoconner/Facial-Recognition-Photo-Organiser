@@ -28,7 +28,8 @@ class Settings:
             'sort_mode': 'names_asc',
             'hide_unnamed_persons': False,
             'scan_frequency': 'restart_1_day',
-            'last_scan_time': None
+            'last_scan_time': None,
+            'show_face_tags_preview': True
         }
         
         self.settings = self.load()

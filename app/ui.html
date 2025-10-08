@@ -255,7 +255,20 @@
                                 <span style="color: #a0a0a0; font-size: 13px;">photos</span>
                             </div>
                         </div>
-                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Show face tags in full screen image previews</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Use this to see person's name in the photo so you know where they are tagged in, for example, in a group photo or in the background. Default On</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="showFaceTagsPreviewToggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
                         <div class="setting-row">
                             <div class="setting-label">
                                 <span>Close to tray</span>
@@ -483,6 +496,7 @@
         
         <div class="lightbox-content" id="lightboxContent">
             <img src="" alt="Preview" id="lightboxImage">
+            <div class="face-tags-overlay" id="faceTagsOverlay"></div>
         </div>
         
         <button class="lightbox-nav lightbox-next" id="lightboxNext">

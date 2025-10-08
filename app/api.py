@@ -826,6 +826,25 @@ class API:
             
             exit_thread = threading.Thread(target=force_exit, daemon=True)
             exit_thread.start()
+
+    def get_photo_face_tags(self, photo_path: str):
+        """Get face tags for a photo by path"""
+        try:
+            photo_id = self._db.get_photo_id(photo_path)
+            if not photo_id:
+                return {'success': False, 'faces': []}
+            
+            faces = self._db.get_photo_face_tags(photo_id)
+            return {'success': True, 'faces': faces}
+        except Exception as e:
+            print(f"Error getting photo face tags: {e}")
+            return {'success': False, 'faces': []}
+
+    def get_show_face_tags_preview(self):
+        return self._settings.get('show_face_tags_preview', True)
+
+    def set_show_face_tags_preview(self, enabled):
+        self._settings.set('show_face_tags_preview', enabled)
     
     def close(self):
         if self._tray_icon:
