@@ -1,6 +1,11 @@
 # Organise Photos by Faces
-A no nonsense photo organiser for windows, if you group people by faces. With negligible false results, the cutting edge AI backed program scans your folder and groups users users together by faces. </br>
+
+Face Recognition Photo Organizer is a desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
+
+A no nonsense photo organiser for windows, if you want to group people by faces without having to deal with complex UI or professional tools. With negligible false results, the cutting edge AI backed program scans your folder and groups users users together by faces. </br>
+
 No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally being used by me to sort through hundreds of thousands of photos all taken as back as 2010, and organise them. So they are already being tested in real time with a huge database. 
+
 
 ## Table of content
 - [Features](#Features)
