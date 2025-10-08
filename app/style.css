@@ -1423,18 +1423,38 @@
             position: relative;
             width: 1000px;
             max-width: calc(100vw - 80px);
+            max-height: calc(100vh - 80px);
             background: #1a1a1a;
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
             overflow: hidden;
             z-index: 99999;
             animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
         }
 
         .help-content {
             padding: 40px 48px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .help-content::-webkit-scrollbar {
+            width: 8px;
         }
 
+        .help-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .help-content::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+
+        .help-content::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
         .help-title {
             font-size: 28px;
             font-weight: 700;
@@ -1469,7 +1489,7 @@
         .close-help-btn {
             width: 100%;
             padding: 12px 32px;
-            background: #3b82f6;
+            background: #dc2626;
             border: none;
             border-radius: 8px;
             color: #ffffff;
@@ -1480,7 +1500,7 @@
         }
 
         .close-help-btn:hover {
-            background: #2563eb;
+            background: #b91c1c;
         }
 
         .no-folders-container {
@@ -1660,3 +1680,101 @@
                 opacity: 0.5;
             }
         }
+/* Add these styles to the existing style.css */
+
+.photo-item.selected {
+    outline: 3px solid #3b82f6;
+    outline-offset: -3px;
+    z-index: 5;
+}
+
+.photo-item.selected::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    background: #3b82f6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.photo-item.selected::before {
+    content: '✓';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 7;
+}
+
+.selection-info {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2a2a2a;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: none;
+    animation: slideUp 0.2s ease;
+}
+
+.selection-info.show {
+    display: block;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.selection-info-text {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.selection-info-text span {
+    color: #3b82f6;
+}
+
+.clear-selection-btn {
+    background: transparent;
+    border: none;
+    color: #a0a0a0;
+    cursor: pointer;
+    padding: 4px 8px;
+    margin-left: 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.clear-selection-btn:hover {
+    background: #3a3a3a;
+    color: #ffffff;
+}

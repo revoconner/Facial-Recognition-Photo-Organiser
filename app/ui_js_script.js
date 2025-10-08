@@ -21,6 +21,8 @@ let people = [];
         let hasMorePhotos = true;
         let scrollCheckInterval = null;
         let hideUnnamedPersons = false;
+        let selectedPhotos = new Set();
+        let lastSelectedIndex = -1;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
@@ -29,6 +31,65 @@ let people = [];
 
         function getPersonColor(personId) {
             return personColors[personId % personColors.length];
+        }
+
+        function updateSelectionInfo() {
+            const selectionInfo = document.getElementById('selectionInfo');
+            if (!selectionInfo) {
+                const info = document.createElement('div');
+                info.className = 'selection-info';
+                info.id = 'selectionInfo';
+                info.innerHTML = `
+                    <div class="selection-info-text">
+                        <span id="selectionCount">0</span> photos selected
+                        <button class="clear-selection-btn" onclick="clearSelection()">Clear</button>
+                    </div>
+                `;
+                document.body.appendChild(info);
+            }
+            
+            const count = selectedPhotos.size;
+            if (count > 0) {
+                document.getElementById('selectionInfo').classList.add('show');
+                document.getElementById('selectionCount').textContent = count;
+            } else {
+                document.getElementById('selectionInfo').classList.remove('show');
+            }
+        }
+
+        function clearSelection() {
+            selectedPhotos.clear();
+            lastSelectedIndex = -1;
+            document.querySelectorAll('.photo-item.selected').forEach(item => {
+                item.classList.remove('selected');
+            });
+            updateSelectionInfo();
+        }
+
+        function togglePhotoSelection(faceId, photoIndex, element) {
+            if (selectedPhotos.has(faceId)) {
+                selectedPhotos.delete(faceId);
+                element.classList.remove('selected');
+            } else {
+                selectedPhotos.add(faceId);
+                element.classList.add('selected');
+                lastSelectedIndex = photoIndex;
+            }
+            updateSelectionInfo();
+        }
+
+        function selectPhotoRange(startIndex, endIndex) {
+            const photoItems = Array.from(document.querySelectorAll('.photo-item'));
+            const start = Math.min(startIndex, endIndex);
+            const end = Math.max(startIndex, endIndex);
+            
+            for (let i = start; i <= end && i < photoItems.length; i++) {
+                const item = photoItems[i];
+                const faceId = parseInt(item.getAttribute('data-face-id'));
+                selectedPhotos.add(faceId);
+                item.classList.add('selected');
+            }
+            updateSelectionInfo();
         }
 
         function positionMenu(menu, button) {
@@ -321,6 +382,7 @@ let people = [];
             hasMorePhotos = true;
             lightboxPhotos = [];
             isLoadingMore = false;
+            clearSelection();
             
             document.getElementById('contentTitle').textContent = `${person.name}'s Photos`;
             
@@ -349,6 +411,7 @@ let people = [];
                 hasMorePhotos = true;
                 lightboxPhotos = [];
                 isLoadingMore = false;
+                clearSelection();
             }
             
             if (isLoadingMore) {
@@ -426,25 +489,26 @@ let people = [];
                     const contextMenu = document.createElement('div');
                     contextMenu.className = 'context-menu';
                     
-                    if (photo.is_hidden) {
-                        contextMenu.innerHTML = `
-                            <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
-                            <div class="context-menu-item" data-action="unhide-photo">Unhide photo</div>
-                        `;
-                    } else {
-                        contextMenu.innerHTML = `
-                            <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
-                            <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag</div>
-                            <div class="context-menu-item" data-action="hide-photo">Hide photo</div>
-                        `;
-                    }
-                    
                     document.body.appendChild(contextMenu);
                     
                     photoItem.addEventListener('click', (e) => {
-                        if (!e.target.closest('.kebab-menu')) {
-                            const photoIndex = parseInt(photoItem.getAttribute('data-index'));
-                            openLightbox(photoIndex);
+                        if (e.target.closest('.kebab-menu')) {
+                            return;
+                        }
+                        
+                        const photoIndex = parseInt(photoItem.getAttribute('data-index'));
+                        const faceId = photo.face_id;
+                        
+                        if (e.ctrlKey || e.metaKey) {
+                            togglePhotoSelection(faceId, photoIndex, photoItem);
+                        } else if (e.shiftKey && lastSelectedIndex >= 0) {
+                            selectPhotoRange(lastSelectedIndex, photoIndex);
+                        } else {
+                            if (selectedPhotos.size === 0) {
+                                openLightbox(photoIndex);
+                            } else {
+                                clearSelection();
+                            }
                         }
                     });
                     
@@ -467,6 +531,42 @@ let people = [];
                             path: photo.path,
                             is_hidden: photo.is_hidden
                         };
+                        
+                        const hasSelection = selectedPhotos.size > 0;
+                        const isPhotoSelected = selectedPhotos.has(photo.face_id);
+                        
+                        if (hasSelection) {
+                            if (!isPhotoSelected) {
+                                selectedPhotos.add(photo.face_id);
+                                photoItem.classList.add('selected');
+                                updateSelectionInfo();
+                            }
+                            
+                            if (photo.is_hidden) {
+                                contextMenu.innerHTML = `
+                                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag (${selectedPhotos.size} photos)</div>
+                                    <div class="context-menu-item" data-action="unhide-photo">Unhide photo (${selectedPhotos.size} photos)</div>
+                                `;
+                            } else {
+                                contextMenu.innerHTML = `
+                                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag (${selectedPhotos.size} photos)</div>
+                                    <div class="context-menu-item" data-action="hide-photo">Hide photo (${selectedPhotos.size} photos)</div>
+                                `;
+                            }
+                        } else {
+                            if (photo.is_hidden) {
+                                contextMenu.innerHTML = `
+                                    <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                                    <div class="context-menu-item" data-action="unhide-photo">Unhide photo</div>
+                                `;
+                            } else {
+                                contextMenu.innerHTML = `
+                                    <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag</div>
+                                    <div class="context-menu-item" data-action="hide-photo">Hide photo</div>
+                                `;
+                            }
+                        }
                         
                         contextMenu.classList.add('show');
                         photoItem.classList.add('menu-active');
@@ -494,9 +594,9 @@ let people = [];
                             if (action === 'make-primary') {
                                 makePrimaryPhoto();
                             } else if (action === 'hide-photo') {
-                                hidePhoto();
+                                hidePhotos();
                             } else if (action === 'unhide-photo') {
-                                unhidePhoto();
+                                unhidePhotos();
                             } else if (action === 'transfer-tag') {
                                 openTransferDialog();
                             }
@@ -553,6 +653,7 @@ let people = [];
                 console.log(`Load complete. isLoadingMore=${isLoadingMore}, hasMorePhotos=${hasMorePhotos}`);
             }
         }
+        
         function openLightbox(index) {
             lightboxCurrentIndex = index;
             updateLightbox();
@@ -633,26 +734,30 @@ let people = [];
                 } else if (e.key === 'ArrowRight') {
                     nextLightboxImage();
                 }
+            } else if (e.key === 'Escape' && selectedPhotos.size > 0) {
+                clearSelection();
             }
         });
 
         async function openTransferDialog() {
-            if (!currentPhotoContext) {
-                console.error('No photo context - context was:', currentPhotoContext);
+            if (!currentPhotoContext && selectedPhotos.size === 0) {
+                console.error('No photo context or selection');
                 addLogEntry('ERROR: No photo context available');
                 closeAllMenus();
                 return;
             }
             
-            if (!currentPhotoContext.face_id) {
-                console.error('Photo context missing face_id:', currentPhotoContext);
+            const faceIds = selectedPhotos.size > 0 ? Array.from(selectedPhotos) : [currentPhotoContext.face_id];
+            
+            if (!faceIds.length) {
+                console.error('No face IDs available');
                 addLogEntry('ERROR: Invalid photo context');
                 closeAllMenus();
                 return;
             }
             
             transferContext = {
-                face_id: currentPhotoContext.face_id,
+                face_ids: faceIds,
                 current_person: currentPhotoContext.person_name
             };
             
@@ -681,20 +786,23 @@ let people = [];
             const transferList = document.getElementById('transferList');
             transferList.innerHTML = '';
             
+            const faceCount = transferContext.face_ids.length;
+            const countText = faceCount > 1 ? ` (${faceCount} photos)` : '';
+            
             const removeOption = document.createElement('div');
             removeOption.className = 'transfer-option remove';
-            removeOption.textContent = '🗑️ Remove from this person';
+            removeOption.textContent = `Remove from this person${countText}`;
             removeOption.addEventListener('click', () => {
-                executeRemoveFace();
+                executeRemoveFaces();
             });
             transferList.appendChild(removeOption);
             
             people.forEach(person => {
                 const option = document.createElement('div');
                 option.className = 'transfer-option';
-                option.textContent = `→ ${person.name}`;
+                option.textContent = `Transfer to ${person.name}${countText}`;
                 option.addEventListener('click', () => {
-                    executeTransferFace(person.name);
+                    executeTransferFaces(person.name);
                 });
                 transferList.appendChild(option);
             });
@@ -709,10 +817,10 @@ let people = [];
             transferContext = null;
         }
         
-        async function executeRemoveFace() {
+        async function executeRemoveFaces() {
             if (!transferContext) return;
             
-            const faceId = transferContext.face_id;
+            const faceIds = transferContext.face_ids;
             const personName = transferContext.current_person;
             
             closeTransferDialog();
@@ -723,23 +831,22 @@ let people = [];
                     return;
                 }
                 
-                const result = await pywebview.api.remove_face_to_unmatched(currentPerson.clustering_id, faceId);
-                if (result.success) {
-                    addLogEntry(`Face moved from ${personName} to Unmatched Faces`);
-                } else {
-                    addLogEntry('ERROR: ' + result.message);
+                for (const faceId of faceIds) {
+                    await pywebview.api.remove_face_to_unmatched(currentPerson.clustering_id, faceId);
                 }
+                
+                addLogEntry(`${faceIds.length} face(s) moved from ${personName} to Unmatched Faces`);
+                clearSelection();
             } catch (error) {
-                console.error('Error removing face:', error);
-                addLogEntry('Error removing face: ' + error);
+                console.error('Error removing faces:', error);
+                addLogEntry('Error removing faces: ' + error);
             }
-        }        
+        }
 
-
-        async function executeTransferFace(targetName) {
+        async function executeTransferFaces(targetName) {
             if (!transferContext) return;
             
-            const faceId = transferContext.face_id;
+            const faceIds = transferContext.face_ids;
             const sourceName = transferContext.current_person;
             
             closeTransferDialog();
@@ -750,19 +857,17 @@ let people = [];
                     return;
                 }
                 
-                const result = await pywebview.api.transfer_face_to_person(currentPerson.clustering_id, faceId, targetName);
-                
-                if (result.success) {
-                    addLogEntry(`Face transferred from ${sourceName} to ${targetName}`);
-                } else {
-                    addLogEntry('ERROR: ' + result.message);
+                for (const faceId of faceIds) {
+                    await pywebview.api.transfer_face_to_person(currentPerson.clustering_id, faceId, targetName);
                 }
+                
+                addLogEntry(`${faceIds.length} face(s) transferred from ${sourceName} to ${targetName}`);
+                clearSelection();
             } catch (error) {
-                console.error('Error transferring face:', error);
-                addLogEntry('Error transferring face: ' + error);
+                console.error('Error transferring faces:', error);
+                addLogEntry('Error transferring faces: ' + error);
             }
         }
-
 
         document.getElementById('transferCancelBtn').addEventListener('click', closeTransferDialog);
         
@@ -778,6 +883,7 @@ let people = [];
                 hasMorePhotos = true;
                 lightboxPhotos = [];
                 isLoadingMore = false;
+                clearSelection();
                 await loadPhotos(currentPerson.clustering_id, currentPerson.id, true);
             }
         }
@@ -823,6 +929,9 @@ let people = [];
                 document.getElementById('thresholdSlider').value = threshold;
                 document.getElementById('thresholdValue').textContent = threshold + '%';
                 
+                const scanFrequency = await pywebview.api.get_scan_frequency();
+                document.getElementById('scanFrequencyDropdown').value = scanFrequency;
+                
                 const closeToTray = await pywebview.api.get_close_to_tray();
                 document.getElementById('closeToTrayToggle').checked = closeToTray;
                 
@@ -865,9 +974,6 @@ let people = [];
                 
                 const viewMode = await pywebview.api.get_view_mode();
                 document.getElementById('viewModeDropdown').value = viewMode;
-
-                const scanFrequency = await pywebview.api.get_scan_frequency();
-                document.getElementById('scanFrequencyDropdown').value = scanFrequency;
                 
                 const sortMode = await pywebview.api.get_sort_mode();
                 currentSortMode = sortMode;
@@ -890,6 +996,29 @@ let people = [];
                 addLogEntry('ERROR: Failed to load settings - ' + error);
             }
         }
+
+        document.getElementById('scanFrequencyDropdown').addEventListener('change', async (e) => {
+            const frequency = e.target.value;
+            try {
+                await pywebview.api.set_scan_frequency(frequency);
+                
+                const frequencyNames = {
+                    'every_restart': 'every restart',
+                    'restart_1_day': 'restart after 1 day',
+                    'restart_1_week': 'restart after 1 week',
+                    'manual': 'manually'
+                };
+                
+                addLogEntry('Scan frequency changed to: ' + frequencyNames[frequency]);
+                
+                if (frequency === 'manual') {
+                    addLogEntry('Note: You must manually rescan from Folders to Scan settings');
+                }
+            } catch (error) {
+                console.error('Error changing scan frequency:', error);
+                addLogEntry('ERROR: Failed to change scan frequency - ' + error);
+            }
+        });
 
         document.getElementById('hideUnnamedToggle').addEventListener('change', async (e) => {
             hideUnnamedPersons = e.target.checked;
@@ -1548,32 +1677,6 @@ let people = [];
             }
         });
 
-
-
-        document.getElementById('scanFrequencyDropdown').addEventListener('change', async (e) => {
-            const frequency = e.target.value;
-            try {
-                await pywebview.api.set_scan_frequency(frequency);
-                
-                const frequencyNames = {
-                    'every_restart': 'every restart',
-                    'restart_1_day': 'restart after 1 day',
-                    'restart_1_week': 'restart after 1 week',
-                    'manual': 'manually'
-                };
-                
-                addLogEntry('Scan frequency changed to: ' + frequencyNames[frequency]);
-                
-                if (frequency === 'manual') {
-                    addLogEntry('Note: You must manually rescan from Folders to Scan settings');
-                }
-            } catch (error) {
-                console.error('Error changing scan frequency:', error);
-                addLogEntry('ERROR: Failed to change scan frequency - ' + error);
-            }
-        });
-
-        
         async function renamePerson(clusteringId, personId, currentName) {
             closeAllMenus();
             showRenameDialog(clusteringId, personId, currentName);
@@ -1646,45 +1749,37 @@ let people = [];
             }
         }
 
-        async function hidePhoto() {
+        async function hidePhotos() {
             closeAllMenus();
             
-            if (!currentPhotoContext) {
-                addLogEntry('ERROR: No photo context available');
-                return;
-            }
-            
-            const faceId = currentPhotoContext.face_id;
+            const faceIds = selectedPhotos.size > 0 ? Array.from(selectedPhotos) : [currentPhotoContext.face_id];
             
             try {
-                const result = await pywebview.api.hide_photo(faceId);
-                if (result.success) {
-                    addLogEntry(`Photo hidden: face_id ${faceId}`);
+                for (const faceId of faceIds) {
+                    await pywebview.api.hide_photo(faceId);
                 }
+                addLogEntry(`${faceIds.length} photo(s) hidden`);
+                clearSelection();
             } catch (error) {
-                console.error('Error hiding photo:', error);
-                addLogEntry('Error hiding photo: ' + error);
+                console.error('Error hiding photos:', error);
+                addLogEntry('Error hiding photos: ' + error);
             }
         }
 
-        async function unhidePhoto() {
+        async function unhidePhotos() {
             closeAllMenus();
             
-            if (!currentPhotoContext) {
-                addLogEntry('ERROR: No photo context available');
-                return;
-            }
-            
-            const faceId = currentPhotoContext.face_id;
+            const faceIds = selectedPhotos.size > 0 ? Array.from(selectedPhotos) : [currentPhotoContext.face_id];
             
             try {
-                const result = await pywebview.api.unhide_photo(faceId);
-                if (result.success) {
-                    addLogEntry(`Photo unhidden: face_id ${faceId}`);
+                for (const faceId of faceIds) {
+                    await pywebview.api.unhide_photo(faceId);
                 }
+                addLogEntry(`${faceIds.length} photo(s) unhidden`);
+                clearSelection();
             } catch (error) {
-                console.error('Error unhiding photo:', error);
-                addLogEntry('Error unhiding photo: ' + error);
+                console.error('Error unhiding photos:', error);
+                addLogEntry('Error unhiding photos: ' + error);
             }
         }
 
@@ -1704,13 +1799,14 @@ let people = [];
 
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.kebab-menu') && !e.target.closest('.context-menu') && !e.target.closest('#filterBtn')) {
-                closeAllMenus();
+                if (selectedPhotos.size === 0) {
+                    closeAllMenus();
+                }
             }
         });
 
         document.querySelectorAll('.info-icon').forEach(icon => {
             icon.addEventListener('mouseenter', function(e) {
-                // Only handle actual info-icon elements, not their children
                 if (!this.classList.contains('info-icon')) return;
                 
                 const tooltip = this.querySelector('.tooltip');
