@@ -34,7 +34,6 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 - Lets user decide the threshold percentage, for facial matching (45%-50% recommended)
 - Allocates system resources dynamically so as not to bog down your system.
 
-### Click this or scroll down for User Guide
 
 ## Screenshots
 
