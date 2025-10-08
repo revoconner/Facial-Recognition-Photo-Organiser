@@ -334,7 +334,7 @@ class API:
         if not face_ids:
             return {'success': False, 'message': 'No faces found for this person'}
         
-        self._db.tag_faces(face_ids, new_name)
+        self._db.tag_faces(face_ids, new_name, is_manual=True)
         
         if self._window:
             self._window.evaluate_js('loadPeople()')

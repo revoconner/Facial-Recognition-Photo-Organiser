@@ -329,16 +329,16 @@ class ClusterWorker(threading.Thread):
             
             self.api.update_status(f"Clustering {len(embeddings)} faces with Chinese Whispers...")
             
-            person_ids, confidences = self.cluster_with_pytorch(embeddings)
+            person_ids, confidences, embeddings_norm = self.cluster_with_pytorch(embeddings)
             
-            self.api.update_status("Propagating manual tags to new faces...")
-            person_ids = self.propagate_manual_tags(face_ids, person_ids)
+            self.api.update_status("Merging clusters by existing tags...")
+            person_ids = self.merge_by_tags(face_ids, person_ids)
             
             self.api.update_status("Saving clustering...")
             clustering_id = self.db.create_clustering(self.threshold * 100)
             self.db.save_cluster_assignments(clustering_id, face_ids, person_ids, confidences)
             
-            self.api.update_status("Applying manual tags to clusters...")
+            self.api.update_status("Applying tags to new faces...")
             self.apply_tags_to_clusters(clustering_id, face_ids, person_ids)
             
             unique_persons = len(set(person_ids))
@@ -355,101 +355,7 @@ class ClusterWorker(threading.Thread):
         except Exception as e:
             self.api.update_status(f"Error: {str(e)}")
     
-    def propagate_manual_tags(self, face_ids: List[int], person_ids: List[int]) -> List[int]:
-        cursor = self.db.conn.cursor()
-        
-        cursor.execute('''
-            SELECT face_id, tag_name 
-            FROM face_tags 
-            WHERE is_manual = 1
-        ''')
-        manual_tags = {row[0]: row[1] for row in cursor.fetchall()}
-        
-        if not manual_tags:
-            return person_ids
-        
-        self.api.update_status(f"Found {len(manual_tags)} manually tagged faces")
-        
-        cluster_to_tag = {}
-        
-        for idx, face_id in enumerate(face_ids):
-            if face_id in manual_tags:
-                cluster_id = person_ids[idx]
-                tag_name = manual_tags[face_id]
-                
-                if cluster_id not in cluster_to_tag:
-                    cluster_to_tag[cluster_id] = {}
-                
-                if tag_name not in cluster_to_tag[cluster_id]:
-                    cluster_to_tag[cluster_id][tag_name] = 0
-                cluster_to_tag[cluster_id][tag_name] += 1
-        
-        tag_to_target_cluster = {}
-        
-        for cluster_id, tag_counts in cluster_to_tag.items():
-            dominant_tag = max(tag_counts.items(), key=lambda x: x[1])[0]
-            
-            if dominant_tag not in tag_to_target_cluster:
-                tag_to_target_cluster[dominant_tag] = cluster_id
-            else:
-                existing_cluster = tag_to_target_cluster[dominant_tag]
-                if cluster_id < existing_cluster:
-                    tag_to_target_cluster[dominant_tag] = cluster_id
-        
-        cluster_mapping = {}
-        for cluster_id, tag_counts in cluster_to_tag.items():
-            dominant_tag = max(tag_counts.items(), key=lambda x: x[1])[0]
-            target_cluster = tag_to_target_cluster[dominant_tag]
-            
-            if cluster_id != target_cluster:
-                cluster_mapping[cluster_id] = target_cluster
-                self.api.update_status(f"Merging cluster {cluster_id} into {target_cluster} (tag: {dominant_tag})")
-        
-        merged_person_ids = []
-        for pid in person_ids:
-            merged_person_ids.append(cluster_mapping.get(pid, pid))
-        
-        return merged_person_ids
-    
-    def apply_tags_to_clusters(self, clustering_id: int, face_ids: List[int], person_ids: List[int]):
-        cursor = self.db.conn.cursor()
-        
-        cursor.execute('''
-            SELECT face_id, tag_name 
-            FROM face_tags 
-            WHERE is_manual = 1
-        ''')
-        manual_tags = {row[0]: row[1] for row in cursor.fetchall()}
-        
-        if not manual_tags:
-            return
-        
-        cluster_to_tag = {}
-        
-        for idx, face_id in enumerate(face_ids):
-            if face_id in manual_tags:
-                cluster_id = person_ids[idx]
-                tag_name = manual_tags[face_id]
-                
-                if cluster_id not in cluster_to_tag:
-                    cluster_to_tag[cluster_id] = {}
-                
-                if tag_name not in cluster_to_tag[cluster_id]:
-                    cluster_to_tag[cluster_id][tag_name] = 0
-                cluster_to_tag[cluster_id][tag_name] += 1
-        
-        for cluster_id, tag_counts in cluster_to_tag.items():
-            dominant_tag = max(tag_counts.items(), key=lambda x: x[1])[0]
-            
-            cluster_face_ids = [face_ids[idx] for idx, pid in enumerate(person_ids) if pid == cluster_id]
-            
-            untagged_faces = [fid for fid in cluster_face_ids if fid not in manual_tags]
-            
-            if untagged_faces:
-                self.db.tag_faces(untagged_faces, dominant_tag, is_manual=False)
-                self.api.update_status(f"Auto-tagged {len(untagged_faces)} new faces as '{dominant_tag}'")
-    
-    def cluster_with_pytorch(self, embeddings: np.ndarray) -> Tuple[List[int], List[float]]:
+    def cluster_with_pytorch(self, embeddings: np.ndarray) -> Tuple[List[int], List[float], torch.Tensor]:
         n_faces = len(embeddings)
         
         device_name = "GPU" if GPU_AVAILABLE else "CPU"
@@ -463,7 +369,7 @@ class ClusterWorker(threading.Thread):
         batch_size = 1000
         n_batches = (n_faces + batch_size - 1) // batch_size
         
-        self.api.update_status("Building similarity graph with stricter threshold...")
+        self.api.update_status("Building similarity graph...")
         
         adjacency = {}
         edge_count = 0
@@ -490,7 +396,7 @@ class ClusterWorker(threading.Thread):
                     adjacency[global_idx] = neighbors
             
             if (i + 1) % 10 == 0 or i == n_batches - 1:
-                self.api.update_status(f"Graph building: batch {i+1}/{n_batches}, {edge_count} edges")
+                self.api.update_status(f"Graph building: batch {i+1}/{n_batches}")
         
         self.api.update_status(f"Graph built: {len(adjacency)} nodes, {edge_count} edges")
         
@@ -523,13 +429,14 @@ class ClusterWorker(threading.Thread):
                         labels[node] = best_label
                         changes += 1
             
-            self.api.update_status(f"Iteration {iteration+1}/{self.max_iterations}: {changes} label changes")
+            if (i + 1) % 5 == 0 or i == n_batches - 1:
+                self.api.update_status(f"Iteration {iteration+1}/{self.max_iterations}: {changes} changes")
             
             if changes < n_faces * 0.001:
                 self.api.update_status(f"Converged after {iteration+1} iterations")
                 break
         
-        self.api.update_status("Validating clusters against centroids...")
+        self.api.update_status("Validating clusters...")
         
         unique_labels = set(labels)
         label_mapping = {old: new for new, old in enumerate(sorted(unique_labels), start=1)}
@@ -565,6 +472,93 @@ class ClusterWorker(threading.Thread):
                     confidences[face_idx] = 0.0
                     rejected += 1
         
-        self.api.update_status(f"Validation complete: {rejected} faces rejected from clusters")
+        self.api.update_status(f"Validation complete: {rejected} faces rejected")
         
-        return person_ids, confidences
+        return person_ids, confidences, embeddings_norm
+    
+    def merge_by_tags(self, face_ids: List[int], person_ids: List[int]) -> List[int]:
+        cursor = self.db.conn.cursor()
+        
+        cursor.execute('SELECT face_id, tag_name FROM face_tags')
+        all_tags = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        if not all_tags:
+            return person_ids
+        
+        self.api.update_status(f"Found {len(all_tags)} tagged faces")
+        
+        tag_to_clusters = {}
+        
+        for idx, face_id in enumerate(face_ids):
+            if face_id in all_tags:
+                tag_name = all_tags[face_id]
+                cluster_id = person_ids[idx]
+                
+                if cluster_id == 0:
+                    continue
+                
+                if tag_name not in tag_to_clusters:
+                    tag_to_clusters[tag_name] = {}
+                
+                if cluster_id not in tag_to_clusters[tag_name]:
+                    tag_to_clusters[tag_name][cluster_id] = 0
+                tag_to_clusters[tag_name][cluster_id] += 1
+        
+        cluster_mapping = {}
+        
+        for tag_name, cluster_counts in tag_to_clusters.items():
+            clusters = list(cluster_counts.keys())
+            
+            if len(clusters) > 1:
+                sorted_clusters = sorted(clusters, key=lambda c: cluster_counts[c], reverse=True)
+                target_cluster = sorted_clusters[0]
+                
+                self.api.update_status(f"Tag '{tag_name}': merging {len(clusters)} clusters into {target_cluster}")
+                
+                for cluster_id in clusters:
+                    if cluster_id != target_cluster:
+                        cluster_mapping[cluster_id] = target_cluster
+        
+        if not cluster_mapping:
+            return person_ids
+        
+        merged_person_ids = [cluster_mapping.get(pid, pid) for pid in person_ids]
+        
+        return merged_person_ids
+    
+    def apply_tags_to_clusters(self, clustering_id: int, face_ids: List[int], person_ids: List[int]):
+        cursor = self.db.conn.cursor()
+        
+        cursor.execute('SELECT face_id, tag_name FROM face_tags')
+        all_tags = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        if not all_tags:
+            return
+        
+        cluster_to_tag = {}
+        
+        for idx, face_id in enumerate(face_ids):
+            if face_id in all_tags:
+                cluster_id = person_ids[idx]
+                tag_name = all_tags[face_id]
+                
+                if cluster_id == 0:
+                    continue
+                
+                if cluster_id not in cluster_to_tag:
+                    cluster_to_tag[cluster_id] = {}
+                
+                if tag_name not in cluster_to_tag[cluster_id]:
+                    cluster_to_tag[cluster_id][tag_name] = 0
+                cluster_to_tag[cluster_id][tag_name] += 1
+        
+        for cluster_id, tag_counts in cluster_to_tag.items():
+            dominant_tag = max(tag_counts.items(), key=lambda x: x[1])[0]
+            
+            cluster_face_ids = [face_ids[idx] for idx, pid in enumerate(person_ids) if pid == cluster_id]
+            
+            untagged_faces = [fid for fid in cluster_face_ids if fid not in all_tags]
+            
+            if untagged_faces:
+                self.db.tag_faces(untagged_faces, dominant_tag, is_manual=False)
+                self.api.update_status(f"Auto-tagged {len(untagged_faces)} faces as '{dominant_tag}'")
