@@ -26,7 +26,9 @@ class Settings:
             'wildcard_exclusions': '',
             'view_mode': 'entire_photo',
             'sort_mode': 'names_asc',
-            'hide_unnamed_persons': False
+            'hide_unnamed_persons': False,
+            'scan_frequency': 'restart_1_day',
+            'last_scan_time': None
         }
         
         self.settings = self.load()

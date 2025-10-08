@@ -297,6 +297,38 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Hide unnamed persons</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Hides all the people from the list whom you have not renamed yet. Remember if this is the first time you are scanning, you must turn this off to see new people before you can rename them. This will not hide Unmatched Faces. Default Off</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="hideUnnamedToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        
+
+                            <div class="setting-row">
+                                <div class="setting-label">
+                                    <span>Find changes in photos in the drive</span>
+                                    <span class="info-icon">
+                                        i
+                                        <div class="tooltip">Every time the app restarts, it searches for new photos or removes old photos from the database which has been deleted to keep in sync with your drive. This results in a slow start. If you do make a lot of changes to your photos library, you can set a threshold of time before it rescans for changes after a restart. If set to manually you will have to go to "Folders to Scan" section and click the rescan button.</div>
+                                    </span>
+                                </div>
+                                <select class="view-dropdown" id="scanFrequencyDropdown" style="min-width: 200px;">
+                                    <option value="every_restart">After Every restart</option>
+                                    <option value="restart_1_day" selected>On Every Restart after 1 day</option>
+                                    <option value="restart_1_week">On Every Restart after 1 week</option>
+                                    <option value="manual">Manually (Not Recommended)</option>
+                                </select>
+                            </div>
+
                         
                         <div class="setting-row">
                             <div class="setting-label">
@@ -311,20 +343,6 @@
                                 <span class="toggle-slider"></span>
                             </label>
                         </div>
-                        <div class="setting-row">
-                            <div class="setting-label">
-                                <span>Hide unnamed persons</span>
-                                <span class="info-icon">
-                                    i
-                                    <div class="tooltip">Hides all the people from the list whom you have not renamed yet. Remember if this is the first time you are scanning, you must turn this off to see new people before you can rename them. This will not hide Unmatched Faces. Default Off</div>
-                                </span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="hideUnnamedToggle">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <!-- Add this setting group to ui.html in the general-panel section, after the other setting groups -->
 
                         <div class="setting-group">
                             <div class="setting-row">

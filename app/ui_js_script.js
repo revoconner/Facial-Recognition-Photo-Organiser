@@ -865,6 +865,9 @@ let people = [];
                 
                 const viewMode = await pywebview.api.get_view_mode();
                 document.getElementById('viewModeDropdown').value = viewMode;
+
+                const scanFrequency = await pywebview.api.get_scan_frequency();
+                document.getElementById('scanFrequencyDropdown').value = scanFrequency;
                 
                 const sortMode = await pywebview.api.get_sort_mode();
                 currentSortMode = sortMode;
@@ -1545,6 +1548,32 @@ let people = [];
             }
         });
 
+
+
+        document.getElementById('scanFrequencyDropdown').addEventListener('change', async (e) => {
+            const frequency = e.target.value;
+            try {
+                await pywebview.api.set_scan_frequency(frequency);
+                
+                const frequencyNames = {
+                    'every_restart': 'every restart',
+                    'restart_1_day': 'restart after 1 day',
+                    'restart_1_week': 'restart after 1 week',
+                    'manual': 'manually'
+                };
+                
+                addLogEntry('Scan frequency changed to: ' + frequencyNames[frequency]);
+                
+                if (frequency === 'manual') {
+                    addLogEntry('Note: You must manually rescan from Folders to Scan settings');
+                }
+            } catch (error) {
+                console.error('Error changing scan frequency:', error);
+                addLogEntry('ERROR: Failed to change scan frequency - ' + error);
+            }
+        });
+
+        
         async function renamePerson(clusteringId, personId, currentName) {
             closeAllMenus();
             showRenameDialog(clusteringId, personId, currentName);

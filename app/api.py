@@ -2,6 +2,7 @@ import sys
 import os
 import base64
 import threading
+import time
 from pathlib import Path
 from typing import Optional, List
 from io import BytesIO
@@ -148,6 +149,8 @@ class API:
         if pending_count > 0:
             self.update_status(f"Warning: {pending_count} photos had errors and were skipped")
         
+        self._settings.set('last_scan_time', time.time())
+        
         active_clustering = self._db.get_active_clustering()
         has_existing_clustering = active_clustering is not None
         new_photos_found = getattr(self, '_new_photos_found', False)
@@ -184,6 +187,30 @@ class API:
             'gpu_name': torch.cuda.get_device_name(0) if GPU_AVAILABLE else 'N/A',
             'total_faces': self._db.get_total_faces()
         }
+    
+    def should_scan_on_startup(self) -> bool:
+        scan_frequency = self._settings.get('scan_frequency', 'restart_1_day')
+        
+        if scan_frequency == 'manual':
+            return False
+        
+        if scan_frequency == 'every_restart':
+            return True
+        
+        last_scan_time = self._settings.get('last_scan_time')
+        
+        if last_scan_time is None:
+            return True
+        
+        current_time = time.time()
+        time_since_scan = current_time - last_scan_time
+        
+        if scan_frequency == 'restart_1_day':
+            return time_since_scan >= 86400
+        elif scan_frequency == 'restart_1_week':
+            return time_since_scan >= 604800
+        
+        return True
     
     def start_scanning(self):
         if self._scan_worker is None or not self._scan_worker.is_alive():
@@ -523,9 +550,39 @@ class API:
         
         self.update_status(f"Database status: {total_photos} photos scanned, {total_faces} faces detected")
         
-        self.update_status("Checking filesystem for changes...")
-        self.start_scanning()
-        return {'needs_scan': True}
+        if self.should_scan_on_startup():
+            scan_frequency = self._settings.get('scan_frequency', 'restart_1_day')
+            
+            if scan_frequency == 'manual':
+                self.update_status("Automatic scanning disabled - use manual rescan from settings")
+            else:
+                self.update_status("Checking filesystem for changes...")
+                self.start_scanning()
+                return {'needs_scan': True}
+        else:
+            scan_frequency = self._settings.get('scan_frequency', 'restart_1_day')
+            last_scan_time = self._settings.get('last_scan_time')
+            
+            if last_scan_time:
+                time_since_scan = time.time() - last_scan_time
+                hours = int(time_since_scan / 3600)
+                
+                if scan_frequency == 'restart_1_day':
+                    self.update_status(f"Automatic scan skipped - scanned {hours}h ago, will scan after 24h")
+                elif scan_frequency == 'restart_1_week':
+                    days = int(time_since_scan / 86400)
+                    self.update_status(f"Automatic scan skipped - scanned {days} days ago, will scan after 7 days")
+            
+            self.update_status("Loading existing data...")
+            self.cluster_complete()
+            
+        return {'needs_scan': False}
+    
+    def get_scan_frequency(self):
+        return self._settings.get('scan_frequency', 'restart_1_day')
+    
+    def set_scan_frequency(self, frequency):
+        self._settings.set('scan_frequency', frequency)
     
     def get_close_to_tray(self):
         return self._close_to_tray
