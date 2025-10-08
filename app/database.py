@@ -354,21 +354,9 @@ class FaceDatabase:
     def create_clustering(self, threshold: float) -> int:
         cursor = self.conn.cursor()
         
-        cursor.execute('SELECT clustering_id FROM clusterings WHERE is_active = 1')
-        old_clustering = cursor.fetchone()
-        old_clustering_id = old_clustering[0] if old_clustering else None
-        
         cursor.execute('UPDATE clusterings SET is_active = 0')
         cursor.execute('INSERT INTO clusterings (threshold, is_active) VALUES (?, 1)', (threshold,))
         new_clustering_id = cursor.lastrowid
-        
-        if old_clustering_id:
-            cursor.execute('''
-                INSERT OR IGNORE INTO hidden_persons (clustering_id, person_id)
-                SELECT ?, person_id FROM hidden_persons
-                WHERE clustering_id = ?
-            ''', (new_clustering_id, old_clustering_id))
-            print(f"Migrated hidden persons from clustering {old_clustering_id} to {new_clustering_id}")
         
         self.conn.commit()
         

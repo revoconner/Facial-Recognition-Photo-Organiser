@@ -350,22 +350,87 @@ class API:
             self._window.evaluate_js('reloadCurrentPhotos()')
         return {'success': True}
     
-    def rename_person(self, clustering_id, person_id, new_name):
+    def check_name_conflict(self, clustering_id, person_id, new_name):
         if not new_name or not new_name.strip():
-            return {'success': False, 'message': 'Name cannot be empty'}
+            return {'has_conflict': False}
         
         new_name = new_name.strip()
         
+        current_name = self._db.get_person_name_fast(clustering_id, person_id)
+        
+        if new_name == current_name or new_name == current_name.replace(" (hidden)", ""):
+            return {'has_conflict': False}
+        
+        cursor = self._db.conn.cursor()
+        cursor.execute('''
+            SELECT COUNT(DISTINCT ca.person_id)
+            FROM cluster_assignments ca
+            JOIN face_tags ft ON ca.face_id = ft.face_id
+            WHERE ca.clustering_id = ? AND ft.tag_name = ? AND ca.person_id != ?
+        ''', (clustering_id, new_name, person_id))
+        
+        count = cursor.fetchone()[0]
+        
+        if count > 0:
+            base_name = new_name
+            next_num = 2
+            
+            while True:
+                test_name = f"{base_name} {next_num}"
+                cursor.execute('''
+                    SELECT COUNT(DISTINCT ca.person_id)
+                    FROM cluster_assignments ca
+                    JOIN face_tags ft ON ca.face_id = ft.face_id
+                    WHERE ca.clustering_id = ? AND ft.tag_name = ?
+                ''', (clustering_id, test_name))
+                
+                if cursor.fetchone()[0] == 0:
+                    suggested_name = test_name
+                    break
+                
+                next_num += 1
+                if next_num > 100:
+                    suggested_name = f"{base_name} {next_num}"
+                    break
+            
+            return {
+                'has_conflict': True,
+                'existing_name': new_name,
+                'suggested_name': suggested_name
+            }
+        
+        return {'has_conflict': False}
+    
+    def rename_person(self, clustering_id, person_id, new_name):
+        print(f"=== RENAME PERSON CALLED ===")
+        print(f"clustering_id: {clustering_id}")
+        print(f"person_id: {person_id}")
+        print(f"new_name: {new_name}")
+        print(f"new_name type: {type(new_name)}")
+        
+        if not new_name or not new_name.strip():
+            print("ERROR: Name is empty")
+            return {'success': False, 'message': 'Name cannot be empty'}
+        
+        new_name = new_name.strip()
+        print(f"Trimmed name: {new_name}")
+        
         face_ids = self._db.get_face_ids_for_person(clustering_id, person_id, limit=10000)
+        print(f"Found {len(face_ids)} face IDs to tag")
         
         if not face_ids:
+            print("ERROR: No faces found")
             return {'success': False, 'message': 'No faces found for this person'}
         
+        print(f"Calling tag_faces with name: {new_name}")
         self._db.tag_faces(face_ids, new_name, is_manual=True)
+        print("tag_faces completed")
         
         if self._window:
+            print("Calling loadPeople() via evaluate_js")
             self._window.evaluate_js('loadPeople()')
         
+        print(f"Returning success with {len(face_ids)} faces tagged")
         return {'success': True, 'faces_tagged': len(face_ids)}
     
     def untag_person(self, clustering_id, person_id):

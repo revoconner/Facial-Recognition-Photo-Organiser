@@ -23,12 +23,68 @@ let people = [];
         let hideUnnamedPersons = false;
         let selectedPhotos = new Set();
         let lastSelectedIndex = -1;
+        let nameConflictData = null;
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
             '#30cfd0', '#a8edea', '#fed6e3', '#c1dfc4', '#d299c2',
             '#fda085', '#f6d365', '#96e6a1', '#764ba2', '#f79d00'
         ];
 
+
+        function showRenameDialog(clusteringId, personId, currentName) {
+            const cleanName = currentName.replace(' (hidden)', '');
+            
+            renameContext = {
+                clusteringId: clusteringId,
+                personId: personId
+            };
+            
+            const renameOverlay = document.getElementById('renameOverlay');
+            const renameInput = document.getElementById('renameInput');
+            
+            renameInput.value = cleanName;
+            renameOverlay.classList.add('active');
+            appContainer.classList.add('blurred');
+            
+            setTimeout(() => {
+                renameInput.focus();
+                renameInput.select();
+            }, 100);
+        }
+
+        function closeRenameDialog() {
+            const renameOverlay = document.getElementById('renameOverlay');
+            renameOverlay.classList.remove('active');
+            appContainer.classList.remove('blurred');
+            renameContext = null;
+            document.getElementById('renameInput').value = '';
+        }
+
+        function showNameConflictDialog(conflictInfo, originalName) {
+            console.log('Showing conflict dialog with:', conflictInfo);
+            console.log('Original name attempted:', originalName);
+            
+            nameConflictData = {
+                clusteringId: renameContext.clusteringId,
+                personId: renameContext.personId,
+                originalName: originalName,
+                suggestedName: conflictInfo.suggested_name
+            };
+            
+            console.log('nameConflictData set to:', nameConflictData);
+            
+            document.getElementById('autoRenameText').textContent = `Name them "${conflictInfo.suggested_name}"`;
+            
+            const conflictOverlay = document.getElementById('nameConflictOverlay');
+            conflictOverlay.classList.add('active');
+        }
+
+        function closeNameConflictDialog() {
+            const conflictOverlay = document.getElementById('nameConflictOverlay');
+            conflictOverlay.classList.remove('active');
+            nameConflictData = null;
+        }
+        
         function getPersonColor(personId) {
             return personColors[personId % personColors.length];
         }
@@ -1607,33 +1663,66 @@ let people = [];
             }
         });
 
-        function showRenameDialog(clusteringId, personId, currentName) {
-            const cleanName = currentName.replace(' (hidden)', '');
+
+
+        async function handleConflictProceed() {
+            if (!nameConflictData) return;
             
-            renameContext = {
-                clusteringId: clusteringId,
-                personId: personId
-            };
+            const savedData = { ...nameConflictData };
             
-            const renameOverlay = document.getElementById('renameOverlay');
-            const renameInput = document.getElementById('renameInput');
+            closeNameConflictDialog();
+            closeRenameDialog();
             
-            renameInput.value = cleanName;
-            renameOverlay.classList.add('active');
-            appContainer.classList.add('blurred');
-            
-            setTimeout(() => {
-                renameInput.focus();
-                renameInput.select();
-            }, 100);
+            try {
+                const result = await pywebview.api.rename_person(
+                    savedData.clusteringId,
+                    savedData.personId,
+                    savedData.originalName
+                );
+                
+                if (result.success) {
+                    addLogEntry(`Person renamed to "${savedData.originalName}" - ${result.faces_tagged} faces tagged`);
+                    addLogEntry(`WARNING: This name already exists and will merge on next calibration`);
+                    await loadPeople();
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error renaming person:', error);
+                addLogEntry('Error renaming person: ' + error);
+            }
         }
 
-        function closeRenameDialog() {
-            const renameOverlay = document.getElementById('renameOverlay');
-            renameOverlay.classList.remove('active');
-            appContainer.classList.remove('blurred');
-            renameContext = null;
-            document.getElementById('renameInput').value = '';
+
+        async function handleConflictAutoRename() {
+            if (!nameConflictData) return;
+            
+            const savedData = { ...nameConflictData };
+            
+            closeNameConflictDialog();
+            closeRenameDialog();
+            
+            try {
+                const result = await pywebview.api.rename_person(
+                    savedData.clusteringId,
+                    savedData.personId,
+                    savedData.suggestedName
+                );
+                
+                if (result.success) {
+                    addLogEntry(`Person renamed to "${savedData.suggestedName}" - ${result.faces_tagged} faces tagged`);
+                    await loadPeople();
+                } else {
+                    addLogEntry('ERROR: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error renaming person:', error);
+                addLogEntry('Error renaming person: ' + error);
+            }
+        }
+
+        function handleConflictGoBack() {
+            closeNameConflictDialog();
         }
 
         async function confirmRename() {
@@ -1647,24 +1736,46 @@ let people = [];
                 return;
             }
             
+            const trimmedName = newName.trim();
+            
+            console.log('Attempting rename to:', trimmedName);
+            console.log('For person:', renameContext.personId, 'in clustering:', renameContext.clusteringId);
+            
             try {
+                const conflictCheck = await pywebview.api.check_name_conflict(
+                    renameContext.clusteringId,
+                    renameContext.personId,
+                    trimmedName
+                );
+                
+                console.log('Conflict check result:', conflictCheck);
+                
+                if (conflictCheck.has_conflict) {
+                    showNameConflictDialog(conflictCheck, trimmedName);
+                    return;
+                }
+                
                 const result = await pywebview.api.rename_person(
                     renameContext.clusteringId,
                     renameContext.personId,
-                    newName.trim()
+                    trimmedName
                 );
                 
+                console.log('Rename result:', result);
+                
                 if (result.success) {
-                    addLogEntry(`Person renamed to "${newName.trim()}" - ${result.faces_tagged} faces tagged`);
+                    addLogEntry(`Person renamed to "${trimmedName}" - ${result.faces_tagged} faces tagged`);
+                    closeRenameDialog();
+                    await loadPeople();
                 } else {
                     addLogEntry('ERROR: ' + result.message);
+                    closeRenameDialog();
                 }
             } catch (error) {
                 console.error('Error renaming person:', error);
                 addLogEntry('Error renaming person: ' + error);
+                closeRenameDialog();
             }
-            
-            closeRenameDialog();
         }
 
         document.getElementById('renameConfirmBtn').addEventListener('click', confirmRename);
@@ -1841,6 +1952,15 @@ let people = [];
             return false;
         });
 
+        document.getElementById('conflictProceedBtn').addEventListener('click', handleConflictProceed);
+        document.getElementById('conflictAutoRenameBtn').addEventListener('click', handleConflictAutoRename);
+        document.getElementById('conflictGoBackBtn').addEventListener('click', handleConflictGoBack);
+
+        document.getElementById('nameConflictOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('nameConflictOverlay')) {
+                handleConflictGoBack();
+            }
+        });
         document.getElementById('minimizeBtn').addEventListener('click', () => {
             pywebview.api.minimize_window();
         });

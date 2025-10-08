@@ -327,6 +327,23 @@ class ClusterWorker(threading.Thread):
                 self.api.update_status("No faces found")
                 return
             
+            old_clustering = self.db.get_active_clustering()
+            old_clustering_id = old_clustering['clustering_id'] if old_clustering else None
+            
+            hidden_face_ids = set()
+            if old_clustering_id:
+                self.api.update_status("Saving hidden persons...")
+                hidden_person_ids = self.db.get_hidden_persons(old_clustering_id)
+                
+                for person_id in hidden_person_ids:
+                    person_face_ids = self.db.get_face_ids_for_person(old_clustering_id, person_id)
+                    hidden_face_ids.update(person_face_ids)
+                    
+                    name = self.db.get_person_name_fast(old_clustering_id, person_id)
+                    self.api.update_status(f"  Hidden person to preserve: {name} ({len(person_face_ids)} faces)")
+                
+                self.api.update_status(f"Total hidden faces to track: {len(hidden_face_ids)}")
+            
             self.api.update_status(f"Clustering {len(embeddings)} faces with Chinese Whispers...")
             
             person_ids, confidences, embeddings_norm = self.cluster_with_pytorch(embeddings)
@@ -341,6 +358,10 @@ class ClusterWorker(threading.Thread):
             self.api.update_status("Applying tags to new faces...")
             self.apply_tags_to_clusters(clustering_id, face_ids, person_ids)
             
+            if hidden_face_ids:
+                self.api.update_status("Restoring hidden persons...")
+                self.restore_hidden_persons(clustering_id, face_ids, person_ids, hidden_face_ids)
+            
             unique_persons = len(set(person_ids))
             matched_faces = sum(1 for pid in person_ids if pid > 0)
             unmatched_faces = sum(1 for pid in person_ids if pid == 0)
@@ -354,6 +375,22 @@ class ClusterWorker(threading.Thread):
             
         except Exception as e:
             self.api.update_status(f"Error: {str(e)}")
+    
+    def restore_hidden_persons(self, clustering_id: int, face_ids: List[int], person_ids: List[int], hidden_face_ids: set):
+        new_person_ids_to_hide = set()
+        
+        for idx, face_id in enumerate(face_ids):
+            if face_id in hidden_face_ids:
+                new_person_id = person_ids[idx]
+                if new_person_id > 0:
+                    new_person_ids_to_hide.add(new_person_id)
+        
+        for person_id in new_person_ids_to_hide:
+            name = self.db.get_person_name_fast(clustering_id, person_id)
+            self.db.hide_person(clustering_id, person_id)
+            self.api.update_status(f"  Restored hidden status for: {name} (person_id={person_id})")
+        
+        self.api.update_status(f"Hidden {len(new_person_ids_to_hide)} persons after reclustering")
     
     def cluster_with_pytorch(self, embeddings: np.ndarray) -> Tuple[List[int], List[float], torch.Tensor]:
         n_faces = len(embeddings)

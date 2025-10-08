@@ -509,7 +509,6 @@
         </div>
     </div>
 
-    <!--This is a comment. Comments are not displayed in the browser-->
     <div class="cleanup-overlay" id="renameOverlay">
         <div class="cleanup-message" id="renameDialog">
             <div class="cleanup-title" id="renameTitle">Rename Person</div>
@@ -527,11 +526,31 @@
         </div>
     </div>
 
+    <div class="cleanup-overlay" id="nameConflictOverlay">
+        <div class="name-conflict-message" id="nameConflictDialog">
+            <div class="cleanup-title">Name Already Exists</div>
+            <div class="conflict-warning">
+                Warning: A person with the same name exists. If you keep the same name, these users will merge in the next calibration.
+            </div>
+            <div class="conflict-question">Do you want to proceed?</div>
+            <div class="conflict-buttons">
+                <button class="conflict-btn proceed" id="conflictProceedBtn">
+                    <span>Yes, merge them</span>
+                </button>
+                <button class="conflict-btn auto-rename" id="conflictAutoRenameBtn">
+                    <span id="autoRenameText">Name them differently</span>
+                </button>
+                <button class="conflict-btn go-back" id="conflictGoBackBtn">
+                    <span>Go back to rename</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="transfer-overlay" id="transferOverlay">
         <div class="transfer-dialog">
             <div class="transfer-title">Transfer Face To...</div>
             <div class="transfer-list" id="transferList">
-                <!-- Populated dynamically -->
             </div>
             <button class="transfer-cancel" id="transferCancelBtn">Cancel</button>
         </div>

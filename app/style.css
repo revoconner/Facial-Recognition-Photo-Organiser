@@ -1778,3 +1778,72 @@
     background: #3a3a3a;
     color: #ffffff;
 }
+.name-conflict-message {
+    background: #1a1a1a;
+    border-radius: 12px;
+    padding: 32px 40px;
+    max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.conflict-warning {
+    font-size: 14px;
+    color: #e0e0e0;
+    margin: 20px 0 16px;
+    line-height: 1.6;
+    text-align: center;
+}
+
+.conflict-question {
+    font-size: 15px;
+    color: #ffffff;
+    font-weight: 600;
+    margin-bottom: 28px;
+    text-align: center;
+}
+
+.conflict-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.conflict-btn {
+    width: 100%;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.conflict-btn.proceed {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.conflict-btn.proceed:hover {
+    background: #b91c1c;
+}
+
+.conflict-btn.auto-rename {
+    background: #3b82f6;
+    color: #ffffff;
+}
+
+.conflict-btn.auto-rename:hover {
+    background: #2563eb;
+}
+
+.conflict-btn.go-back {
+    background: #2a2a2a;
+    color: #ffffff;
+}
+
+.conflict-btn.go-back:hover {
+    background: #3a3a3a;
+}
