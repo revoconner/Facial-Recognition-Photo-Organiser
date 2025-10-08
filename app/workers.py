@@ -3,6 +3,7 @@ import hashlib
 import time
 import threading
 import fnmatch
+import random
 from pathlib import Path
 from typing import Optional, Tuple, List
 import numpy as np
@@ -314,6 +315,8 @@ class ClusterWorker(threading.Thread):
         self.threshold = threshold / 100.0
         self.api = api
         self.daemon = True
+        self.min_edge_weight = self.threshold + 0.05
+        self.max_iterations = 25
     
     def run(self):
         try:
@@ -324,7 +327,7 @@ class ClusterWorker(threading.Thread):
                 self.api.update_status("No faces found")
                 return
             
-            self.api.update_status(f"Clustering {len(embeddings)} faces with PyTorch...")
+            self.api.update_status(f"Clustering {len(embeddings)} faces with Chinese Whispers...")
             
             person_ids, confidences = self.cluster_with_pytorch(embeddings)
             
@@ -360,9 +363,10 @@ class ClusterWorker(threading.Thread):
         batch_size = 1000
         n_batches = (n_faces + batch_size - 1) // batch_size
         
-        self.api.update_status("Computing similarity matrix...")
+        self.api.update_status("Building similarity graph with stricter threshold...")
         
-        G = nx.Graph()
+        adjacency = {}
+        edge_count = 0
         
         for i in range(n_batches):
             start_i = i * batch_size
@@ -373,30 +377,94 @@ class ClusterWorker(threading.Thread):
             similarities_cpu = similarities.cpu().numpy()
             
             for local_idx, global_idx in enumerate(range(start_i, end_i)):
-                similar_indices = np.where(similarities_cpu[local_idx] >= self.threshold)[0]
+                similar_indices = np.where(similarities_cpu[local_idx] >= self.min_edge_weight)[0]
                 
+                neighbors = {}
                 for j in similar_indices:
-                    if global_idx != j and global_idx < j:
-                        G.add_edge(global_idx, int(j), weight=float(similarities_cpu[local_idx, j]))
+                    if global_idx != j:
+                        weight = float(similarities_cpu[local_idx, j])
+                        neighbors[int(j)] = weight
+                        edge_count += 1
+                
+                if neighbors:
+                    adjacency[global_idx] = neighbors
             
             if (i + 1) % 10 == 0 or i == n_batches - 1:
-                self.api.update_status(f"Processing batch {i+1}/{n_batches}...")
+                self.api.update_status(f"Graph building: batch {i+1}/{n_batches}, {edge_count} edges")
         
-        self.api.update_status("Finding connected components...")
-        components = list(nx.connected_components(G))
+        self.api.update_status(f"Graph built: {len(adjacency)} nodes, {edge_count} edges")
+        
+        labels = list(range(n_faces))
+        
+        self.api.update_status("Running Chinese Whispers clustering...")
+        
+        for iteration in range(self.max_iterations):
+            changes = 0
+            node_order = list(range(n_faces))
+            random.shuffle(node_order)
+            
+            for node in node_order:
+                if node not in adjacency:
+                    continue
+                
+                neighbors = adjacency[node]
+                if not neighbors:
+                    continue
+                
+                label_weights = {}
+                for neighbor, weight in neighbors.items():
+                    neighbor_label = labels[neighbor]
+                    label_weights[neighbor_label] = label_weights.get(neighbor_label, 0) + weight
+                
+                if label_weights:
+                    best_label = max(label_weights.items(), key=lambda x: x[1])[0]
+                    
+                    if labels[node] != best_label:
+                        labels[node] = best_label
+                        changes += 1
+            
+            self.api.update_status(f"Iteration {iteration+1}/{self.max_iterations}: {changes} label changes")
+            
+            if changes < n_faces * 0.001:
+                self.api.update_status(f"Converged after {iteration+1} iterations")
+                break
+        
+        self.api.update_status("Validating clusters against centroids...")
+        
+        unique_labels = set(labels)
+        label_mapping = {old: new for new, old in enumerate(sorted(unique_labels), start=1)}
         
         person_ids = [0] * n_faces
         confidences = [0.0] * n_faces
+        rejected = 0
         
-        for person_id, component in enumerate(components, start=1):
-            for face_idx in component:
-                person_ids[face_idx] = person_id
+        for old_label in unique_labels:
+            cluster_indices = [i for i, l in enumerate(labels) if l == old_label]
+            
+            if len(cluster_indices) == 1:
+                person_ids[cluster_indices[0]] = 0
+                confidences[cluster_indices[0]] = 0.0
+                continue
+            
+            cluster_embeddings = embeddings_norm[cluster_indices]
+            centroid = cluster_embeddings.mean(dim=0)
+            centroid = centroid / centroid.norm()
+            
+            similarities_to_centroid = torch.mv(cluster_embeddings, centroid)
+            
+            new_person_id = label_mapping[old_label]
+            
+            for idx, face_idx in enumerate(cluster_indices):
+                centroid_sim = float(similarities_to_centroid[idx])
                 
-                neighbors = list(G.neighbors(face_idx))
-                if neighbors:
-                    weights = [G[face_idx][n]['weight'] for n in neighbors]
-                    confidences[face_idx] = float(np.mean(weights))
+                if centroid_sim >= self.threshold:
+                    person_ids[face_idx] = new_person_id
+                    confidences[face_idx] = centroid_sim
                 else:
-                    confidences[face_idx] = 1.0
+                    person_ids[face_idx] = 0
+                    confidences[face_idx] = 0.0
+                    rejected += 1
+        
+        self.api.update_status(f"Validation complete: {rejected} faces rejected from clusters")
         
         return person_ids, confidences
