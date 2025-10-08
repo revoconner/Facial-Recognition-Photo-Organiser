@@ -1,9 +1,6 @@
 # Organise Photos by Faces
-A program that recognises faces in all your photos, and groups them by faces, without changing the underlying file path or structure.
-
-The photos stored in your computer are seldom stored by what people are in those photos. Users usually tend to group them into one folder, or organise them depending on dates or events. But what if you need to find all photos of a certain person, say you broke up with your ex and needs to delete all of their photos, or maybe you need to make a collage for your best friend's birthday. 
-
-While there are tools that already do this, they all need some kind of internet connectivity and sends your data to some cloud (which is just a computer running in some datacenter). Now you can do this locally on your pc, with a great GUI program. And it doesn't even mess up the way you originally organised your photos.
+A no nonsense photo organiser for windows, if you group people by faces. With negligible false results, the cutting edge AI backed program scans your folder and groups users users together by faces. </br>
+No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally being used by me to sort through hundreds of thousands of photos all taken as back as 2010, and organise them. So they are already being tested in real time with a huge database. 
 
 ## Table of content
 - [Features](#Features)
