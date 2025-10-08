@@ -757,16 +757,33 @@ let people = [];
             const imgRect = imageElement.getBoundingClientRect();
             const contentRect = document.getElementById('lightboxContent').getBoundingClientRect();
             
-            overlayContainer.style.width = imgRect.width + 'px';
-            overlayContainer.style.height = imgRect.height + 'px';
-            overlayContainer.style.left = (imgRect.left - contentRect.left) + 'px';
-            overlayContainer.style.top = (imgRect.top - contentRect.top) + 'px';
+            const naturalWidth = imageElement.naturalWidth;
+            const naturalHeight = imageElement.naturalHeight;
             
-            const imgNaturalWidth = imageElement.naturalWidth;
-            const imgNaturalHeight = imageElement.naturalHeight;
+            const imageAspect = naturalWidth / naturalHeight;
+            const containerAspect = imgRect.width / imgRect.height;
             
-            const scaleX = imgRect.width / imgNaturalWidth;
-            const scaleY = imgRect.height / imgNaturalHeight;
+            let displayWidth, displayHeight, offsetX, offsetY;
+            
+            if (imageAspect > containerAspect) {
+                displayWidth = imgRect.width;
+                displayHeight = imgRect.width / imageAspect;
+                offsetX = 0;
+                offsetY = (imgRect.height - displayHeight) / 2;
+            } else {
+                displayHeight = imgRect.height;
+                displayWidth = imgRect.height * imageAspect;
+                offsetX = (imgRect.width - displayWidth) / 2;
+                offsetY = 0;
+            }
+            
+            overlayContainer.style.width = displayWidth + 'px';
+            overlayContainer.style.height = displayHeight + 'px';
+            overlayContainer.style.left = (imgRect.left - contentRect.left + offsetX) + 'px';
+            overlayContainer.style.top = (imgRect.top - contentRect.top + offsetY) + 'px';
+            
+            const scaleX = displayWidth / naturalWidth;
+            const scaleY = displayHeight / naturalHeight;
             
             faces.forEach(face => {
                 if (!face.tag_name) return;
@@ -808,29 +825,37 @@ let people = [];
             overlayContainer.style.height = '0';
             
             try {
-                const fullSizePreview = await pywebview.api.get_full_size_preview(photo.path);
                 const lightboxImage = document.getElementById('lightboxImage');
                 
-                if (fullSizePreview) {
-                    lightboxImage.src = fullSizePreview;
-                } else {
-                    lightboxImage.src = photo.thumbnail;
-                }
-                
                 if (showFaceTagsPreview) {
-                    lightboxImage.onload = async () => {
-                        const result = await pywebview.api.get_photo_face_tags(photo.path);
+                    const result = await pywebview.api.get_photo_face_tags(photo.path);
+                    
+                    const fullSizePreview = await pywebview.api.get_full_size_preview(photo.path);
+                    
+                    if (fullSizePreview) {
+                        lightboxImage.src = fullSizePreview;
+                    } else {
+                        lightboxImage.src = photo.thumbnail;
+                    }
+                    
+                    lightboxImage.onload = () => {
                         if (result.success && result.faces.length > 0) {
                             drawFaceTags(result.faces, lightboxImage);
                         }
                     };
+                } else {
+                    const fullSizePreview = await pywebview.api.get_full_size_preview(photo.path);
+                    if (fullSizePreview) {
+                        lightboxImage.src = fullSizePreview;
+                    } else {
+                        lightboxImage.src = photo.thumbnail;
+                    }
                 }
             } catch (error) {
                 console.error('Error loading full size preview:', error);
                 document.getElementById('lightboxImage').src = photo.thumbnail;
             }
         }
-
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
 
@@ -1103,7 +1128,16 @@ let people = [];
                 
                 const showFaceTagsPreviewSetting = await pywebview.api.get_show_face_tags_preview();
                 showFaceTagsPreview = showFaceTagsPreviewSetting;
-                document.getElementById('showFaceTagsPreviewToggle').checked = showFaceTagsPreviewSetting;
+                document.getElementById('showFaceTagsPreviewToggle').addEventListener('change', async (e) => {
+                    showFaceTagsPreview = e.target.checked;
+                    await pywebview.api.set_show_face_tags_preview(showFaceTagsPreview);
+                    
+                    if (document.getElementById('lightboxOverlay').classList.contains('active')) {
+                        await updateLightbox();
+                    }
+                    
+                    addLogEntry('Show face tags in preview: ' + (showFaceTagsPreview ? 'enabled' : 'disabled'));
+                });
                 
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
@@ -1134,6 +1168,7 @@ let people = [];
                 addLogEntry('ERROR: Failed to load settings - ' + error);
             }
         }
+
 
         document.getElementById('scanFrequencyDropdown').addEventListener('change', async (e) => {
             const frequency = e.target.value;
