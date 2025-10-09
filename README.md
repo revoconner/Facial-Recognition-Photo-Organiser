@@ -1,10 +1,10 @@
 # Organise Photos by Faces (Beta)
 
-Face Recognition Photo Organizer is a desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
+Face Recognition Photo Organizer is an offline standalone desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
 
-A no nonsense photo organiser for windows, if you want to group people by faces without having to deal with complex UI or professional tools. With negligible false results, the cutting edge AI backed program scans your folder and groups users users together by faces. </br>
+A no nonsense photo organiser for windows, if you want to group people by faces without having to deal with complex UI or professional tools. With negligible false results, the cutting edge AI backed program scans your folder and groups users users together by faces, and without having to upload anything to a cloud somewhere, for complete privacy.
 
-No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally being used by me to sort through hundreds of thousands of photos all taken as back as 2010, and organise them. So they are already being tested in real time with a huge database. 
+No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally used by me to sort through hundreds of thousands of photos all taken as back as 2004 by devices ranging from 0.5megapixel camera from early phones to professional DSLR cameras, so the database contains all kinds of photo conditions, and this helps me train the AI more efficiently so you get 99.8% accuracy without worrying. 
 
 ## Screenshots
 <img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
@@ -202,8 +202,8 @@ Our focus is on creating a user friendly app to organise photos by person instea
 # User Guide
 
 <details><summary><b>Click here to expand the user guide</b></summary>
+  
 ## Table of content
-
 - [What Is This App?](#what-is-this-app)
 - [How It Works](#how-it-works)
 - [Getting Started](#getting-started)
@@ -232,9 +232,7 @@ Our focus is on creating a user friendly app to organise photos by person instea
 - [Troubleshooting](#troubleshooting)
 - [Advanced Features](#advanced-features)
   - [Development Options](#development-options)
-- [License and Usage](#license-and-usage)
-- [Version Information](#version-information)
-- [Getting Help](#getting-help)
+
 
 ## What Is This App?
 
@@ -621,7 +619,7 @@ The app uses facial recognition technology. You are responsible for complying wi
 
 If you encounter issues not covered in this guide:
 1. Check the log in Settings > View Log for error messages
-2. Save the log file for reference
+2. Save the log file for reference, and create an issue ticket on this project
 3. Make sure you are using the latest version of the app
 
 Remember: The app **never** modifies your original photos, so you can always start fresh if needed by deleting the app data folder and rescanning.
