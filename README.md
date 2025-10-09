@@ -78,6 +78,12 @@ Our focus is on creating a user friendly app to organise photos by person instea
       <td>Medium</td>
     </tr>
     <tr>
+      <td><strong>Manual Tagging Not Required</strong></td>
+      <td>✓ (Very Accurate)</td>
+      <td>✗ (Accuracy drops with large amount of photos)</td>
+      <td>✗ (Cleanup required from time to time)</td>
+    </tr>
+    <tr>
       <td><strong>Photo Management Library</strong></td>
       <td>Only for organising by faces</td>
       <td>Full suite (editing, GPS, collections, batch processing, metadata)</td>
