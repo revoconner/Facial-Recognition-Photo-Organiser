@@ -27,13 +27,12 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 </details>
 
 ## Table of content
-- [Features](#Features)
+- [Features](#features)
 - [Comparison with other similar apps](#comparison-with-other-photo-management-software)
-- [Known bugs](#Known-Bugs)
-- [User Guide](#User-Guide)
-- [License and Usage](#License-and-Usage)
-- [Version Info](#Version-Information)
-- [Performance Figures](#Performance-Stats)
+- [Known bugs](#known-bugs-improvements-and-changelog)
+- [User Guide](#user-guide)
+- [License and Usage](#license-and-usage)
+- [Performance Figures](pPerformance-stats)
 
 
 
@@ -202,6 +201,7 @@ Our focus is on creating a user friendly app to organise photos by person instea
 
 # User Guide
 
+<details><summary><b>Click here to expand the user guide</b></summary>
 ## Table of content
 
 - [What Is This App?](#what-is-this-app)
@@ -597,6 +597,8 @@ When "Show development options" is enabled in Settings, you will see additional 
 - Accessible from the person's menu
 - Removes all name tags, reverting person back to "Person X"
 - Use this if you want to start fresh with naming
+</details>
+
 
 ----
 
