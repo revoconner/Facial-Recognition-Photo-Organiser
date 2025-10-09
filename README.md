@@ -58,6 +58,9 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 - Allocates system resources dynamically so as not to bog down your system.
 
 ## Comparison with other photo management software
+
+Our focus is on creating a user friendly app to organise photos by person instead of creating an app that does everything photo related making. This keeps the UI easy and clean to be user friendly to everyone, not just professionals. 
+
 <table>
   <thead>
     <tr>
