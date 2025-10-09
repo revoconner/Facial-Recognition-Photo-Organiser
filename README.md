@@ -6,18 +6,6 @@ A no nonsense photo organiser for windows, if you want to group people by faces 
 
 No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally being used by me to sort through hundreds of thousands of photos all taken as back as 2010, and organise them. So they are already being tested in real time with a huge database. 
 
-
-## Table of content
-- [Screenshots](#Screenshots)
-- [Features](#Features)
-- [Comparison with other similar apps](#comparison-with-other-photo-management-software)
-- [Known bugs](#Known-Bugs)
-- [User Guide](#User-Guide)
-- [License and Usage](#License-and-Usage)
-- [Version Info](#Version-Information)
-- [Performance Figures](#Performance-Stats)
-
-
 ## Screenshots
 <img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
 <img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/77c0f566-0584-4784-af99-8d7a53089d60" /></br></br>
@@ -37,6 +25,18 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 <img width="auto" height="1269" alt="image" src="https://github.com/user-attachments/assets/a74a3151-2ba0-4214-ac66-d0887db35727" /></br></br>
   
 </details>
+
+## Table of content
+- [Features](#Features)
+- [Comparison with other similar apps](#comparison-with-other-photo-management-software)
+- [Known bugs](#Known-Bugs)
+- [User Guide](#User-Guide)
+- [License and Usage](#License-and-Usage)
+- [Version Info](#Version-Information)
+- [Performance Figures](#Performance-Stats)
+
+
+
 
 ## Features
 - User friendly GUI, built by professional for everyday users!
