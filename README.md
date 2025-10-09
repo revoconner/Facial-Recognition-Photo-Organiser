@@ -8,13 +8,34 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 
 
 ## Table of content
-- [Features](#Features)
 - [Screenshots](#Screenshots)
+- [Features](#Features)
 - [Known bugs](#Known-Bugs)
 - [User Guide](#User-Guide)
 - [License and Usage](#License-and-Usage)
 - [Version Info](#Version-Information)
 - [Performance Figures](#Performance-Stats)
+
+
+## Screenshots
+<img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
+<img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/77c0f566-0584-4784-af99-8d7a53089d60" /></br></br>
+
+<details>
+<summary><b>More images below (Click to expand)</b></summary>
+<img width="auto" height="690" alt="image" src="https://github.com/user-attachments/assets/b4a487af-8cc9-4527-9de6-c7e8efe5fb96" /></br></br>
+<img width="auto" height="681" alt="image" src="https://github.com/user-attachments/assets/a70e8a71-25e7-4a12-aa44-d65d11a81221" /></br></br>
+<img width="auto" height="1341" alt="image" src="https://github.com/user-attachments/assets/5588619d-9129-454c-bbfc-97ed724da105" /></br></br>
+<img width="auto" height="1518" alt="image" src="https://github.com/user-attachments/assets/4cf0abb6-f87b-4b22-a626-64d846962fb4" /></br></br>
+<img width="auto" height="528" alt="image" src="https://github.com/user-attachments/assets/98a8ca26-5d70-438b-9889-e8117478899f" /></br></br>
+<img width="auto" height="1332" alt="image" src="https://github.com/user-attachments/assets/02d481ab-4160-4f32-a3af-f89b939e777c" /></br></br>
+<img width="auto" height="1509" alt="image" src="https://github.com/user-attachments/assets/eab36cb1-4595-4719-acaf-ebca777b0db5" /></br></br>
+<img width="auto" height="720" alt="image" src="https://github.com/user-attachments/assets/24532caf-b015-4289-8db2-f46141c7a2bd" /></br></br>
+<img width="auto" height="336" alt="image" src="https://github.com/user-attachments/assets/8ddf1930-26fd-4595-800a-656b1a1f36ef" /></br></br>
+<img width="auto" height="696" alt="image" src="https://github.com/user-attachments/assets/1999eea0-1494-4930-878c-909bfa8534b3" /></br></br>
+<img width="auto" height="1269" alt="image" src="https://github.com/user-attachments/assets/a74a3151-2ba0-4214-ac66-d0887db35727" /></br></br>
+  
+</details>
 
 ## Features
 - User friendly GUI, built by professional for everyday users!
@@ -36,27 +57,6 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 - Allocates system resources dynamically so as not to bog down your system.
 
 
-## Screenshots
-<img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
-<img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/77c0f566-0584-4784-af99-8d7a53089d60" /></br></br>
-
-<details>
-<summary>**More images below (Click to expand)**</summary>
-<img width="auto" height="690" alt="image" src="https://github.com/user-attachments/assets/b4a487af-8cc9-4527-9de6-c7e8efe5fb96" /></br></br>
-<img width="auto" height="681" alt="image" src="https://github.com/user-attachments/assets/a70e8a71-25e7-4a12-aa44-d65d11a81221" /></br></br>
-<img width="auto" height="1341" alt="image" src="https://github.com/user-attachments/assets/5588619d-9129-454c-bbfc-97ed724da105" /></br></br>
-<img width="auto" height="1518" alt="image" src="https://github.com/user-attachments/assets/4cf0abb6-f87b-4b22-a626-64d846962fb4" /></br></br>
-<img width="auto" height="528" alt="image" src="https://github.com/user-attachments/assets/98a8ca26-5d70-438b-9889-e8117478899f" /></br></br>
-<img width="auto" height="1332" alt="image" src="https://github.com/user-attachments/assets/02d481ab-4160-4f32-a3af-f89b939e777c" /></br></br>
-<img width="auto" height="1509" alt="image" src="https://github.com/user-attachments/assets/eab36cb1-4595-4719-acaf-ebca777b0db5" /></br></br>
-<img width="auto" height="720" alt="image" src="https://github.com/user-attachments/assets/24532caf-b015-4289-8db2-f46141c7a2bd" /></br></br>
-<img width="auto" height="336" alt="image" src="https://github.com/user-attachments/assets/8ddf1930-26fd-4595-800a-656b1a1f36ef" /></br></br>
-<img width="auto" height="696" alt="image" src="https://github.com/user-attachments/assets/1999eea0-1494-4930-878c-909bfa8534b3" /></br></br>
-<img width="auto" height="1269" alt="image" src="https://github.com/user-attachments/assets/a74a3151-2ba0-4214-ac66-d0887db35727" /></br></br>
-
-
-  
-</details>
 
 ## Known Bugs, improvements and changelog:
 [These are detailed in the release versions](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/releases)
