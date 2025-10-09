@@ -10,6 +10,7 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 ## Table of content
 - [Screenshots](#Screenshots)
 - [Features](#Features)
+- [Comparison with other similar apps](#comparison-with-other-photo-management-software)
 - [Known bugs](#Known-Bugs)
 - [User Guide](#User-Guide)
 - [License and Usage](#License-and-Usage)
@@ -56,7 +57,133 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 - Lets user decide the threshold percentage, for facial matching (45%-50% recommended)
 - Allocates system resources dynamically so as not to bog down your system.
 
-
+## Comparison with other photo management software
+<table>
+  <thead>
+    <tr>
+      <th>Feature</th>
+      <th>FRPO</th>
+      <th>DigiKam</th>
+      <th>Tonfotos</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>UI Complexity</strong></td>
+      <td>Easy</td>
+      <td>Hard</td>
+      <td>Medium</td>
+    </tr>
+    <tr>
+      <td><strong>Photo Management Library</strong></td>
+      <td>Only for organising by faces</td>
+      <td>Full suite (editing, GPS, collections, batch processing, metadata)</td>
+      <td>Timeline, albums, smart filters, events</td>
+    </tr>
+    <tr>
+      <td><strong>Instant Re-clustering (no rescan)</strong></td>
+      <td>✓</td>
+      <td>✗</td>
+      <td>✗</td>
+    </tr>
+    <tr>
+      <td><strong>Tag Preservation Across Re-clustering</strong></td>
+      <td>✓</td>
+      <td>✗</td>
+      <td>✗</td>
+    </tr>
+    <tr>
+      <td><strong>Dedicated Unmatched Faces Group</strong></td>
+      <td>✓</td>
+      <td>✗</td>
+      <td>✗</td>
+    </tr>
+    <tr>
+      <td><strong>Dynamic CPU Throttling (background)</strong></td>
+      <td>✓</td>
+      <td>✗</td>
+      <td>✗</td>
+    </tr>
+    <tr>
+      <td><strong>Scan Frequency Options</strong></td>
+      <td>✓ (4 modes)</td>
+      <td>✗ (manual only)</td>
+      <td>✗ (auto only)</td>
+    </tr>
+    <tr>
+      <td><strong>InsightFace 99.8% Accuracy</strong></td>
+      <td>✓</td>
+      <td>✗ (~95%)</td>
+      <td>✗ (~98%)</td>
+    </tr>
+    <tr>
+      <td><strong>Manual Face Transfer Between Persons</strong></td>
+      <td>✓</td>
+      <td>Limited</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>Primary Photo Selection per Person</strong></td>
+      <td>✓</td>
+      <td>✗</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>View Mode: Zoom to Tagged Faces</strong></td>
+      <td>✓</td>
+      <td>✗</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>Cost</strong></td>
+      <td>Free</td>
+      <td>Free</td>
+      <td>✗ ($99)</td>
+    </tr>
+    <tr>
+      <td><strong>Single Executable Size</strong></td>
+      <td>✓ (minimal)</td>
+      <td>✗ (heavy KDE)</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>Photo Editing</strong></td>
+      <td>✗</td>
+      <td>✓</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>Timeline View</strong></td>
+      <td>✗</td>
+      <td>✓</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>Duplicate Detection</strong></td>
+      <td>✗</td>
+      <td>✓</td>
+      <td>✓</td>
+    </tr>
+    <tr>
+      <td><strong>Metadata Management</strong></td>
+      <td>✗</td>
+      <td>✓</td>
+      <td>Limited</td>
+    </tr>
+    <tr>
+      <td><strong>Cross-Platform</strong></td>
+      <td>✗ (Windows only)</td>
+      <td>✓ (Linux/Win/Mac)</td>
+      <td>✗ (Windows only)</td>
+    </tr>
+    <tr>
+      <td><strong>Photo Enhancement/Filters</strong></td>
+      <td>✗</td>
+      <td>✓</td>
+      <td>✓</td>
+    </tr>
+  </tbody>
+</table>
 
 ## Known Bugs, improvements and changelog:
 [These are detailed in the release versions](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/releases)
