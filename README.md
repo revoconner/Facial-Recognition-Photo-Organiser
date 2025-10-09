@@ -1,4 +1,4 @@
-# Organise Photos by Faces
+# Organise Photos by Faces (Beta)
 
 Face Recognition Photo Organizer is a desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
 
