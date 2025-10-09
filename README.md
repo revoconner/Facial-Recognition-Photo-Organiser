@@ -602,9 +602,9 @@ When "Show development options" is enabled in Settings, you will see additional 
 
 ## License and Usage
 
-This app is provided free of usage restriction for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is for personal use.
+This app is provided free of cost, and no usage restriction for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is being used for personal use.
 
-We do not collect any of your data, this app does not send any data online and works completely offline. 
+We do not collect any of your data, this app does not send any data online and works completely offline. If you see any network activity on this app, report a bug immediately with the details. 
 
 The app uses facial recognition technology. You are responsible for complying with applicable privacy laws and obtaining consent from individuals whose images are processed.
 
