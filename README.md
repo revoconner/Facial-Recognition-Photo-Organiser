@@ -28,6 +28,7 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 - Quickly jump to a person
 - Transfer face tag to another person to remove it (for false positive; in my testing with 90,980 real everyday photos, false positives were a rarity)
 - Hide unnamed people
+- Auto naming conflict resolution
 - Finds new photos or deleted photos on disk autmatically
 - Exclusion by wildcard or subfolder
 - Doesn't change your folder structure, the faces only work inside the app and is kept in a separate database. So if you have organised your folders in a certain way, it won't mess with that.
@@ -36,19 +37,29 @@ No more manual tagging, no more confirming for weighted algorithm. Just scan and
 
 
 ## Screenshots
+<img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
+<img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/77c0f566-0584-4784-af99-8d7a53089d60" /></br></br>
 
-<img width="1791" height="1146" alt="image" src="https://github.com/user-attachments/assets/78303298-915a-4594-aa3a-16b9d28760cd" /> </br>
-<img width="auto" height="700" alt="image" src="https://github.com/user-attachments/assets/1b66b311-6763-4369-b067-7ead5ed7d19e" /></br>
-<img width="auto" height="800" alt="image" src="https://github.com/user-attachments/assets/386814d4-0c52-49ec-a06e-d9046970bb25" /></br>
-<img width="auto" height="300" alt="image" src="https://github.com/user-attachments/assets/d2d6e5d4-b02e-42b6-8e9a-9567c2e117e7" /></br>
-<img width="2364" height="1518" alt="image" src="https://github.com/user-attachments/assets/4b1407ff-7e5b-46b6-b862-3e34f5af6b9b" /></br>
-<img width="2664" height="1629" alt="image" src="https://github.com/user-attachments/assets/0bf04aa2-2abc-410d-908a-b322f089c3d5" /></br>
-<img width="2217" height="1512" alt="image" src="https://github.com/user-attachments/assets/95e66a8a-cf4f-413f-b59d-e85cc14da02a" /></br>
-<img width="auto" height="200" alt="image" src="https://github.com/user-attachments/assets/d2b20cf7-9175-4167-84dd-6af2f14e9ef5" /></br>
-<img width="2652" height="1428" alt="image" src="https://github.com/user-attachments/assets/e81412ab-0a21-4ecc-97a6-c615826327da" /></br>
+<details>
+<summary>**More images below (Click to expand)**</summary>
+<img width="auto" height="690" alt="image" src="https://github.com/user-attachments/assets/b4a487af-8cc9-4527-9de6-c7e8efe5fb96" /></br></br>
+<img width="auto" height="681" alt="image" src="https://github.com/user-attachments/assets/a70e8a71-25e7-4a12-aa44-d65d11a81221" /></br></br>
+<img width="auto" height="1341" alt="image" src="https://github.com/user-attachments/assets/5588619d-9129-454c-bbfc-97ed724da105" /></br></br>
+<img width="auto" height="1518" alt="image" src="https://github.com/user-attachments/assets/4cf0abb6-f87b-4b22-a626-64d846962fb4" /></br></br>
+<img width="auto" height="528" alt="image" src="https://github.com/user-attachments/assets/98a8ca26-5d70-438b-9889-e8117478899f" /></br></br>
+<img width="auto" height="1332" alt="image" src="https://github.com/user-attachments/assets/02d481ab-4160-4f32-a3af-f89b939e777c" /></br></br>
+<img width="auto" height="1509" alt="image" src="https://github.com/user-attachments/assets/eab36cb1-4595-4719-acaf-ebca777b0db5" /></br></br>
+<img width="auto" height="720" alt="image" src="https://github.com/user-attachments/assets/24532caf-b015-4289-8db2-f46141c7a2bd" /></br></br>
+<img width="auto" height="336" alt="image" src="https://github.com/user-attachments/assets/8ddf1930-26fd-4595-800a-656b1a1f36ef" /></br></br>
+<img width="auto" height="696" alt="image" src="https://github.com/user-attachments/assets/1999eea0-1494-4930-878c-909bfa8534b3" /></br></br>
+<img width="auto" height="1269" alt="image" src="https://github.com/user-attachments/assets/a74a3151-2ba0-4214-ac66-d0887db35727" /></br></br>
 
-## Known Bugs:
-- Initial start might take a bit of time. Do not worry your computer did not crash.
+
+  
+</details>
+
+## Known Bugs, improvements and changelog:
+[These are detailed in the release versions](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/releases)
 
 ----
 
@@ -455,15 +466,12 @@ When "Show development options" is enabled in Settings, you will see additional 
 
 ## License and Usage
 
-This app is provided free for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is for personal use.
+This app is provided free of usage restriction for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is for personal use.
+
+We do not collect any of your data, this app does not send any data online and works completely offline. 
 
 The app uses facial recognition technology. You are responsible for complying with applicable privacy laws and obtaining consent from individuals whose images are processed.
 
-## Version Information
-
-Current Version: 0.2.1 (Beta)
-
-This is the second release and is in beta testing. While there may be bugs, none of them will delete or modify your original photos. The app does not edit photos on disk directly.
 
 ## Performance Stats
 1. [10/7/2025, 5:46:28 AM] - [10/7/2025, 10:50:24 AM] - Scan complete: 104577 faces in 90491 photos
