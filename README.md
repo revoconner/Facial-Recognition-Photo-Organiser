@@ -6,6 +6,14 @@ A no nonsense photo organiser for windows, if you want to group people by faces 
 
 No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally used by me to sort through hundreds of thousands of photos all taken as back as 2004 by devices ranging from 0.5megapixel camera from early phones to professional DSLR cameras, so the database contains all kinds of photo conditions, and this helps me train the AI more efficiently so you get 99.8% accuracy without worrying. 
 
+## Privacy statement
+
+The app doesn't connect to the internet in any way or form (unless you specifically specify one of the folder from an online location to be scanned, then it will use the network activity to fetch data from that folder). The app is completely offline, all AI packages and bundles are provided with the setup file. 
+
+You can use this app on an airgapped computer if you want. And as such, we do not collect any data, analytical or otherwise. 
+
+If you plan on reporting a bug, you may have to voluntarily disclose the log file. We will use that log file to track the bug and solve it for next patch, and as such the log file may be available on the open web for an indefinite amount of time.  The log file, while not containing any identifier, will be associated with the account that submits the bug report. Use an alternate account if you want your account to not be associated with the log file. 
+
 ## Screenshots
 <img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
 <img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/77c0f566-0584-4784-af99-8d7a53089d60" /></br></br>
@@ -603,8 +611,6 @@ When "Show development options" is enabled in Settings, you will see additional 
 ## License and Usage
 
 This app is provided free of cost, and no usage restriction for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is being used for personal use.
-
-We do not collect any of your data, this app does not send any data online and works completely offline. If you see any network activity on this app, report a bug immediately with the details. 
 
 The app uses facial recognition technology. You are responsible for complying with applicable privacy laws and obtaining consent from individuals whose images are processed.
 
