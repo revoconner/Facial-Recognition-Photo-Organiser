@@ -2,17 +2,23 @@
 
 Face Recognition Photo Organizer is an offline standalone desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
 
-A no nonsense photo organiser for windows, if you want to group people by faces without having to deal with complex UI or professional tools. With negligible false results, the cutting edge AI backed program scans your folder and groups users users together by faces, and without having to upload anything to a cloud somewhere, for complete privacy.
+A no nonsense photo organiser for windows, if you want to group people by faces without having to deal with complex UI or professional tools. 
 
-No more manual tagging, no more confirming for weighted algorithm. Just scan and wait for the results. Responsive UI, user friendly settings with tooltips explaining everything, including filtering out unwanted locations, wildcards for advanced users and hding people in multiple ways. The software is in beta at the moment, and is being personally used by me to sort through hundreds of thousands of photos all taken as back as 2004 by devices ranging from 0.5megapixel camera from early phones to professional DSLR cameras, so the database contains all kinds of photo conditions, and this helps me train the AI more efficiently so you get 99.8% accuracy without worrying. 
+- User friendly UI
+- No need for manual tagging, or confirming faces
+- Completely offline and built for privacy
+- Just point to the location of your folders and let the app do its thing.
 
 ## Privacy statement
 
+<details>
+<summary><b>Click to read our privacy statement</b></summary>
 The app doesn't connect to the internet in any way or form (unless you specifically specify one of the folder from an online location to be scanned, then it will use the network activity to fetch data from that folder). The app is completely offline, all AI packages and bundles are provided with the setup file. 
 
 You can use this app on an airgapped computer if you want. And as such, we do not collect any data, analytical or otherwise. 
 
 If you plan on reporting a bug, you may have to voluntarily disclose the log file. We will use that log file to track the bug and solve it for next patch, and as such the log file may be available on the open web for an indefinite amount of time.  The log file, while not containing any identifier, will be associated with the account that submits the bug report. Use an alternate account if you want your account to not be associated with the log file. 
+</details>
 
 ## Screenshots
 <img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
@@ -152,15 +158,9 @@ Our focus is on creating a user friendly app to organise photos by person instea
     </tr>
     <tr>
       <td><strong>Cost</strong></td>
-      <td>Free</td>
+      <td>Free - Non Commercial</td>
       <td>Free</td>
       <td>✗ ($99)</td>
-    </tr>
-    <tr>
-      <td><strong>Single Executable Size</strong></td>
-      <td>✓ (minimal)</td>
-      <td>✗ (heavy KDE)</td>
-      <td>✓</td>
     </tr>
     <tr>
       <td><strong>Photo Editing</strong></td>
@@ -176,13 +176,13 @@ Our focus is on creating a user friendly app to organise photos by person instea
     </tr>
     <tr>
       <td><strong>Duplicate Detection</strong></td>
-      <td>✗</td>
+      <td>TBA - Planned Feature</td>
       <td>✓</td>
       <td>✓</td>
     </tr>
     <tr>
       <td><strong>Metadata Management</strong></td>
-      <td>✗</td>
+      <td>TBA - Planned Feature</td>
       <td>✓</td>
       <td>Limited</td>
     </tr>
