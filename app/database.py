@@ -836,16 +836,13 @@ class FaceDatabase:
     def close(self):
         if hasattr(self, 'conn') and self.conn:
             self.conn.close()
-            self.conn = None
-
+        
         if hasattr(self, '_local') and hasattr(self._local, 'conn'):
             if self._local.conn:
                 self._local.conn.close()
-                self._local.conn = None
-
+        
         if hasattr(self, 'env') and self.env:
             self.env.close()
-            self.env = None
 
     def get_photo_face_tags(self, photo_id: int) -> List[Dict]:
         """Get all faces in a photo with their tags and bboxes"""
