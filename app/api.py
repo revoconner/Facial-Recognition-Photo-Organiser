@@ -15,6 +15,7 @@ from pystray import MenuItem as item
 from utils import get_appdata_path, create_tray_icon
 from database import FaceDatabase
 from thumbnail_cache import ThumbnailCache
+from thumbnail_worker import ThumbnailWorker
 from settings import Settings
 from workers import ScanWorker, ClusterWorker
 
@@ -40,6 +41,10 @@ class API:
         cache_path = db_path.parent / "thumbnail_cache"
         self._thumbnail_cache = ThumbnailCache(str(cache_path))
         print(f"Thumbnail cache location: {cache_path}")
+
+        # Initialize background thumbnail worker
+        self._thumbnail_worker = ThumbnailWorker(self._thumbnail_cache, num_threads=4)
+        print(f"Thumbnail worker initialized with 4 threads")
 
     def set_window(self, window):
         self._window = window
@@ -214,7 +219,7 @@ class API:
     
     def start_scanning(self):
         if self._scan_worker is None or not self._scan_worker.is_alive():
-            self._scan_worker = ScanWorker(self._db, self)
+            self._scan_worker = ScanWorker(self._db, self, self._thumbnail_worker)
             self._scan_worker.start()
     
     def start_clustering(self):
