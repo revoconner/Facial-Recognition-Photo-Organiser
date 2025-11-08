@@ -535,7 +535,7 @@ let people = [];
                     const hiddenOverlay = photo.is_hidden ? '<div class="hidden-overlay"></div>' : '';
                     
                     photoItem.innerHTML = `
-                        <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
+                        <img src="${photo.thumbnail}" loading="lazy" decoding="async" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
                         ${hiddenOverlay}
                         <button class="kebab-menu">
                             <span class="kebab-dot"></span>

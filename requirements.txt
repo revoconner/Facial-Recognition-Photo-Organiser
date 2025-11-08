@@ -1,0 +1,11 @@
+torch
+torchvision
+pywebview
+Pillow
+insightface
+networkx
+numpy
+opencv-python
+pystray
+lmdb
+pillow-heif

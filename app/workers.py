@@ -20,10 +20,11 @@ DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
 
 
 class ScanWorker(threading.Thread):
-    def __init__(self, db, api):
+    def __init__(self, db, api, thumbnail_worker=None):
         super().__init__()
         self.db = db
         self.api = api
+        self.thumbnail_worker = thumbnail_worker
         self.face_app = None
         self.daemon = True
         self.batch_size = 25
@@ -284,21 +285,28 @@ class ScanWorker(threading.Thread):
     def commit_batch(self, batch_data: List[dict]):
         try:
             cursor = self.db.conn.cursor()
-            
+
             for photo_data in batch_data:
                 photo_id = photo_data['photo_id']
-                
+                file_path = photo_data['file_path']
+
                 for face_data in photo_data['faces']:
                     face_id = self.db.add_face(photo_id, face_data['embedding'], face_data['bbox'])
-                
+
+                    # Queue thumbnail generation in background
+                    if self.thumbnail_worker:
+                        # Generate thumbnails for both view modes (zoom and entire)
+                        self.thumbnail_worker.add_job(face_id, file_path, face_data['bbox'], size=180)
+                        self.thumbnail_worker.add_job(face_id, file_path, None, size=180)
+
                 self.db.update_photo_status(photo_id, photo_data['status'])
-            
+
             self.db.conn.commit()
-            
+
         except Exception as e:
             self.api.update_status(f"ERROR: Batch commit failed: {str(e)}")
             self.db.conn.rollback()
-            
+
             for photo_data in batch_data:
                 if photo_data.get('photo_id'):
                     try:
