@@ -14,7 +14,8 @@
       "Bash(git commit:*)",
       "Bash(git config:*)",
       "Bash(git log:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
