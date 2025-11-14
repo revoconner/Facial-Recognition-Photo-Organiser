@@ -387,12 +387,22 @@ class APIQt(QObject):
         except Exception as e:
             return {'success': False, 'message': str(e)}
 
-    def get_photos(self, clustering_id, person_id, page=1, page_size=100):
-        offset = (page - 1) * page_size
+    def get_photos(self, clustering_id, person_id):
+        print(f"=== API get_photos ===")
+        print(f"clustering_id: {clustering_id}, person_id: {person_id}")
 
+        # Get all photos for person (no pagination)
         photo_data, total_count = self._db.get_photos_by_person_paginated(
-            clustering_id, person_id, limit=page_size, offset=offset
+            clustering_id, person_id, limit=10000, offset=0
         )
+
+        print(f"Database returned {len(photo_data)} photos for person_id {person_id}")
+
+        # Debug: Print first few face IDs and file paths
+        if photo_data:
+            print(f"First few entries:")
+            for i, d in enumerate(photo_data[:3]):
+                print(f"  [{i}] face_id: {d['face_id']}, file: {os.path.basename(d['file_path'])}")
 
         hidden_photos = self._db.get_hidden_photos()
         show_hidden_photos = self._settings.get('show_hidden_photos', False)
@@ -424,12 +434,10 @@ class APIQt(QObject):
                     'is_hidden': is_hidden
                 })
 
+        print(f"Returning {len(photos)} photos after filtering")
+
         return {
-            'photos': photos,
-            'total_count': total_count,
-            'page': page,
-            'page_size': page_size,
-            'has_more': offset + len(photos) < total_count
+            'photos': photos
         }
 
     def get_full_size_preview(self, image_path: str) -> Optional[str]:

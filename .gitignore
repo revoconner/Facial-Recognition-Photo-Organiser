@@ -10,3 +10,4 @@ app/output/
 app/__pycache__/
 app/claude.md
 app/nul
+app/.claude/

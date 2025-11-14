@@ -155,7 +155,7 @@ class PersonListItem(QWidget):
 
 
 class PhotoGridWidget(QWidget):
-    """Widget for displaying photo grid with pagination"""
+    """Widget for displaying photo grid"""
     photo_clicked = Signal(dict)
 
     def __init__(self, parent=None):
@@ -180,29 +180,10 @@ class PhotoGridWidget(QWidget):
         scroll.setWidget(self.grid_widget)
         layout.addWidget(scroll)
 
-        # Load more button
-        self.load_more_btn = QPushButton("Load More Photos")
-        self.load_more_btn.setVisible(False)
-        self.load_more_btn.setStyleSheet("""
-            QPushButton {
-                background: #3b82f6;
-                color: white;
-                border: none;
-                padding: 12px;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background: #2563eb;
-            }
-        """)
-        layout.addWidget(self.load_more_btn)
-
-    def set_photos(self, photos, has_more=False):
+    def set_photos(self, photos):
         """Set photos to display"""
         self.photos = photos
         self.render_grid()
-        self.load_more_btn.setVisible(has_more)
 
     def set_grid_size(self, size):
         """Update grid thumbnail size"""
@@ -300,7 +281,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.api = api
         self.current_person = None
-        self.current_page = 1
 
         self.setup_ui()
         self.setup_connections()
@@ -654,7 +634,6 @@ class MainWindow(QMainWindow):
         """Setup signal/slot connections"""
         self.size_slider.valueChanged.connect(self.on_size_changed)
         self.view_mode_combo.currentIndexChanged.connect(self.on_view_mode_changed)
-        self.photo_grid.load_more_btn.clicked.connect(self.load_more_photos)
         self.settings_btn.clicked.connect(self.show_settings)
         self.people_menu_btn.clicked.connect(self.show_people_menu)
         self.photo_menu_btn.clicked.connect(self.show_photo_menu)
@@ -716,8 +695,13 @@ class MainWindow(QMainWindow):
 
     def on_person_selected(self, person_data):
         """Handle person selection"""
+        print(f"=== PERSON SELECTED ===")
+        print(f"Person data: {person_data}")
+        print(f"Person ID: {person_data.get('id')}")
+        print(f"Person name: {person_data.get('name')}")
+        print(f"Clustering ID: {person_data.get('clustering_id')}")
+
         self.current_person = person_data
-        self.current_page = 1
         self.content_title.setText(person_data['name'])
         self.load_photos()
 
@@ -727,21 +711,22 @@ class MainWindow(QMainWindow):
             return
 
         try:
+            print(f"=== LOADING PHOTOS ===")
+            print(f"Clustering ID: {self.current_person['clustering_id']}")
+            print(f"Person ID: {self.current_person['id']}")
+
             result = self.api.get_photos(
                 self.current_person['clustering_id'],
-                self.current_person['id'],
-                page=self.current_page,
-                page_size=100
+                self.current_person['id']
             )
 
-            self.photo_grid.set_photos(result['photos'], result.get('has_more', False))
+            print(f"Got {len(result['photos'])} photos")
+
+            self.photo_grid.set_photos(result['photos'])
         except Exception as e:
             print(f"Error loading photos: {e}")
-
-    def load_more_photos(self):
-        """Load next page of photos"""
-        self.current_page += 1
-        self.load_photos()
+            import traceback
+            traceback.print_exc()
 
     def on_size_changed(self, value):
         """Handle grid size change"""
