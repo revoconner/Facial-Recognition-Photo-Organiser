@@ -158,8 +158,9 @@ class PhotoGridWidget(QWidget):
     """Widget for displaying photo grid with lazy loading"""
     photo_clicked = Signal(dict)
 
-    def __init__(self, parent=None):
+    def __init__(self, api, parent=None):
         super().__init__(parent)
+        self.api = api
         self.photos = []
         self.grid_size = 180
         self.loaded_count = 0
@@ -244,9 +245,10 @@ class PhotoGridWidget(QWidget):
             """)
             photo_label.setScaledContents(False)
 
-            # Set thumbnail
-            if photo.get('thumbnail'):
-                self.set_photo_thumbnail(photo_label, photo['thumbnail'])
+            # Generate thumbnail on-demand
+            thumbnail = self.api.get_thumbnail_for_photo(photo, self.grid_size)
+            if thumbnail:
+                self.set_photo_thumbnail(photo_label, thumbnail)
 
             # Store photo data
             photo_label.setProperty('photo_data', photo)
@@ -565,8 +567,8 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(header)
 
-        # Photo grid
-        self.photo_grid = PhotoGridWidget()
+        # Photo grid (pass api reference for thumbnail generation)
+        self.photo_grid = PhotoGridWidget(self.api)
         layout.addWidget(self.photo_grid)
 
         return container

@@ -391,25 +391,18 @@ class APIQt(QObject):
         print(f"=== API get_photos ===")
         print(f"clustering_id: {clustering_id}, person_id: {person_id}")
 
-        # Get all photos for person (no pagination)
+        # Get all photo metadata (no thumbnails yet)
         photo_data, total_count = self._db.get_photos_by_person_paginated(
             clustering_id, person_id, limit=10000, offset=0
         )
 
         print(f"Database returned {len(photo_data)} photos for person_id {person_id}")
 
-        # Debug: Print first few face IDs and file paths
-        if photo_data:
-            print(f"First few entries:")
-            for i, d in enumerate(photo_data[:3]):
-                print(f"  [{i}] face_id: {d['face_id']}, file: {os.path.basename(d['file_path'])}")
-
         hidden_photos = self._db.get_hidden_photos()
         show_hidden_photos = self._settings.get('show_hidden_photos', False)
         photos = []
 
         view_mode = self._settings.get('view_mode', 'entire_photo')
-        grid_size = self._settings.get('grid_size', 180)
 
         for data in photo_data:
             face_id = data['face_id']
@@ -424,21 +417,27 @@ class APIQt(QObject):
             if view_mode == 'zoom_to_faces':
                 bbox = [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']]
 
-            thumbnail = self.create_thumbnail(path, size=grid_size, bbox=bbox, face_id=face_id)
-            if thumbnail:
-                photos.append({
-                    'path': path,
-                    'thumbnail': thumbnail,
-                    'name': os.path.basename(path),
-                    'face_id': face_id,
-                    'is_hidden': is_hidden
-                })
+            # Store metadata only, generate thumbnail on-demand
+            photos.append({
+                'path': path,
+                'name': os.path.basename(path),
+                'face_id': face_id,
+                'is_hidden': is_hidden,
+                'bbox': bbox  # Store bbox for lazy thumbnail generation
+            })
 
-        print(f"Returning {len(photos)} photos after filtering")
+        print(f"Returning {len(photos)} photo metadata (thumbnails will be generated on-demand)")
 
         return {
             'photos': photos
         }
+
+    def get_thumbnail_for_photo(self, photo_data, size):
+        """Generate thumbnail on-demand for a specific photo"""
+        path = photo_data['path']
+        bbox = photo_data.get('bbox')
+        face_id = photo_data['face_id']
+        return self.create_thumbnail(path, size=size, bbox=bbox, face_id=face_id)
 
     def get_full_size_preview(self, image_path: str) -> Optional[str]:
         try:
