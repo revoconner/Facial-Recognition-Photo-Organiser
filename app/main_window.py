@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QSize, QTimer, QRect, QPropertyAnimation, QEasingCurve, Property
 from PySide6.QtGui import QPixmap, QIcon, QAction, QImage, QPainter, QPainterPath, QBrush, QRegion, QColor
+from lightbox_dialog import LightboxDialog
 
 
 class PersonListItem(QWidget):
@@ -156,7 +157,7 @@ class PersonListItem(QWidget):
 
 class PhotoGridWidget(QWidget):
     """Widget for displaying photo grid with lazy loading"""
-    photo_clicked = Signal(dict)
+    photo_clicked = Signal(dict)  # Emits {'photo': photo_data, 'index': int}
 
     def __init__(self, api, parent=None):
         super().__init__(parent)
@@ -255,9 +256,15 @@ class PhotoGridWidget(QWidget):
             if thumbnail:
                 self.set_photo_thumbnail(photo_label, thumbnail)
 
-            # Store photo data
+            # Store photo data and index
             photo_label.setProperty('photo_data', photo)
-            photo_label.mousePressEvent = lambda e, p=photo: self.photo_clicked.emit(p)
+            photo_label.setProperty('photo_index', idx)
+
+            # Make clickable - emit signal with index
+            def make_click_handler(index):
+                return lambda e: self.photo_clicked.emit({'photo': photo, 'index': index})
+
+            photo_label.mousePressEvent = make_click_handler(idx)
 
             row = idx // cols
             col = idx % cols
@@ -690,6 +697,7 @@ class MainWindow(QMainWindow):
         self.sort_btn.clicked.connect(self.show_sort_menu)
         self.jump_to_btn.clicked.connect(self.show_jump_to_dialog)
         self.help_btn.clicked.connect(self.show_help)
+        self.photo_grid.photo_clicked.connect(self.on_photo_clicked)
 
     def load_initial_data(self):
         """Load initial data from API"""
@@ -893,13 +901,38 @@ class MainWindow(QMainWindow):
         <p><b>Enter</b> - View selected person's photos</p>
         <p><b>Ctrl+F</b> - Search/Jump to name</p>
         <p><b>Ctrl+,</b> - Open settings</p>
+        <p><b>←/→</b> - Navigate lightbox photos</p>
+        <p><b>Escape</b> - Close lightbox</p>
 
         <h3>Tips</h3>
-        <p>• Click and drag to select multiple photos</p>
+        <p>• Click photos to view full size</p>
         <p>• Right-click photos for more options</p>
         <p>• Adjust similarity threshold in settings</p>
         """
         QMessageBox.information(self, "Help", help_text)
+
+    def on_photo_clicked(self, data):
+        """Handle photo click - open lightbox"""
+        try:
+            photo_index = data['index']
+            print(f"Photo clicked: index={photo_index}")
+
+            # Get all currently loaded photos from the grid
+            photos = self.photo_grid.photos
+
+            print(f"Total photos available: {len(photos)}")
+            if photos and photo_index < len(photos):
+                print(f"Opening lightbox for photo: {photos[photo_index].get('name', 'unknown')}")
+                # Open lightbox dialog
+                lightbox = LightboxDialog(self.api, photos, photo_index, self)
+                lightbox.showMaximized()  # Maximize before exec to get correct size
+                print("Lightbox created, about to exec()")
+                lightbox.exec()
+                print("Lightbox closed")
+        except Exception as e:
+            print(f"Error opening lightbox: {e}")
+            import traceback
+            traceback.print_exc()
 
     def update_progress(self, current, total, percent):
         """Update progress bar"""
