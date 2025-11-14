@@ -9,3 +9,4 @@ app/build/
 app/output/
 app/__pycache__/
 app/claude.md
+app/nul
