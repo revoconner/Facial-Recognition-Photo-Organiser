@@ -201,7 +201,9 @@ class PhotoGridWidget(QWidget):
                 item.widget().deleteLater()
 
         print(f"PhotoGrid: Loading initial batch of {min(self.batch_size, len(self.photos))} photos")
-        self.load_more_photos()
+
+        # Defer loading until after layout pass to get correct width
+        QTimer.singleShot(0, self.load_more_photos)
 
     def on_scroll(self, value):
         """Load more photos when scrolling near bottom"""
@@ -224,9 +226,12 @@ class PhotoGridWidget(QWidget):
 
         print(f"PhotoGrid: Loading photos {start_idx} to {end_idx-1}")
 
-        # Calculate columns based on widget width
-        width = self.width() if self.width() > 0 else 800
+        # Calculate columns based on scroll viewport width (more accurate than self.width())
+        viewport_width = self.scroll.viewport().width()
+        width = viewport_width if viewport_width > 100 else 800
         cols = max(1, width // (self.grid_size + 8))
+
+        print(f"PhotoGrid: Viewport width={width}, cols={cols}")
 
         # Add photos
         for idx in range(start_idx, end_idx):
@@ -262,6 +267,10 @@ class PhotoGridWidget(QWidget):
         self.loading = False
 
         print(f"PhotoGrid: Loaded {self.loaded_count}/{len(self.photos)} photos")
+
+        # Force layout update to prevent overlapping
+        self.grid_widget.updateGeometry()
+        self.scroll.update()
 
     def set_grid_size(self, size):
         """Update grid thumbnail size"""
