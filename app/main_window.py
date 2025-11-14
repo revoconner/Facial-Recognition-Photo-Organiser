@@ -10,13 +10,16 @@ from PySide6.QtWidgets import (
     QMenu, QMessageBox, QToolButton
 )
 from PySide6.QtCore import Qt, Signal, QSize, QTimer, QRect, QPropertyAnimation, QEasingCurve, Property
-from PySide6.QtGui import QPixmap, QIcon, QAction, QImage, QPainter, QPainterPath, QBrush, QRegion, QColor
+from PySide6.QtGui import QPixmap, QIcon, QAction, QImage, QPainter, QPainterPath, QBrush, QRegion, QColor, QCursor
 from lightbox_dialog import LightboxDialog
 
 
 class PersonListItem(QWidget):
     """Custom widget for displaying a person in the list"""
     clicked = Signal(dict)
+    rename_requested = Signal(dict)  # Emits person_data when rename is clicked
+    hide_requested = Signal(dict)  # Emits person_data when hide is clicked
+    unhide_requested = Signal(dict)  # Emits person_data when unhide is clicked
 
     def __init__(self, person_data, parent=None):
         super().__init__(parent)
@@ -83,6 +86,7 @@ class PersonListItem(QWidget):
                 border-radius: 4px;
             }
         """)
+        self.menu_btn.clicked.connect(self.show_context_menu)
         layout.addWidget(self.menu_btn)
 
         self.setStyleSheet("""
@@ -149,9 +153,54 @@ class PersonListItem(QWidget):
 
             self.thumbnail_label.setPixmap(circular_pixmap)
 
+    def show_context_menu(self):
+        """Show context menu for person"""
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background: #2a2a2a;
+                color: #e0e0e0;
+                border: 1px solid #3a3a3a;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 24px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background: #3b82f6;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #3a3a3a;
+                margin: 4px 0px;
+            }
+        """)
+
+        # Rename action (always available)
+        rename_action = menu.addAction("Rename")
+        rename_action.triggered.connect(lambda: self.rename_requested.emit(self.person_data))
+
+        menu.addSeparator()
+
+        # Hide/Unhide action based on current state
+        is_hidden = self.person_data.get('is_hidden', False)
+        if is_hidden:
+            unhide_action = menu.addAction("Unhide Person")
+            unhide_action.triggered.connect(lambda: self.unhide_requested.emit(self.person_data))
+        else:
+            hide_action = menu.addAction("Hide Person")
+            hide_action.triggered.connect(lambda: self.hide_requested.emit(self.person_data))
+
+        # Show menu at button position
+        menu.exec(self.menu_btn.mapToGlobal(self.menu_btn.rect().bottomLeft()))
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.person_data)
+            # Only emit clicked if not clicking the menu button
+            if not self.menu_btn.geometry().contains(event.pos()):
+                self.clicked.emit(self.person_data)
         super().mousePressEvent(event)
 
 
@@ -167,6 +216,8 @@ class PhotoGridWidget(QWidget):
         self.loaded_count = 0
         self.batch_size = 200  # Load 200 at a time
         self.loading = False
+        self.current_photo_context = None  # Store context for right-click menu
+        self.current_person_name = None  # Store current person name for menu actions
         self.setup_ui()
 
     def setup_ui(self):
@@ -250,6 +301,7 @@ class PhotoGridWidget(QWidget):
                 }}
             """)
             photo_label.setScaledContents(False)
+            photo_label.setContextMenuPolicy(Qt.CustomContextMenu)
 
             # Generate thumbnail on-demand
             thumbnail = self.api.get_thumbnail_for_photo(photo, self.grid_size)
@@ -261,10 +313,15 @@ class PhotoGridWidget(QWidget):
             photo_label.setProperty('photo_index', idx)
 
             # Make clickable - emit signal with index
-            def make_click_handler(index):
-                return lambda e: self.photo_clicked.emit({'photo': photo, 'index': index})
+            def make_click_handler(index, photo_obj):
+                def handler(event):
+                    if event.button() == Qt.LeftButton:
+                        self.photo_clicked.emit({'photo': photo_obj, 'index': index})
+                    elif event.button() == Qt.RightButton:
+                        self.show_photo_context_menu(photo_obj, event.globalPos())
+                return handler
 
-            photo_label.mousePressEvent = make_click_handler(idx)
+            photo_label.mousePressEvent = make_click_handler(idx, photo)
 
             row = idx // cols
             col = idx % cols
@@ -322,6 +379,117 @@ class PhotoGridWidget(QWidget):
             painter.end()
 
             label.setPixmap(rounded_pixmap)
+
+    def show_photo_context_menu(self, photo, pos):
+        """Show context menu for photo"""
+        self.current_photo_context = photo
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background: #2a2a2a;
+                color: #e0e0e0;
+                border: 1px solid #3a3a3a;
+                border-radius: 6px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 24px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background: #3b82f6;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #3a3a3a;
+                margin: 4px 0px;
+            }
+        """)
+
+        # Menu actions based on photo state
+        is_hidden = photo.get('is_hidden', False)
+
+        make_primary = menu.addAction("Make Primary Photo")
+        make_primary.triggered.connect(self.on_make_primary_photo)
+
+        transfer_tag = menu.addAction("Remove/Transfer Tag")
+        transfer_tag.triggered.connect(self.on_transfer_tag)
+
+        menu.addSeparator()
+
+        if is_hidden:
+            unhide = menu.addAction("Unhide Photo")
+            unhide.triggered.connect(self.on_unhide_photo)
+        else:
+            hide = menu.addAction("Hide Photo")
+            hide.triggered.connect(self.on_hide_photo)
+
+        menu.exec(pos)
+
+    def on_make_primary_photo(self):
+        """Make this photo the primary photo for the person"""
+        if not self.current_photo_context or not self.current_person_name:
+            return
+
+        try:
+            face_id = self.current_photo_context['face_id']
+            # Remove " (hidden)" suffix if present
+            clean_name = self.current_person_name.replace(' (hidden)', '')
+
+            result = self.api.set_primary_photo(clean_name, face_id)
+
+            if result['success']:
+                print(f"Primary photo set for {clean_name}")
+            else:
+                print(f"Error setting primary photo: {result.get('message', 'Unknown error')}")
+        except Exception as e:
+            print(f"Error making primary photo: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_hide_photo(self):
+        """Hide the photo"""
+        if not self.current_photo_context:
+            return
+
+        try:
+            face_id = self.current_photo_context['face_id']
+            self.api.hide_photo(face_id)
+            print(f"Photo hidden: {face_id}")
+            # TODO: Refresh the photo grid to show hidden overlay
+        except Exception as e:
+            print(f"Error hiding photo: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_unhide_photo(self):
+        """Unhide the photo"""
+        if not self.current_photo_context:
+            return
+
+        try:
+            face_id = self.current_photo_context['face_id']
+            self.api.unhide_photo(face_id)
+            print(f"Photo unhidden: {face_id}")
+            # TODO: Refresh the photo grid to remove hidden overlay
+        except Exception as e:
+            print(f"Error unhiding photo: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_transfer_tag(self):
+        """Open transfer/remove tag dialog"""
+        if not self.current_photo_context:
+            return
+
+        # TODO: Implement transfer dialog
+        print("Transfer tag not yet implemented")
+        # This will be implemented with a separate dialog
+
+    def set_current_person_name(self, name):
+        """Set the current person name for context menu actions"""
+        self.current_person_name = name
 
     def resizeEvent(self, event):
         """Handle resize to recalculate grid columns"""
@@ -535,25 +703,6 @@ class MainWindow(QMainWindow):
         self.content_title.setStyleSheet("font-size: 18px; font-weight: bold;")
         header.addWidget(self.content_title)
 
-        # Photo menu button
-        self.photo_menu_btn = QToolButton()
-        self.photo_menu_btn.setText("⋮")
-        self.photo_menu_btn.setToolTip("Photo options")
-        self.photo_menu_btn.setStyleSheet("""
-            QToolButton {
-                font-size: 18px;
-                border: none;
-                padding: 4px 8px;
-                border-radius: 4px;
-                color: #a0a0a0;
-            }
-            QToolButton:hover {
-                background: #2a2a2a;
-                color: #e0e0e0;
-            }
-        """)
-        header.addWidget(self.photo_menu_btn)
-
         header.addStretch()
 
         # Size slider
@@ -693,7 +842,6 @@ class MainWindow(QMainWindow):
         self.view_mode_combo.currentIndexChanged.connect(self.on_view_mode_changed)
         self.settings_btn.clicked.connect(self.show_settings)
         self.people_menu_btn.clicked.connect(self.show_people_menu)
-        self.photo_menu_btn.clicked.connect(self.show_photo_menu)
         self.sort_btn.clicked.connect(self.show_sort_menu)
         self.jump_to_btn.clicked.connect(self.show_jump_to_dialog)
         self.help_btn.clicked.connect(self.show_help)
@@ -743,6 +891,9 @@ class MainWindow(QMainWindow):
                 # Create custom item
                 item_widget = PersonListItem(person)
                 item_widget.clicked.connect(self.on_person_selected)
+                item_widget.rename_requested.connect(self.on_rename_person)
+                item_widget.hide_requested.connect(self.on_hide_person)
+                item_widget.unhide_requested.connect(self.on_unhide_person)
 
                 item = QListWidgetItem(self.people_list)
                 item.setSizeHint(item_widget.sizeHint())
@@ -761,6 +912,7 @@ class MainWindow(QMainWindow):
 
         self.current_person = person_data
         self.content_title.setText(person_data['name'])
+        self.photo_grid.set_current_person_name(person_data['name'])
         self.load_photos()
 
     def load_photos(self):
@@ -828,37 +980,6 @@ class MainWindow(QMainWindow):
         menu.addAction("Refresh list")
 
         menu.exec(self.people_menu_btn.mapToGlobal(self.people_menu_btn.rect().bottomLeft()))
-
-    def show_photo_menu(self):
-        """Show photo options menu"""
-        if not self.current_person:
-            return
-
-        menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background: #2a2a2a;
-                border: 1px solid #3a3a3a;
-                border-radius: 6px;
-                padding: 4px;
-            }
-            QMenu::item {
-                padding: 8px 24px;
-                border-radius: 4px;
-                color: #e0e0e0;
-            }
-            QMenu::item:selected {
-                background: #3b82f6;
-            }
-        """)
-
-        menu.addAction("Set primary photo")
-        menu.addAction("Rename person")
-        menu.addSeparator()
-        menu.addAction("Hide person")
-        menu.addAction("Export photos")
-
-        menu.exec(self.photo_menu_btn.mapToGlobal(self.photo_menu_btn.rect().bottomLeft()))
 
     def show_sort_menu(self):
         """Show sort options menu"""
@@ -931,6 +1052,44 @@ class MainWindow(QMainWindow):
                 print("Lightbox closed")
         except Exception as e:
             print(f"Error opening lightbox: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_rename_person(self, person_data):
+        """Handle rename person request"""
+        print(f"Rename person: {person_data['name']}")
+        # TODO: Show rename dialog
+        QMessageBox.information(self, "Rename", f"Rename dialog for {person_data['name']} coming soon!")
+
+    def on_hide_person(self, person_data):
+        """Handle hide person request"""
+        try:
+            clustering_id = person_data['clustering_id']
+            person_id = person_data['id']
+
+            self.api.hide_person(clustering_id, person_id)
+            print(f"Person hidden: {person_data['name']}")
+
+            # Reload people list to reflect changes
+            self.load_people()
+        except Exception as e:
+            print(f"Error hiding person: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_unhide_person(self, person_data):
+        """Handle unhide person request"""
+        try:
+            clustering_id = person_data['clustering_id']
+            person_id = person_data['id']
+
+            self.api.unhide_person(clustering_id, person_id)
+            print(f"Person unhidden: {person_data['name']}")
+
+            # Reload people list to reflect changes
+            self.load_people()
+        except Exception as e:
+            print(f"Error unhiding person: {e}")
             import traceback
             traceback.print_exc()
 
