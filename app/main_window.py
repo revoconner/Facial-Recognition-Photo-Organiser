@@ -155,13 +155,16 @@ class PersonListItem(QWidget):
 
 
 class PhotoGridWidget(QWidget):
-    """Widget for displaying photo grid"""
+    """Widget for displaying photo grid with lazy loading"""
     photo_clicked = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.photos = []
         self.grid_size = 180
+        self.loaded_count = 0
+        self.batch_size = 200  # Load 200 at a time
+        self.loading = False
         self.setup_ui()
 
     def setup_ui(self):
@@ -169,41 +172,64 @@ class PhotoGridWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Scroll area for photos
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.verticalScrollBar().valueChanged.connect(self.on_scroll)
 
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout(self.grid_widget)
         self.grid_layout.setSpacing(8)
 
-        scroll.setWidget(self.grid_widget)
-        layout.addWidget(scroll)
+        self.scroll.setWidget(self.grid_widget)
+        layout.addWidget(self.scroll)
 
     def set_photos(self, photos):
         """Set photos to display"""
+        print(f"PhotoGrid: Setting {len(photos)} photos")
         self.photos = photos
-        self.render_grid()
+        self.loaded_count = 0
+        self.render_initial_batch()
 
-    def set_grid_size(self, size):
-        """Update grid thumbnail size"""
-        self.grid_size = size
-        self.render_grid()
-
-    def render_grid(self):
-        """Render photo grid"""
+    def render_initial_batch(self):
+        """Load first batch of photos"""
         # Clear existing items
         while self.grid_layout.count():
             item = self.grid_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
 
+        print(f"PhotoGrid: Loading initial batch of {min(self.batch_size, len(self.photos))} photos")
+        self.load_more_photos()
+
+    def on_scroll(self, value):
+        """Load more photos when scrolling near bottom"""
+        if self.loading or self.loaded_count >= len(self.photos):
+            return
+
+        scrollbar = self.scroll.verticalScrollBar()
+        # Load more when 80% scrolled
+        if value >= scrollbar.maximum() * 0.8:
+            self.load_more_photos()
+
+    def load_more_photos(self):
+        """Load next batch of photos"""
+        if self.loading or self.loaded_count >= len(self.photos):
+            return
+
+        self.loading = True
+        start_idx = self.loaded_count
+        end_idx = min(start_idx + self.batch_size, len(self.photos))
+
+        print(f"PhotoGrid: Loading photos {start_idx} to {end_idx-1}")
+
         # Calculate columns based on widget width
-        width = self.width()
+        width = self.width() if self.width() > 0 else 800
         cols = max(1, width // (self.grid_size + 8))
 
         # Add photos
-        for idx, photo in enumerate(self.photos):
+        for idx in range(start_idx, end_idx):
+            photo = self.photos[idx]
             photo_label = QLabel()
             photo_label.setFixedSize(self.grid_size, self.grid_size)
             photo_label.setStyleSheet(f"""
@@ -229,6 +255,18 @@ class PhotoGridWidget(QWidget):
             row = idx // cols
             col = idx % cols
             self.grid_layout.addWidget(photo_label, row, col)
+
+        self.loaded_count = end_idx
+        self.loading = False
+
+        print(f"PhotoGrid: Loaded {self.loaded_count}/{len(self.photos)} photos")
+
+    def set_grid_size(self, size):
+        """Update grid thumbnail size"""
+        self.grid_size = size
+        # Reload with new size
+        if self.photos:
+            self.render_initial_batch()
 
     def set_photo_thumbnail(self, label, base64_data):
         """Set photo thumbnail from base64 with rounded corners"""
@@ -270,8 +308,9 @@ class PhotoGridWidget(QWidget):
     def resizeEvent(self, event):
         """Handle resize to recalculate grid columns"""
         super().resizeEvent(event)
-        if self.photos:
-            self.render_grid()
+        # Reload grid with new column count
+        if self.photos and self.loaded_count > 0:
+            self.render_initial_batch()
 
 
 class MainWindow(QMainWindow):
