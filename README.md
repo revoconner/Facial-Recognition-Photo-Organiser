@@ -629,3 +629,10 @@ If you encounter issues not covered in this guide:
 3. Make sure you are using the latest version of the app
 
 Remember: The app **never** modifies your original photos, so you can always start fresh if needed by deleting the app data folder and rescanning.
+
+## LLM generated code notice
+#### Some parts of the source code is LLM generated, here's a summary of it:
+- The JS implementation was done in most parts by Claude Sonnet 3.5 and Sonnet 4 models. Not surprised that there is a high priority DOM retention bug that came with it. Issue is marked and is being addressed.
+- Variable names in part have been changed to be more accurate to represent what they do, left to me they would look like a, b, c, c_final, cff, and makes it harder to maintain later.
+- Explanatory comments for defs, func and class have been converted to be nore readable and user source friendly in case someone forks it.
+- This README.md file has been originally written by Sonnet 4, but later revised by me.
