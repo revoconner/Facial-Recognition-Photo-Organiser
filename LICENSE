@@ -1,11 +1,30 @@
-Copyright (c) 2025 Rév O'Conner
+PROPRIETARY LICENSE (Non-Commercial Use Only)
 
-All rights reserved.
+Copyright (c) 2025 Rev Oconner. All Rights Reserved.
 
-This source code is for demonstration and viewing purposes only and may not be used, modified except under conditions written below, or distributed without the express written permission of the copyright holder.
+NOTICE: This repository contains proprietary code and documentation ("the Software") of the repository owner and is 
+protected under copyright law and international treaties. All rights not explicitly granted herein are strictly reserved.
 
-Modification of this source code is only allowed for the purpose of contributing to the code and personal use. You must create a pull request to this repository once you have modified the code publicly. You may only use the modified version, in whole or in part, of this code for your personal use and may not distribute it, or share it with others including but not limited to employees, students or people who may use and share the same computing equipements as you. 
+---
 
-This license is subject to change, and as such if you continue to use and update the app, you will be agreeing to the terms of the revised license agreement.
+1. SCOPE OF LICENSE
 
-For commerical use of this application, including educational use, please contact the author for a new license agreement.
+This license grants limited, non-exclusive rights for Non-Commercial Use Only as defined in Section 2. All other rights, including, but not limited to, commercial use, sublicensing, or redistribution for compensation, are expressly reserved by the Copyright Holder (Rev Oconner).
+
+2. PERMITTED NON-COMMERCIAL USE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of the Software, to deal in the Software, without charge, including the rights to clone, fork, merge, modify, and distribute the Software or derivative works thereof, for the purpose of non-commercial use only.
+
+The use of the Software on a device which is otherwise used for commercial purposes is permitted, provided the Software itself is not utilized for or in direct support of a commercial purpose.
+
+Any use, distribution, or licensing of the Software, or any derivative work, for the purpose of commercial use is strictly prohibited without a separate commercial license.
+
+For the purpose of this license, "Commercial Use" includes, but is not limited to, selling, sublicensing, or distributing the Software or its derivative works for profit, or incorporating the Software into a product or service that generates revenue.
+
+3. CONTACT
+
+For inquiries regarding commercial licensing, please contact the developer at www.revoconner.com
+
+4. DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
