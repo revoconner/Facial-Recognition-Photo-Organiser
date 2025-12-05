@@ -20,6 +20,12 @@ You can use this app on an airgapped computer if you want. And as such, we do no
 If you plan on reporting a bug, you may have to voluntarily disclose the log file. We will use that log file to track the bug and solve it for next patch, and as such the log file may be available on the open web for an indefinite amount of time.  The log file, while not containing any identifier, will be associated with the account that submits the bug report. Use an alternate account if you want your account to not be associated with the log file. 
 </details>
 
+## Photo extractor
+
+This function was requested and while it will take time to integrate it into the app, I have added some helper files that you can run to extract photos. 
+
+[Tools are in this folder](extra-tools)
+
 ## Screenshots
 <img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/a2782e8d-8f3a-49b6-a868-963ebf481f21" /></br></br>
 <img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/77c0f566-0584-4784-af99-8d7a53089d60" /></br></br>
