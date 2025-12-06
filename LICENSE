@@ -1,30 +1,141 @@
 PROPRIETARY LICENSE (Non-Commercial Use Only)
 
-Copyright (c) 2025 Rev Oconner. All Rights Reserved.
+   Copyright (c) 2025-2026 Rév Oconner. All Rights Reserved.
 
-NOTICE: This repository contains proprietary code and documentation ("the Software") of the repository owner and is 
-protected under copyright law and international treaties. All rights not explicitly granted herein are strictly reserved.
+   NOTICE: This repository contains proprietary code and documentation ("the Software") of the repository owner and is
+   protected under copyright law and international treaties. All rights not explicitly granted herein are strictly reserved.
 
----
+   PLEASE READ THIS AGREEMENT CAREFULLY. BY DOWNLOADING, INSTALLING, OR USING THE SOFTWARE, YOU ARE AGREEING TO BE BOUND
+   BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT OR CANNOT AGREE TO THE TERMS OF THIS AGREEMENT, DO NOT USE THE SOFTWARE.
 
-1. SCOPE OF LICENSE
+   When we say "you," "your" or "yourself", we mean you as an individual or the legal entity exercising rights under this
+   Agreement through you. When we say "Copyright Holder," "we" or "us," we are referring to Rev Oconner.
 
-This license grants limited, non-exclusive rights for Non-Commercial Use Only as defined in Section 2. All other rights, including, but not limited to, commercial use, sublicensing, or redistribution for compensation, are expressly reserved by the Copyright Holder (Rev Oconner).
 
-2. PERMITTED NON-COMMERCIAL USE
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of the Software, to deal in the Software, without charge, including the rights to clone, fork, merge, modify, and distribute the Software or derivative works thereof, for the purpose of non-commercial use only.
+ 1. DEFINITIONS
 
-The use of the Software on a device which is otherwise used for commercial purposes is permitted, provided the Software itself is not utilized for or in direct support of a commercial purpose.
+   "The Software" refers to the source code, object code, documentation, and any other materials contained in this
+   repository, including any modified version of any of the foregoing that you make under this License.
 
-Any use, distribution, or licensing of the Software, or any derivative work, for the purpose of commercial use is strictly prohibited without a separate commercial license.
+   "Derivative Work" means any work that is based on or derived from the Software, including but not limited to
+   modifications, translations, adaptations, or any work that incorporates all or part of the Software.
 
-For the purpose of this license, "Commercial Use" includes, but is not limited to, selling, sublicensing, or distributing the Software or its derivative works for profit, or incorporating the Software into a product or service that generates revenue.
+   "Product" means any product, service, or project that either (a) is made using any of the Software or (b) combines
+   any of the Software with any other software or content.
 
-3. CONTACT
+   "Distribute" or "Distribution" means to provide or otherwise make a copy available, or to make the functionality of
+   the Software available to third parties.
 
-For inquiries regarding commercial licensing, please contact the developer at www.revoconner.com
+   "Commercial Use" includes, but is not limited to, selling, sublicensing, or distributing the Software or its
+   Derivative Works for profit, or incorporating the Software into a Product that generates revenue.
 
-4. DISCLAIMER
+   "Licensee" refers to any individual or entity exercising rights under this License.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ 2. SCOPE OF LICENSE
+
+   The Copyright Holder grants you a non-exclusive, non-transferable, non-sublicensable license to privately use,
+   reproduce, display, perform, and modify the Software in accordance with the terms of this Agreement.
+
+   This license grants limited rights for Non-Commercial Use Only as defined in Section 3. All other rights, including,
+   but not limited to, commercial use, sublicensing, or redistribution for compensation, are expressly reserved by the
+   Copyright Holder (Rev Oconner).
+
+
+ 3. PERMITTED NON-COMMERCIAL USE
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy of the Software, to deal in the Software
+   without charge, including the rights to clone, fork, merge, modify, and distribute the Software or Derivative Works
+   thereof, for the purpose of non-commercial use only.
+
+   The use of the Software on a device which is otherwise used for commercial purposes is permitted, provided the Software
+   itself is not utilized for or in direct support of a commercial purpose.
+
+   Any use, distribution, or licensing of the Software, or any Derivative Work, for the purpose of Commercial Use is
+   strictly prohibited without a separate commercial license obtained from the Copyright Holder.
+
+ 4. ATTRIBUTION
+
+   All copies or substantial portions of the Software, including Derivative Works, must include:
+
+   (a) This license in its entirety, or a prominent link to it;
+   (b) The original copyright notice;
+   (c) Clear attribution to the original author(s).
+
+ 5. RECORDS AND AUDITS
+
+   You agree to keep accurate books and records related to your use of the Software sufficient to verify compliance with
+   the non-commercial use requirements of this License. The Copyright Holder may conduct reasonable audits to verify
+   compliance with the terms of this License, upon reasonable notice and during normal business hours. If an audit reveals
+   non-compliance, you shall promptly remedy the situation and bear the reasonable costs of the audit.
+
+ 6. INDEMNIFICATION
+
+   You agree to indemnify, pay the defense costs of, and hold the Copyright Holder and its affiliates, officers,
+   directors, and employees harmless from all claims, losses, damages, liabilities, and expenses (including reasonable
+   attorneys' fees) arising out of or in connection with any claims arising from: (a) your breach of this Agreement;
+   (b) your Products or Derivative Works; or (c) your use of the Software.
+
+ 7. TERMINATION
+
+   This License and the rights granted hereunder will terminate automatically if the Licensee fails to comply with any
+   of its terms. Upon termination, the Licensee must cease all use and distribution of the Software and any Derivative
+   Works. The following sections shall survive any termination of this Agreement: Sections 1, 6, 8, 9, 10, 11 and 14.
+
+ 8. DISCLAIMER
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+ 9. LIMITATION OF LIABILITY
+
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY INDIRECT,
+   INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED
+   DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM (A) YOUR
+   ACCESS TO OR USE OF OR INABILITY TO ACCESS OR USE THE SOFTWARE; (B) ANY CONDUCT OR CONTENT OF ANY THIRD PARTY
+   RELATING TO THE SOFTWARE; OR (C) UNAUTHORIZED ACCESS, USE, OR ALTERATION OF THE SOFTWARE.
+
+ 10. GOVERNING LAW AND JURISDICTION
+
+   This Agreement shall be governed by and construed in accordance with the laws of Republic of India, without regard to
+   its conflict of law principles. Any dispute arising out of or relating to this Agreement shall be subject to the
+   exclusive jurisdiction of the courts located in the Republic of India.
+
+ 11. SEVERABILITY AND MODIFICATION
+
+   If any provision of this License is held to be unenforceable, such provision shall be reformed only to the extent
+   necessary to make it enforceable, and the remaining provisions shall continue in full force and effect.
+
+   The Copyright Holder reserves the right to release the Software under different license terms or to modify the terms
+   of this License for future versions of the Software. Such modifications shall not retroactively affect the rights
+   granted under prior versions of this License.
+
+ 12. ENTIRE AGREEMENT
+
+   This Agreement constitutes the entire agreement between the parties regarding its subject matter and supersedes all
+   prior agreements and understandings, whether written or oral, relating to such subject matter.
+
+ 13. CONTACT
+
+   For inquiries regarding commercial licensing, please contact the developer at https://www.revoconner.com/
+
+14. THIRD-PARTY COMPONENTS
+
+   The Software may include, reference, or depend upon third-party libraries, packages, modules, frameworks, or other
+   external components ("Third-Party Components") that are not authored by the Copyright Holder. These Third-Party
+   Components are not covered by this License and are instead governed solely by their respective licenses.
+
+   The term "Software" as used in this License does not include any Third-Party Components. Nothing in this License
+   shall be construed as granting any rights to Third-Party Components, nor shall it impose any restrictions beyond
+   those established by their respective licenses.
+
+   It is the Licensee's responsibility to review and comply with the licenses of any Third-Party Components included
+   in or used alongside the Software. The Copyright Holder makes no representations or warranties regarding Third-Party
+   Components and assumes no liability for their use.
+
+   A list of Third-Party Components and their respective licenses may be found in the THIRD-PARTY-LICENSES file or
+   within the dependency manifest files (e.g., package.json, requirements.txt, packages.config) included in this
+   repository.
+
