@@ -2,7 +2,7 @@ Test_Data/
 Test_Data/*
 *.wixpdb
 *_pycache__*
-*claude.md*
+*CLAUDE.md*
 *inno_setup.iss
 *license.txt
 *pyinstaller_spec.spec
