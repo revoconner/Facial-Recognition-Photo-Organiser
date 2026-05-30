@@ -1,11 +1,10 @@
-Caltech_WebFaces/
-face_data/
-New folder/
-app/dist/
-app/FacialRecognitionOrganiserSetup.msi
-app/license.rtf
-app/build/
+Test_Data/
+Test_Data/*
 *.wixpdb
-app/output/
-app/__pycache__/
-app/claude.md
+*_pycache__*
+*claude.md*
+*inno_setup.iss
+*license.txt
+*pyinstaller_spec.spec
+debug/
+debug/*
