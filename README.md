@@ -18,6 +18,8 @@ A no nonsense photo organiser for windows, if you want to group people by faces 
 - [Help](#help)
 - [License and Usage](#license-and-usage)
 - [Performance Figures](#performance-stats)
+- [Discussion](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/discussions/10)
+- [Progress Tracker](https://github.com/users/revoconner/projects/3)
 
 ## Privacy statement
 
