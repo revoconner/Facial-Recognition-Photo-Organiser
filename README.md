@@ -1,4 +1,4 @@
-# Organise Photos by Faces (Beta)
+# Face Recognition Photo Organiser (Beta)
 
 Face Recognition Photo Organizer is an offline standalone desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
 
@@ -10,32 +10,20 @@ A no nonsense photo organiser for windows, if you want to group people by faces 
 - Just point to the location of your folders and let the app do its thing.
 
 ## Contents
-
-- [Privacy statement](#privacy-statement)
 - [Screenshots](#screenshots)
+- [Help Documentation](#help)
+- [Privacy statement](#privacy-statement)
 - [Features](#features)
+- [Discussion, Feedback, Reviews, or Showcase](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/discussions/10)
+- [Development Tracker](https://github.com/users/revoconner/projects/3)
 - [Known bugs](#known-bugs-improvements-and-changelog)
-- [Help](#help)
 - [License and Usage](#license-and-usage)
 - [Performance Figures](#performance-stats)
-- [Discussion](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/discussions/10)
-- [Progress Tracker](https://github.com/users/revoconner/projects/3)
-
-## Privacy statement
-
-<details>
-<summary><b>Click to read our privacy statement</b></summary>
-The app doesn't connect to the internet in any way or form (unless you specifically specify one of the folder from an online location to be scanned, then it will use the network activity to fetch data from that folder). The app is completely offline, all AI packages and bundles are provided with the setup file. 
-
-You can use this app on an airgapped computer if you want. And as such, we do not collect any data, analytical or otherwise. 
-
-If you plan on reporting a bug, you may have to voluntarily disclose the log file. We will use that log file to track the bug and solve it for next patch, and as such the log file may be available on the open web for an indefinite amount of time.  The log file, while not containing any identifier, will be associated with the account that submits the bug report. Use an alternate account if you want your account to not be associated with the log file. 
-</details>
 
 ## Screenshots
 
-<img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/eab36cb1-4595-4719-acaf-ebca777b0db5" /></br></br>
 <img width="auto" height="1530" alt="image" src="https://github.com/user-attachments/assets/62698946-6a84-4127-865f-ac425de2fd99" /></br></br>
+<img width="auto" height="1350" alt="image" src="https://github.com/user-attachments/assets/eab36cb1-4595-4719-acaf-ebca777b0db5" /></br></br>
 
 <details>
 <summary><h3>More images below (Click to expand)</h3></summary>
@@ -51,6 +39,27 @@ If you plan on reporting a bug, you may have to voluntarily disclose the log fil
 <img width="auto" height="696" alt="image" src="https://github.com/user-attachments/assets/1999eea0-1494-4930-878c-909bfa8534b3" /></br></br>
 <img width="auto" height="1269" alt="image" src="https://github.com/user-attachments/assets/a74a3151-2ba0-4214-ac66-d0887db35727" /></br></br>
   
+</details>
+
+**Photo Credits:**
+- [Blanca Soler](https://www.instagram.com/blanca.soler)
+- [Ella Purnell](https://www.instagram.com/ella_purnell)
+
+## Help
+
+For help, see our [Documentation](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/wiki/Help-Documentation)
+
+Remember: The app **never** modifies your original photos, so you can always start fresh if needed by deleting the app data folder and rescanning.
+
+## Privacy statement
+
+<details>
+<summary><b>Click to read our privacy statement</b></summary>
+The app doesn't connect to the internet in any way or form (unless you specifically specify one of the folder from an online location to be scanned, then it will use the network activity to fetch data from that folder). The app is completely offline, all AI packages and bundles are provided with the setup file. 
+
+You can use this app on an airgapped computer if you want. And as such, we do not collect any data, analytical or otherwise. 
+
+If you plan on reporting a bug, you may have to voluntarily disclose the log file. We will use that log file to track the bug and solve it for next patch, and as such the log file may be available on the open web for an indefinite amount of time.  The log file, while not containing any identifier, will be associated with the account that submits the bug report. Use an alternate account if you want your account to not be associated with the log file. 
 </details>
 
 ## Features
@@ -207,13 +216,9 @@ Our focus is on creating a user friendly app to organise photos by person instea
 </details>
 
 ## Known Bugs, improvements and changelog:
-[These are detailed in the release versions](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/releases)
+- [Changelog](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/releases)
+- [Bug tracker and Features](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/issues?q=sort%3Aupdated-desc+is%3Aissue+is%3Aopen)
 
-## Help
-
-For help, see our [Documentation](https://github.com/revoconner/Facial-Recognition-Photo-Organiser/wiki/Help-Documentation)
-
-Remember: The app **never** modifies your original photos, so you can always start fresh if needed by deleting the app data folder and rescanning.
 
 ----
 
