@@ -8,3 +8,5 @@ Test_Data/*
 *pyinstaller_spec.spec
 debug/
 debug/*
+felicity-venv/
+technical.md
