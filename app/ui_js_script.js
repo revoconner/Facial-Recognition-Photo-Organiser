@@ -15,16 +15,26 @@ let people = [];
         let lightboxPhotos = [];
         let lightboxCurrentIndex = 0;
         let transferContext = null;
-        let currentPage = 1;
-        const PAGE_SIZE = 100;
-        let isLoadingMore = false;
-        let hasMorePhotos = true;
-        let scrollCheckInterval = null;
         let hideUnnamedPersons = false;
         let selectedPhotos = new Set();
         let lastSelectedIndex = -1;
         let nameConflictData = null;
         let showFaceTagsPreview = true;
+
+        // Virtualized photo-grid state. lightboxPhotos holds the full metadata list
+        // for the current person (no thumbnails); only a window of DOM cells is
+        // rendered at any moment and thumbnails are loaded on demand.
+        let currentGridSize = 180;           // cell min size in px (from settings)
+        let gridViewMode = 'entire_photo';   // 'entire_photo' or 'zoom_to_faces'
+        const GRID_GAP = 16;                 // px gap between cells (matches CSS)
+        const GRID_BUFFER_ROWS = 3;          // extra rows rendered above/below the view
+        const THUMB_CACHE_MAX = 400;         // cap on cached thumbnails (bounds memory)
+        let gridGeom = { cols: 1, cellW: 180, cellH: 180, rowH: 196, total: 0 };
+        let renderedItems = new Map();       // photo index -> DOM node currently shown
+        let thumbCache = new Map();          // face_id -> thumbnail data URL (LRU-ish)
+        let gridReqSeq = 0;                  // bumped to discard stale async thumb loads
+        let gridScrollScheduled = false;     // rAF throttle flag for scroll
+        let sharedContextMenu = null;        // single reused photo context-menu element
 
         const personColors = [
             '#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
@@ -137,16 +147,22 @@ let people = [];
         }
 
         function selectPhotoRange(startIndex, endIndex) {
-            const photoItems = Array.from(document.querySelectorAll('.photo-item'));
+            // Select every photo between two indices in the full metadata list.
+            // Indices address lightboxPhotos (all faces), not DOM nodes, because
+            // with virtualization most cells in the range are not rendered.
+            // Selection lives in the selectedPhotos set; any cell currently on
+            // screen also gets the 'selected' class, and off-screen cells pick it
+            // up from the set when they scroll into view (see createPhotoItem).
             const start = Math.min(startIndex, endIndex);
             const end = Math.max(startIndex, endIndex);
-            
-            for (let i = start; i <= end && i < photoItems.length; i++) {
-                const item = photoItems[i];
-                const faceId = parseInt(item.getAttribute('data-face-id'));
+
+            for (let i = start; i <= end && i < lightboxPhotos.length; i++) {
+                const faceId = lightboxPhotos[i].face_id;
                 selectedPhotos.add(faceId);
-                item.classList.add('selected');
+                const node = renderedItems.get(i);
+                if (node) node.classList.add('selected');
             }
+            lastSelectedIndex = endIndex;
             updateSelectionInfo();
         }
 
@@ -436,10 +452,6 @@ let people = [];
 
         async function selectPerson(person) {
             currentPerson = person;
-            currentPage = 1;
-            hasMorePhotos = true;
-            lightboxPhotos = [];
-            isLoadingMore = false;
             clearSelection();
             
             document.getElementById('contentTitle').textContent = `${person.name}'s Photos`;
@@ -456,267 +468,416 @@ let people = [];
                 }
             });
             
-            await loadPhotos(person.clustering_id, person.id, true);
+            await loadPersonPhotos(person.clustering_id, person.id);
         }
 
 
-        async function loadPhotos(clustering_id, person_id, resetGrid = false) {
+        /**
+         * Load all photos for a person and render the virtualized grid.
+         *
+         * Fetches only lightweight metadata (no thumbnails) for the whole person,
+         * stores it in lightboxPhotos, then renders just the cells that fit in the
+         * viewport; thumbnails for visible cells are fetched on demand by loadThumb.
+         * This replaces the old approach of appending every page into the DOM with
+         * an inline base64 thumbnail, which accumulated thousands of nodes and
+         * hundreds of MB of decoded images and eventually froze the app.
+         */
+        async function loadPersonPhotos(clustering_id, person_id) {
             const photoGrid = document.getElementById('photoGrid');
-            
-            if (resetGrid) {
-                photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">Loading photos...</div>';
-                currentPage = 1;
-                hasMorePhotos = true;
-                lightboxPhotos = [];
-                isLoadingMore = false;
-                clearSelection();
-            }
-            
-            if (isLoadingMore) {
-                console.log('Already loading, skipping...');
-                return;
-            }
-            
-            if (!hasMorePhotos) {
-                console.log('No more photos to load');
-                return;
-            }
-            
-            isLoadingMore = true;
-            console.log(`Loading photos: page ${currentPage}, person ${person_id}`);
-            
-            const existingIndicator = document.getElementById('loading-indicator');
-            if (existingIndicator) {
-                existingIndicator.textContent = 'Loading more photos...';
-            }
-            
+
+            // Reset all grid state for the new person.
+            clearSelection();
+            lightboxPhotos = [];
+            renderedItems.clear();
+            thumbCache.clear();
+            photoGrid.style.height = '';
+            photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">Loading photos...</div>';
+
+            // Tag this request so async thumbnail loads from a previous person can be
+            // discarded if the user switches people before they resolve.
+            const mySeq = ++gridReqSeq;
+
             try {
-                const result = await pywebview.api.get_photos(clustering_id, person_id, currentPage, PAGE_SIZE);
-                
-                console.log(`Loaded page ${currentPage}:`, {
-                    photos: result.photos.length,
-                    total: result.total_count,
-                    has_more: result.has_more
-                });
-                
-                if (resetGrid) {
-                    photoGrid.innerHTML = '';
-                } else {
-                    const oldIndicator = document.getElementById('loading-indicator');
-                    if (oldIndicator) {
-                        oldIndicator.remove();
-                    }
-                }
-                
-                if (!result || typeof result !== 'object') {
-                    throw new Error('Invalid response from get_photos');
-                }
-                
-                if (result.total_count === 0) {
+                const result = await pywebview.api.get_person_photo_list(clustering_id, person_id);
+                if (mySeq !== gridReqSeq) return;   // a newer load superseded this one
+
+                lightboxPhotos = (result && Array.isArray(result.photos)) ? result.photos : [];
+
+                if (lightboxPhotos.length === 0) {
                     photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos found</div>';
-                    hasMorePhotos = false;
-                    isLoadingMore = false;
                     return;
                 }
-                
-                hasMorePhotos = result.has_more;
-                
-                const startIndex = lightboxPhotos.length;
-                lightboxPhotos = lightboxPhotos.concat(result.photos);
-                
-                result.photos.forEach((photo, relativeIndex) => {
-                    const absoluteIndex = startIndex + relativeIndex;
-                    
-                    const photoItem = document.createElement('div');
-                    photoItem.className = 'photo-item';
-                    photoItem.setAttribute('data-face-id', photo.face_id);
-                    photoItem.setAttribute('data-index', absoluteIndex);
-                    
-                    const hiddenOverlay = photo.is_hidden ? '<div class="hidden-overlay"></div>' : '';
-                    
-                    photoItem.innerHTML = `
-                        <img src="${photo.thumbnail}" class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
-                        ${hiddenOverlay}
-                        <button class="kebab-menu">
-                            <span class="kebab-dot"></span>
-                            <span class="kebab-dot"></span>
-                            <span class="kebab-dot"></span>
-                        </button>
-                    `;
-                    
-                    const contextMenu = document.createElement('div');
-                    contextMenu.className = 'context-menu';
-                    
-                    document.body.appendChild(contextMenu);
-                    
-                    photoItem.addEventListener('click', (e) => {
-                        if (e.target.closest('.kebab-menu')) {
-                            return;
-                        }
-                        
-                        const photoIndex = parseInt(photoItem.getAttribute('data-index'));
-                        const faceId = photo.face_id;
-                        
-                        if (e.ctrlKey || e.metaKey) {
-                            togglePhotoSelection(faceId, photoIndex, photoItem);
-                        } else if (e.shiftKey) {
-                            if (lastSelectedIndex >= 0) {
-                                selectPhotoRange(lastSelectedIndex, photoIndex);
-                            } else {
-                                selectedPhotos.add(faceId);
-                                photoItem.classList.add('selected');
-                                lastSelectedIndex = photoIndex;
-                                updateSelectionInfo();
-                            }
-                        } else {
-                            if (selectedPhotos.size === 0) {
-                                openLightbox(photoIndex);
-                            } else {
-                                clearSelection();
-                            }
-                        }
-                    });
-                    
-                    photoItem.addEventListener('dblclick', (e) => {
-                        if (!e.target.closest('.kebab-menu')) {
-                            pywebview.api.open_photo(photo.path);
-                        }
-                    });
-                    
-                    photoGrid.appendChild(photoItem);
 
-                    const kebabBtn = photoItem.querySelector('.kebab-menu');
-                    kebabBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        closeAllMenus();
-                        
-                        currentPhotoContext = {
-                            person_name: currentPerson.name,
-                            face_id: photo.face_id,
-                            path: photo.path,
-                            is_hidden: photo.is_hidden
-                        };
-                        
-                        const hasSelection = selectedPhotos.size > 0;
-                        const isPhotoSelected = selectedPhotos.has(photo.face_id);
-                        
-                        if (hasSelection) {
-                            if (!isPhotoSelected) {
-                                selectedPhotos.add(photo.face_id);
-                                photoItem.classList.add('selected');
-                                updateSelectionInfo();
-                            }
-                            
-                            if (photo.is_hidden) {
-                                contextMenu.innerHTML = `
-                                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag (${selectedPhotos.size} photos)</div>
-                                    <div class="context-menu-item" data-action="unhide-photo">Unhide photo (${selectedPhotos.size} photos)</div>
-                                `;
-                            } else {
-                                contextMenu.innerHTML = `
-                                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag (${selectedPhotos.size} photos)</div>
-                                    <div class="context-menu-item" data-action="hide-photo">Hide photo (${selectedPhotos.size} photos)</div>
-                                `;
-                            }
-                        } else {
-                            if (photo.is_hidden) {
-                                contextMenu.innerHTML = `
-                                    <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
-                                    <div class="context-menu-item" data-action="unhide-photo">Unhide photo</div>
-                                `;
-                            } else {
-                                contextMenu.innerHTML = `
-                                    <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
-                                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag</div>
-                                    <div class="context-menu-item" data-action="hide-photo">Hide photo</div>
-                                `;
-                            }
-                        }
-                        
-                        contextMenu.classList.add('show');
-                        photoItem.classList.add('menu-active');
-                        activeMenu = { element: contextMenu, parent: photoItem };
-                        positionMenu(contextMenu, kebabBtn);
-                    });
-
-                    kebabBtn.addEventListener('mouseenter', () => {
-                        if (menuCloseTimeout) {
-                            clearTimeout(menuCloseTimeout);
-                            menuCloseTimeout = null;
-                        }
-                    });
-
-                    kebabBtn.addEventListener('mouseleave', () => {
-                        menuCloseTimeout = setTimeout(() => {
-                            closeAllMenus();
-                        }, 200);
-                    });
-
-                    contextMenu.addEventListener('click', (e) => {
-                        const menuItem = e.target.closest('.context-menu-item');
-                        if (menuItem) {
-                            const action = menuItem.getAttribute('data-action');
-                            if (action === 'make-primary') {
-                                makePrimaryPhoto();
-                            } else if (action === 'hide-photo') {
-                                hidePhotos();
-                            } else if (action === 'unhide-photo') {
-                                unhidePhotos();
-                            } else if (action === 'transfer-tag') {
-                                openTransferDialog();
-                            }
-                        }
-                    });
-
-                    contextMenu.addEventListener('mouseenter', () => {
-                        if (menuCloseTimeout) {
-                            clearTimeout(menuCloseTimeout);
-                            menuCloseTimeout = null;
-                        }
-                    });
-
-                    contextMenu.addEventListener('mouseleave', () => {
-                        menuCloseTimeout = setTimeout(() => {
-                            closeAllMenus();
-                        }, 200);
-                    });
-                });
-                
-                currentPage++;
-                
-                if (hasMorePhotos) {
-                    const loadingIndicator = document.createElement('div');
-                    loadingIndicator.id = 'loading-indicator';
-                    loadingIndicator.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 20px; color: #3b82f6; font-size: 13px; font-weight: 500;';
-                    
-                    if (result.total_count > 1000) {
-                        loadingIndicator.textContent = `Loaded ${lightboxPhotos.length} of ${result.total_count} photos`;
-                    } else {
-                        loadingIndicator.textContent = `${lightboxPhotos.length} of ${result.total_count} photos loaded`;
-                    }
-                    
-                    photoGrid.appendChild(loadingIndicator);
-                } else {
-                    console.log('All photos loaded');
-                    const finalIndicator = document.createElement('div');
-                    finalIndicator.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 20px; color: #a0a0a0; font-size: 13px;';
-                    finalIndicator.textContent = `All ${result.total_count} photos loaded`;
-                    photoGrid.appendChild(finalIndicator);
-                }
-                
+                photoGrid.innerHTML = '';
+                computeGridGeometry();
+                renderGridWindow(true);
             } catch (error) {
                 console.error('Error loading photos:', error);
                 addLogEntry('ERROR loading photos: ' + error.toString());
-                
-                if (resetGrid) {
-                    photoGrid.innerHTML = `<div style="color: #ff6b6b; padding: 20px;">Error loading photos: ${error.toString()}</div>`;
-                }
-                
-                hasMorePhotos = false;
-            } finally {
-                isLoadingMore = false;
-                console.log(`Load complete. isLoadingMore=${isLoadingMore}, hasMorePhotos=${hasMorePhotos}`);
+                photoGrid.innerHTML = `<div style="color: #ff6b6b; padding: 20px;">Error loading photos: ${error.toString()}</div>`;
             }
+        }
+
+        /**
+         * Recompute column count and cell size from the grid's current width and the
+         * user's grid-size setting, then set the grid's full virtual height.
+         *
+         * Mirrors the CSS auto-fill formula repeat(auto-fill, minmax(size, 1fr)) so
+         * the layout matches what the old CSS grid produced. Cells are square to
+         * match the previous aspect-ratio: 1.
+         */
+        function computeGridGeometry() {
+            const photoGrid = document.getElementById('photoGrid');
+            const total = lightboxPhotos.length;
+
+            const width = photoGrid.clientWidth || (photoGrid.parentElement ? photoGrid.parentElement.clientWidth : 0);
+            const minCell = currentGridSize;
+
+            let cols = Math.floor((width + GRID_GAP) / (minCell + GRID_GAP));
+            cols = Math.max(1, cols);
+
+            const cellW = (width - (cols - 1) * GRID_GAP) / cols;
+            const cellH = cellW;                 // square cells
+            const rowH = cellH + GRID_GAP;
+            const rows = Math.ceil(total / cols);
+
+            gridGeom = { cols, cellW, cellH, rowH, total };
+
+            // Full height so the scrollbar reflects every row; trailing gap removed.
+            photoGrid.style.height = (rows > 0 ? rows * rowH - GRID_GAP : 0) + 'px';
+        }
+
+        /**
+         * Absolutely position a cell node for its index using the current geometry.
+         */
+        function positionPhotoItem(node, index) {
+            const cols = gridGeom.cols;
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            node.style.left = (col * (gridGeom.cellW + GRID_GAP)) + 'px';
+            node.style.top = (row * gridGeom.rowH) + 'px';
+            node.style.width = gridGeom.cellW + 'px';
+            node.style.height = gridGeom.cellH + 'px';
+        }
+
+        /**
+         * Render only the cells visible in the viewport (plus a buffer of rows).
+         *
+         * Cells that scrolled out of the window are removed from the DOM and cells
+         * that scrolled in are created, keeping the live node count bounded to
+         * roughly the visible area no matter how many photos the person has.
+         */
+        function renderGridWindow(force) {
+            const container = document.querySelector('.photo-grid-container');
+            const photoGrid = document.getElementById('photoGrid');
+            if (!container || !photoGrid || gridGeom.total === 0) return;
+
+            const cols = gridGeom.cols;
+            const rowH = gridGeom.rowH;
+            const total = gridGeom.total;
+
+            const scrollTop = container.scrollTop;
+            const viewH = container.clientHeight;
+
+            // Index range of cells that should exist right now.
+            let firstRow = Math.floor(scrollTop / rowH) - GRID_BUFFER_ROWS;
+            let lastRow = Math.ceil((scrollTop + viewH) / rowH) + GRID_BUFFER_ROWS;
+            firstRow = Math.max(0, firstRow);
+            const firstIdx = firstRow * cols;
+            let lastIdx = (lastRow + 1) * cols - 1;
+            lastIdx = Math.min(total - 1, lastIdx);
+
+            // Recycle cells that left the window.
+            for (const [idx, node] of renderedItems) {
+                if (idx < firstIdx || idx > lastIdx) {
+                    node.remove();
+                    renderedItems.delete(idx);
+                }
+            }
+
+            // Create cells that entered the window.
+            for (let i = firstIdx; i <= lastIdx; i++) {
+                if (!renderedItems.has(i)) {
+                    const node = createPhotoItem(i);
+                    renderedItems.set(i, node);
+                    photoGrid.appendChild(node);
+                }
+            }
+        }
+
+        /**
+         * Build a single photo cell (image placeholder + kebab button) for an index.
+         *
+         * No per-cell listeners are attached: clicks are handled by one delegated
+         * listener on the grid (onGridClick) and there is a single shared context
+         * menu rather than one per photo. The thumbnail is loaded lazily.
+         */
+        function createPhotoItem(index) {
+            const photo = lightboxPhotos[index];
+
+            const node = document.createElement('div');
+            node.className = 'photo-item';
+            node.setAttribute('data-face-id', photo.face_id);
+            node.setAttribute('data-index', index);
+            if (selectedPhotos.has(photo.face_id)) {
+                node.classList.add('selected');
+            }
+
+            const hiddenOverlay = photo.is_hidden ? '<div class="hidden-overlay"></div>' : '';
+            node.innerHTML = `
+                <img class="photo-placeholder" style="width: 100%; height: 100%; object-fit: cover;">
+                ${hiddenOverlay}
+                <button class="kebab-menu">
+                    <span class="kebab-dot"></span>
+                    <span class="kebab-dot"></span>
+                    <span class="kebab-dot"></span>
+                </button>
+            `;
+
+            positionPhotoItem(node, index);
+            loadThumb(node, photo);
+            return node;
+        }
+
+        /**
+         * Lazily fetch a cell's thumbnail and set it on the cell's <img>.
+         *
+         * Thumbnails are cached by face_id in a bounded map so scrolling back to a
+         * recently seen cell is instant. The request is tagged with the current
+         * gridReqSeq so a thumbnail that resolves after the user changed people or
+         * view mode is dropped instead of painting into a recycled cell.
+         */
+        async function loadThumb(node, photo) {
+            const img = node.querySelector('img');
+            if (!img) return;
+
+            const cached = thumbCache.get(photo.face_id);
+            if (cached) {
+                img.src = cached;
+                return;
+            }
+
+            const mySeq = gridReqSeq;
+            const bbox = (gridViewMode === 'zoom_to_faces') ? photo.bbox : null;
+
+            try {
+                const dataUrl = await pywebview.api.create_thumbnail(photo.path, currentGridSize, bbox, photo.face_id);
+                if (mySeq !== gridReqSeq || !dataUrl) return;
+                cacheThumb(photo.face_id, dataUrl);
+                // The cell may have been recycled while waiting; only paint if the
+                // image is still attached to the document.
+                if (img.isConnected) img.src = dataUrl;
+            } catch (e) {
+                // Leave the placeholder; a later scroll pass can retry.
+            }
+        }
+
+        /**
+         * Store a thumbnail, evicting the oldest entry when the cache is full.
+         */
+        function cacheThumb(faceId, dataUrl) {
+            thumbCache.set(faceId, dataUrl);
+            if (thumbCache.size > THUMB_CACHE_MAX) {
+                const oldest = thumbCache.keys().next().value;
+                thumbCache.delete(oldest);
+            }
+        }
+
+        /**
+         * Recompute geometry and reposition/refresh the window after the grid size
+         * changes or the container is resized.
+         */
+        function relayoutGrid() {
+            if (!lightboxPhotos.length) return;
+            computeGridGeometry();
+            for (const [idx, node] of renderedItems) {
+                positionPhotoItem(node, idx);
+            }
+            renderGridWindow(true);
+        }
+
+        /**
+         * Drop cached crops and reload the visible thumbnails. Used when the view
+         * mode toggles between whole-photo and zoom-to-face, since the crop changes.
+         */
+        function refreshThumbnails() {
+            thumbCache.clear();
+            gridReqSeq++;   // cancel in-flight loads bound to the old view mode
+            for (const [idx, node] of renderedItems) {
+                loadThumb(node, lightboxPhotos[idx]);
+            }
+        }
+
+        /**
+         * rAF-throttled scroll handler: re-render the visible window at most once per
+         * animation frame instead of on every scroll event.
+         */
+        function onGridScroll() {
+            if (gridScrollScheduled) return;
+            gridScrollScheduled = true;
+            requestAnimationFrame(() => {
+                gridScrollScheduled = false;
+                renderGridWindow(false);
+            });
+        }
+
+        /**
+         * Build the HTML for the photo context menu. Matches the original options:
+         * with a multi-selection only transfer + hide/unhide are offered; for a
+         * single photo make-primary is added (and transfer is omitted when the photo
+         * is hidden).
+         */
+        function buildPhotoMenuHTML(isHidden, count) {
+            if (count > 0) {
+                const hideItem = isHidden
+                    ? `<div class="context-menu-item" data-action="unhide-photo">Unhide photo (${count} photos)</div>`
+                    : `<div class="context-menu-item" data-action="hide-photo">Hide photo (${count} photos)</div>`;
+                return `
+                    <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag (${count} photos)</div>
+                    ${hideItem}
+                `;
+            }
+            if (isHidden) {
+                return `
+                    <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                    <div class="context-menu-item" data-action="unhide-photo">Unhide photo</div>
+                `;
+            }
+            return `
+                <div class="context-menu-item" data-action="make-primary">Make primary photo</div>
+                <div class="context-menu-item" data-action="transfer-tag">Remove/Transfer Tag</div>
+                <div class="context-menu-item" data-action="hide-photo">Hide photo</div>
+            `;
+        }
+
+        /**
+         * Open the shared context menu for a photo cell (kebab click). Sets the photo
+         * context used by the menu actions and, when there is already an active
+         * selection, adds the clicked photo to it (preserving the old behaviour).
+         */
+        function openPhotoMenu(item, index, faceId) {
+            closeAllMenus();
+
+            const photo = lightboxPhotos[index];
+            currentPhotoContext = {
+                person_name: currentPerson.name,
+                face_id: faceId,
+                path: photo.path,
+                is_hidden: photo.is_hidden
+            };
+
+            // Whether a selection existed before this click decides single vs
+            // multi-photo menu, matching the original logic.
+            const hasSelection = selectedPhotos.size > 0;
+            if (hasSelection && !selectedPhotos.has(faceId)) {
+                selectedPhotos.add(faceId);
+                item.classList.add('selected');
+                updateSelectionInfo();
+            }
+
+            const count = hasSelection ? selectedPhotos.size : 0;
+            sharedContextMenu.innerHTML = buildPhotoMenuHTML(photo.is_hidden, count);
+            sharedContextMenu.classList.add('show');
+            item.classList.add('menu-active');
+            activeMenu = { element: sharedContextMenu, parent: item };
+            positionMenu(sharedContextMenu, item.querySelector('.kebab-menu'));
+        }
+
+        /**
+         * Delegated click handler for the whole grid. Resolves which cell was clicked
+         * and applies kebab / ctrl-select / shift-range / open behaviour exactly as
+         * the old per-cell listeners did.
+         */
+        function onGridClick(e) {
+            const item = e.target.closest('.photo-item');
+            if (!item) return;
+
+            const index = parseInt(item.getAttribute('data-index'));
+            const faceId = parseInt(item.getAttribute('data-face-id'));
+
+            if (e.target.closest('.kebab-menu')) {
+                e.stopPropagation();
+                openPhotoMenu(item, index, faceId);
+                return;
+            }
+
+            if (e.ctrlKey || e.metaKey) {
+                togglePhotoSelection(faceId, index, item);
+            } else if (e.shiftKey) {
+                if (lastSelectedIndex >= 0) {
+                    selectPhotoRange(lastSelectedIndex, index);
+                } else {
+                    selectedPhotos.add(faceId);
+                    item.classList.add('selected');
+                    lastSelectedIndex = index;
+                    updateSelectionInfo();
+                }
+            } else {
+                if (selectedPhotos.size === 0) {
+                    openLightbox(index);
+                } else {
+                    clearSelection();
+                }
+            }
+        }
+
+        /**
+         * Delegated double-click handler: open the photo in the OS default viewer.
+         */
+        function onGridDblClick(e) {
+            const item = e.target.closest('.photo-item');
+            if (!item || e.target.closest('.kebab-menu')) return;
+            const index = parseInt(item.getAttribute('data-index'));
+            pywebview.api.open_photo(lightboxPhotos[index].path);
+        }
+
+        /**
+         * One-time wiring for the virtualized grid: the shared context menu, the
+         * delegated click/double-click handlers, the throttled scroll handler, and a
+         * ResizeObserver that relayouts when the container size changes.
+         */
+        function setupPhotoGrid() {
+            const container = document.querySelector('.photo-grid-container');
+            const photoGrid = document.getElementById('photoGrid');
+            if (!container || !photoGrid) return;
+
+            // Single context menu reused for every photo (was one per photo before).
+            sharedContextMenu = document.createElement('div');
+            sharedContextMenu.className = 'context-menu';
+            document.body.appendChild(sharedContextMenu);
+
+            sharedContextMenu.addEventListener('click', (e) => {
+                const menuItem = e.target.closest('.context-menu-item');
+                if (!menuItem) return;
+                const action = menuItem.getAttribute('data-action');
+                if (action === 'make-primary') makePrimaryPhoto();
+                else if (action === 'hide-photo') hidePhotos();
+                else if (action === 'unhide-photo') unhidePhotos();
+                else if (action === 'transfer-tag') openTransferDialog();
+            });
+            sharedContextMenu.addEventListener('mouseenter', () => {
+                if (menuCloseTimeout) { clearTimeout(menuCloseTimeout); menuCloseTimeout = null; }
+            });
+            sharedContextMenu.addEventListener('mouseleave', () => {
+                menuCloseTimeout = setTimeout(closeAllMenus, 200);
+            });
+
+            photoGrid.addEventListener('click', onGridClick);
+            photoGrid.addEventListener('dblclick', onGridDblClick);
+            container.addEventListener('scroll', onGridScroll, { passive: true });
+
+            // Recompute columns/cell size when the grid is resized, throttled to one
+            // pass per animation frame.
+            let resizeScheduled = false;
+            const resizeObserver = new ResizeObserver(() => {
+                if (resizeScheduled) return;
+                resizeScheduled = true;
+                requestAnimationFrame(() => {
+                    resizeScheduled = false;
+                    relayoutGrid();
+                });
+            });
+            resizeObserver.observe(container);
         }
         
         function openLightbox(index) {
@@ -835,7 +996,7 @@ let people = [];
                     if (fullSizePreview) {
                         lightboxImage.src = fullSizePreview;
                     } else {
-                        lightboxImage.src = photo.thumbnail;
+                        lightboxImage.src = (thumbCache.get(photo.face_id) || '');
                     }
                     
                     lightboxImage.onload = () => {
@@ -848,13 +1009,13 @@ let people = [];
                     if (fullSizePreview) {
                         lightboxImage.src = fullSizePreview;
                     } else {
-                        lightboxImage.src = photo.thumbnail;
+                        lightboxImage.src = (thumbCache.get(photo.face_id) || '');
                     }
                     lightboxImage.onload = null;
                 }
             } catch (error) {
                 console.error('Error loading full size preview:', error);
-                document.getElementById('lightboxImage').src = photo.thumbnail;
+                document.getElementById('lightboxImage').src = (thumbCache.get(photo.face_id) || '');
             }
         }
 
@@ -1036,13 +1197,10 @@ let people = [];
         });
 
         async function reloadCurrentPhotos() {
+            // Re-fetch and re-render the current person's grid (for example after a
+            // setting that changes which photos are shown, like show-hidden).
             if (currentPerson) {
-                currentPage = 1;
-                hasMorePhotos = true;
-                lightboxPhotos = [];
-                isLoadingMore = false;
-                clearSelection();
-                await loadPhotos(currentPerson.clustering_id, currentPerson.id, true);
+                await loadPersonPhotos(currentPerson.clustering_id, currentPerson.id);
             }
         }
 
@@ -1142,11 +1300,11 @@ let people = [];
                 
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
-                document.getElementById('photoGrid').style.gridTemplateColumns = 
-                    `repeat(auto-fill, minmax(${gridSize}px, 1fr))`;
+                currentGridSize = parseInt(gridSize);   // virtualizer reads this for the cell size
                 
                 const viewMode = await pywebview.api.get_view_mode();
                 document.getElementById('viewModeDropdown').value = viewMode;
+                gridViewMode = viewMode;   // controls whole-photo vs zoom-to-face thumbnails
                 
                 const sortMode = await pywebview.api.get_sort_mode();
                 currentSortMode = sortMode;
@@ -1227,50 +1385,9 @@ let people = [];
             document.getElementById('appContainer').classList.remove('blurred');
         }
 
-        function checkScrollPosition() {
-            if (!currentPerson || !hasMorePhotos || isLoadingMore) {
-                return;
-            }
-            
-            const photoGridContainer = document.querySelector('.photo-grid-container');
-            if (!photoGridContainer) return;
-            
-            const scrollTop = photoGridContainer.scrollTop;
-            const scrollHeight = photoGridContainer.scrollHeight;
-            const clientHeight = photoGridContainer.clientHeight;
-            
-            const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-            
-            if (distanceFromBottom < 800) {
-                console.log(`Triggering load: ${distanceFromBottom}px from bottom`);
-                loadPhotos(currentPerson.clustering_id, currentPerson.id, false);
-            }
-        }
-
-        const photoGridContainer = document.querySelector('.photo-grid-container');
-        if (photoGridContainer) {
-            let scrollTimeout = null;
-            
-            photoGridContainer.addEventListener('scroll', () => {
-                if (scrollTimeout) {
-                    clearTimeout(scrollTimeout);
-                }
-                
-                scrollTimeout = setTimeout(() => {
-                    checkScrollPosition();
-                }, 100);
-            });
-            
-            if (scrollCheckInterval) {
-                clearInterval(scrollCheckInterval);
-            }
-            
-            scrollCheckInterval = setInterval(() => {
-                if (currentPerson && hasMorePhotos && !isLoadingMore) {
-                    checkScrollPosition();
-                }
-            }, 500);
-        }
+        // The virtualized grid (see the grid module above) manages its own
+        // scrolling, resizing, click handling, and context menu. Wire it up once.
+        setupPhotoGrid();
 
         async function initialize() {
             try {
@@ -1416,16 +1533,18 @@ let people = [];
         });
 
         document.getElementById('sizeSlider').addEventListener('input', (e) => {
-            const size = e.target.value;
-            document.getElementById('photoGrid').style.gridTemplateColumns = 
-                `repeat(auto-fill, minmax(${size}px, 1fr))`;
-            pywebview.api.set_grid_size(parseInt(size));
+            const size = parseInt(e.target.value);
+            currentGridSize = size;                  // update virtualizer cell size
+            pywebview.api.set_grid_size(size);
+            relayoutGrid();                          // re-flow the virtualized grid
         });
 
         document.getElementById('viewModeDropdown').addEventListener('change', async (e) => {
             const mode = e.target.value;
             try {
                 await pywebview.api.set_view_mode(mode);
+                gridViewMode = mode;     // switch thumbnails between whole-photo and zoom
+                refreshThumbnails();     // reload the visible crops for the new mode
                 const modeName = mode === 'entire_photo' ? 'entire photo' : 'zoomed to faces';
                 addLogEntry(`View mode changed to: ${modeName}`);
             } catch (error) {

@@ -502,7 +502,45 @@ class API:
             'page_size': page_size,
             'has_more': offset + len(photos) < total_count
         }
-    
+
+    def get_person_photo_list(self, clustering_id, person_id):
+        """Return lightweight metadata for every face of a person, without thumbnails.
+
+        The virtualized photo grid in the UI renders only the cells currently on
+        screen and fetches each thumbnail on demand through create_thumbnail().
+        Sending base64 thumbnails for thousands of faces up front is what caused the
+        memory blow-up and scroll slowdown, so this endpoint deliberately omits them
+        and returns only what the grid needs to lay out and address each cell.
+
+        Hidden faces are filtered out unless the 'show_hidden_photos' setting is on,
+        mirroring get_photos().
+        """
+        photo_data = self._db.get_photos_by_person(clustering_id, person_id)
+
+        hidden_photos = self._db.get_hidden_photos()
+        show_hidden_photos = self._settings.get('show_hidden_photos', False)
+
+        photos = []
+        for data in photo_data:
+            face_id = data['face_id']
+            is_hidden = face_id in hidden_photos
+
+            if is_hidden and not show_hidden_photos:
+                continue
+
+            path = data['file_path']
+            photos.append({
+                'path': path,
+                'name': os.path.basename(path),
+                'face_id': face_id,
+                'is_hidden': is_hidden,
+                # bbox is always included so the front end can switch between the
+                # whole-photo and zoom-to-face crops without another round trip.
+                'bbox': [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']]
+            })
+
+        return {'photos': photos, 'total_count': len(photos)}
+
     def get_full_size_preview(self, image_path: str) -> Optional[str]:
         try:
             img = Image.open(image_path)

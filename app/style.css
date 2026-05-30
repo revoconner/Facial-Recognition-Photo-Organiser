@@ -482,9 +482,12 @@
         }
 
         .photo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 16px;
+            /* Virtualized grid: cells are absolutely positioned by JS (see
+               renderGridWindow in ui_js_script.js) and the element's height is set
+               in JS to the full virtual height, so the scrollbar stays accurate
+               even though only the visible rows exist in the DOM. */
+            position: relative;
+            width: 100%;
             animation: fadeIn 0.5s ease;
         }
 
@@ -500,11 +503,13 @@
         }
 
         .photo-item {
-            position: relative;
-            aspect-ratio: 1;
+            /* Position and size are assigned by the virtualizer. Only transform and
+               box-shadow are transitioned: animating left/top/width/height would
+               make recycled cells visibly slide when they are repositioned. */
+            position: absolute;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
