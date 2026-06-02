@@ -1,3 +1,4 @@
+import sys
 import argparse
 import torch
 import webview
@@ -10,6 +11,17 @@ GPU_AVAILABLE = torch.cuda.is_available()
 
 
 def main():
+    # Console output must not depend on the Windows system code page. Folder paths
+    # can contain characters outside cp1252 (for example U+018F, the Azerbaijani
+    # schwa); without this the startup prints below raise UnicodeEncodeError on a
+    # non-UTF-8 locale. Guarded because sys.stdout/stderr can be None in a windowed
+    # (no-console) build.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (AttributeError, ValueError):
+            pass
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--minimized', action='store_true', help='Start minimized to tray')
     args = parser.parse_args()
