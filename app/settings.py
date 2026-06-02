@@ -29,7 +29,8 @@ class Settings:
             'hide_unnamed_persons': False,
             'scan_frequency': 'restart_1_day',
             'last_scan_time': None,
-            'show_face_tags_preview': True
+            'show_face_tags_preview': True,
+            'log_level': 'DEBUG'
         }
         
         self.settings = self.load()
