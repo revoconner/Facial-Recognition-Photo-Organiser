@@ -1404,12 +1404,18 @@ let people = [];
                 await loadAllSettings();
                 
                 checkNoFolders();
-                
-                document.getElementById('progressSection').style.display = 'flex';
-                
+
+                // Only reveal the progress bar if a scan actually starts. The
+                // backend returns needs_scan=false when there are no folders to
+                // scan, or when a scheduled scan is skipped, so the bar stays
+                // hidden during an ordinary startup instead of showing a stalled
+                // bar with nothing to do.
                 const state = await pywebview.api.check_initial_state();
-                
-                updateStatusMessage('Checking for new photos...');
+
+                if (state && state.needs_scan) {
+                    document.getElementById('progressSection').style.display = 'flex';
+                    updateStatusMessage('Checking for new photos...');
+                }
             } catch (error) {
                 console.error('Initialization error:', error);
                 addLogEntry('ERROR: Initialization failed - ' + error);

@@ -652,7 +652,16 @@ class API:
         total_photos = self._db.get_total_photos()
         
         self.update_status(f"Database status: {total_photos} photos scanned, {total_faces} faces detected")
-        
+
+        # With no folders configured there is nothing to scan, so don't start a
+        # scan at all. This keeps the progress bar hidden on first launch (the
+        # "no folders" prompt guides the user instead). Any existing clustering
+        # is still loaded.
+        if not self.get_include_folders():
+            self.update_status("No folders configured - add folders in Settings to start scanning")
+            self.cluster_complete()
+            return {'needs_scan': False}
+
         if self.should_scan_on_startup():
             scan_frequency = self._settings.get('scan_frequency', 'restart_1_day')
             
