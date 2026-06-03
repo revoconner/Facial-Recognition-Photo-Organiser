@@ -1266,6 +1266,52 @@
             text-align: center;
         }
 
+        .export-result-body {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .export-result-line {
+            font-size: 15px;
+            color: #c0c0c0;
+            margin: 6px 0;
+        }
+
+        .export-note {
+            font-style: italic;
+            font-size: 13px;
+            color: #a0a0a0;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .export-actions {
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .export-cancel-btn {
+            margin-left: 12px;
+            padding: 4px 14px;
+            font-size: 12px;
+            color: #ffffff;
+            background: #b91c1c;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .export-cancel-btn:hover {
+            background: #dc2626;
+        }
+
+        .export-cancel-btn:disabled {
+            background: #6b1d1d;
+            color: #a0a0a0;
+            cursor: default;
+        }
+
         .rename-input-container {
             margin-top: 24px;
         }
