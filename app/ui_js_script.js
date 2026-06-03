@@ -1237,6 +1237,13 @@ let people = [];
             entry.textContent = `[${timestamp}] ${message}`;
             logViewer.appendChild(entry);
             logViewer.scrollTop = logViewer.scrollHeight;
+
+            // Mirror UI log entries into the persistent backend log file, so a saved
+            // or attached log captures both frontend and backend events. Guarded and
+            // fire-and-forget: the bridge may not exist yet during early startup.
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.log_message) {
+                try { window.pywebview.api.log_message('INFO', message); } catch (e) {}
+            }
         }
 
 

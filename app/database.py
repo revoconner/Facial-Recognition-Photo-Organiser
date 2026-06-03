@@ -16,9 +16,7 @@ class FaceDatabase:
         self.sqlite_path = self.db_folder / "metadata.db"
         
         self._local = threading.local()
-        
-        self.conn = self._create_connection()
-        
+
         self.lmdb_path = self.db_folder / "encodings.lmdb"
         self.env = lmdb.open(
             str(self.lmdb_path),
@@ -51,6 +49,7 @@ class FaceDatabase:
             PRAGMA temp_store = MEMORY;
             PRAGMA mmap_size = 268435456;
             PRAGMA page_size = 4096;
+            PRAGMA busy_timeout = 5000;
         ''')
         conn.commit()
         
@@ -60,7 +59,21 @@ class FaceDatabase:
         if not hasattr(self._local, 'conn') or self._local.conn is None:
             self._local.conn = self._create_connection()
         return self._local.conn
-    
+
+    @property
+    def conn(self):
+        """Per-thread SQLite connection.
+
+        A single shared connection (check_same_thread=False, no locking) used across
+        pywebview's call threads and the worker threads caused intermittent
+        "sqlite3.InterfaceError: bad parameter or other API misuse" crashes — e.g.
+        when rename_person() fired loadPeople()/get_people() on another thread while a
+        write was still in flight. Giving each thread its own connection removes the
+        shared-object misuse; WAL mode + busy_timeout let those connections read and
+        write concurrently and see each other's committed data.
+        """
+        return self._get_connection()
+
     def _init_tables(self):
         cursor = self.conn.cursor()
         

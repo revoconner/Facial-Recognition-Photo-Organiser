@@ -17,6 +17,9 @@ from database import FaceDatabase
 from thumbnail_cache import ThumbnailCache
 from settings import Settings
 from workers import ScanWorker, ClusterWorker
+from logger import get_logger
+
+log = get_logger("api")
 
 
 class API:
@@ -25,7 +28,7 @@ class API:
         self._threshold = settings.get('threshold', 50)
         
         db_path = get_appdata_path()
-        print(f"Database location: {db_path}")
+        log.info("Database location: %s", db_path)
         
         self._db = FaceDatabase(str(db_path))
         self._window = None
@@ -39,7 +42,7 @@ class API:
 
         cache_path = db_path.parent / "thumbnail_cache"
         self._thumbnail_cache = ThumbnailCache(str(cache_path))
-        print(f"Thumbnail cache location: {cache_path}")
+        log.info("Thumbnail cache location: %s", cache_path)
 
     def set_window(self, window):
         self._window = window
@@ -121,9 +124,23 @@ class API:
         tray_thread.start()
     
     def update_status(self, message: str):
+        log.info(message)
         if self._window:
             safe_message = message.replace('"', '\\"').replace('\n', ' ')
             self._window.evaluate_js(f'updateStatusMessage("{safe_message}")')
+
+    def log_message(self, level, message):
+        """Bridge for the frontend to write into the same persistent log file, so a
+        saved log captures both UI and backend events. Called from addLogEntry()."""
+        lvl = (level or "INFO").upper()
+        if lvl == "ERROR":
+            log.error("[ui] %s", message)
+        elif lvl == "DEBUG":
+            log.debug("[ui] %s", message)
+        elif lvl == "VERBOSE":
+            log.verbose("[ui] %s", message)
+        else:
+            log.info("[ui] %s", message)
     
     def update_progress(self, current: int, total: int):
         if self._window:

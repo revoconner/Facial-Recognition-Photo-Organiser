@@ -6,6 +6,7 @@ import webview
 from utils import get_resource_path, get_appdata_path
 from settings import Settings
 from api import API
+from logger import setup_logging, get_logger
 
 GPU_AVAILABLE = torch.cuda.is_available()
 
@@ -26,25 +27,22 @@ def main():
     parser.add_argument('--minimized', action='store_true', help='Start minimized to tray')
     args = parser.parse_args()
     
-    print("=" * 60)
-    print("Face Recognition Photo Organizer")
-    print("=" * 60)
-    print(f"PyTorch version: {torch.__version__}")
-    print(f"CUDA available: {GPU_AVAILABLE}")
-    if GPU_AVAILABLE:
-        print(f"CUDA version: {torch.version.cuda}")
-        print(f"GPU device: {torch.cuda.get_device_name(0)}")
-    print("=" * 60)
-    
     settings_path = get_appdata_path()
     settings = Settings(str(settings_path))
-    
-    print(f"Settings loaded from: {settings.settings_file}")
-    print(f"Threshold: {settings.get('threshold')}%")
-    print(f"Include folders: {settings.get('include_folders')}")
-    print(f"Exclude folders: {settings.get('exclude_folders')}")
-    print(f"Wildcard exclusions: {settings.get('wildcard_exclusions')}")
-    print("=" * 60)
+
+    # Configure file + console logging now that the data dir and the user's chosen
+    # level are known. Every module logs through this (see logger.py).
+    setup_logging(settings_path / "logs", settings.get("log_level", "INFO"))
+    log = get_logger("startup")
+
+    log.info("Face Recognition Photo Organizer starting")
+    log.info("PyTorch %s | CUDA available: %s", torch.__version__, GPU_AVAILABLE)
+    if GPU_AVAILABLE:
+        log.info("CUDA %s | GPU: %s", torch.version.cuda, torch.cuda.get_device_name(0))
+    log.info("Settings file: %s", settings.settings_file)
+    log.info("Threshold %s%% | include=%s exclude=%s wildcards=%s",
+             settings.get('threshold'), settings.get('include_folders'),
+             settings.get('exclude_folders'), settings.get('wildcard_exclusions'))
     
     api = API(settings)
     
