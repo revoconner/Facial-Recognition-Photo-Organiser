@@ -16,7 +16,7 @@ from utils import get_appdata_path, create_tray_icon
 from database import FaceDatabase
 from thumbnail_cache import ThumbnailCache
 from settings import Settings
-from workers import ScanWorker, ClusterWorker
+from workers import ScanWorker, ClusterWorker, ExportWorker
 from logger import get_logger
 
 log = get_logger("api")
@@ -34,6 +34,7 @@ class API:
         self._window = None
         self._scan_worker = None
         self._cluster_worker = None
+        self._export_worker = None
         self._tray_icon = None
         self._close_to_tray = settings.get('close_to_tray', True)
         self._quit_flag = False
@@ -142,10 +143,13 @@ class API:
         else:
             log.info("[ui] %s", message)
     
-    def update_progress(self, current: int, total: int):
+    def update_progress(self, current: int, total: int, label: str = None):
         if self._window:
             percent = (current / total) * 100 if total > 0 else 0
-            self._window.evaluate_js(f'updateProgress({current}, {total}, {percent})')
+            # label lets a worker name the bar (e.g. "Exporting"); the front end
+            # defaults to "Scanning" when it is omitted.
+            label_arg = f'"{label}"' if label else 'undefined'
+            self._window.evaluate_js(f'updateProgress({current}, {total}, {percent}, {label_arg})')
 
     def get_cache_stats(self):
         return self._thumbnail_cache.get_cache_size()
@@ -240,6 +244,67 @@ class API:
             self._cluster_worker = ClusterWorker(self._db, threshold, self)
             self._cluster_worker.start()
     
+    def export_person_photos(self, clustering_id, person_id, dest, mode='copy'):
+        """Start a background export of one person's photos into dest/<name>/."""
+        return self._start_export('person', clustering_id, dest, mode, person_id=person_id)
+
+    def export_all_named(self, dest, mode='copy'):
+        """Start a background export of every named person into dest/<name>/.
+        Resolves the active clustering itself so the front end need not pass it."""
+        clustering = self._db.get_active_clustering()
+        if not clustering:
+            return {'success': False, 'message': 'No clustering available to export'}
+        return self._start_export('all_named', clustering['clustering_id'], dest, mode)
+
+    def _start_export(self, scope, clustering_id, dest, mode, person_id=None):
+        if self._export_worker is not None and self._export_worker.is_alive():
+            return {'success': False, 'message': 'An export is already running'}
+        if not dest:
+            return {'success': False, 'message': 'No destination selected'}
+
+        show_hidden_photos = self._settings.get('show_hidden_photos', False)
+        self._export_worker = ExportWorker(
+            self._db, self, dest, scope, clustering_id,
+            person_id=person_id, mode=mode, show_hidden_photos=show_hidden_photos)
+        self._export_worker.start()
+        return {'success': True}
+
+    def check_export_destination(self, dest):
+        """Pre-flight checks so the UI can warn before exporting. Nothing here
+        blocks the export; it only surfaces footguns:
+          - inside_scanned: dest sits inside a folder Felicity scans, so exported
+            copies could be re-ingested on the next scan.
+          - non_empty: dest already has files (collisions get _1/_2 suffixes)."""
+        result = {'inside_scanned': False, 'non_empty': False}
+        if not dest:
+            return result
+        try:
+            dest_norm = os.path.normcase(os.path.normpath(os.path.abspath(dest)))
+            for folder in self.get_include_folders():
+                inc = os.path.normcase(os.path.normpath(os.path.abspath(folder)))
+                if dest_norm == inc or dest_norm.startswith(inc + os.sep):
+                    result['inside_scanned'] = True
+                    break
+            if os.path.isdir(dest) and os.listdir(dest):
+                result['non_empty'] = True
+        except Exception as e:
+            log.error("check_export_destination failed: %s", e)
+        return result
+
+    def cancel_export(self):
+        if self._export_worker is not None and self._export_worker.is_alive():
+            self._export_worker.cancel()
+            self.update_status("Cancelling export...")
+            return {'success': True}
+        return {'success': False, 'message': 'No export in progress'}
+
+    def export_complete(self, summary):
+        """Called by ExportWorker when the export finishes; pushes the result
+        summary to the UI for the completion dialog."""
+        import json
+        if self._window:
+            self._window.evaluate_js(f'showExportComplete({json.dumps(summary)})')
+
     def get_threshold(self):
         return self._threshold
     

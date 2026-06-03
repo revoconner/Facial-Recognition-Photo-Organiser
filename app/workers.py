@@ -1,4 +1,5 @@
 import os
+import shutil
 import hashlib
 import time
 import threading
@@ -599,3 +600,211 @@ class ClusterWorker(threading.Thread):
             if untagged_faces:
                 self.db.tag_faces(untagged_faces, dominant_tag, is_manual=False)
                 self.api.update_status(f"Auto-tagged {len(untagged_faces)} faces as '{dominant_tag}'")
+
+
+class ExportWorker(threading.Thread):
+    """Copies (or hardlinks) photos into per-person subfolders under a destination
+    the user picks. Originals are never moved, renamed, or modified.
+
+    scope:
+        'person'    - export a single person_id (folder named after that person)
+        'all_named' - export every named person, skipping auto "Person X",
+                      "Unmatched Faces", and persons the user has hidden
+    mode:
+        'copy'     - shutil.copy2 (works across any volume)
+        'hardlink' - os.link on the same volume; falls back to copy across volumes
+    """
+
+    INVALID_CHARS = set('<>:"/\\|?*')
+
+    def __init__(self, db, api, dest_folder, scope, clustering_id,
+                 person_id=None, mode='copy', show_hidden_photos=False):
+        super().__init__()
+        self.db = db
+        self.api = api
+        self.dest_folder = dest_folder
+        self.scope = scope
+        self.clustering_id = clustering_id
+        self.person_id = person_id
+        self.mode = mode if mode in ('copy', 'hardlink') else 'copy'
+        self.show_hidden_photos = show_hidden_photos
+        self.daemon = True
+        self._cancel = threading.Event()
+
+    def cancel(self):
+        self._cancel.set()
+
+    def sanitize_folder_name(self, name: str) -> str:
+        """Port of organise.cpp SanitizeFolderName: swap path-illegal characters for
+        underscores and drop trailing spaces/dots (both invalid on Windows)."""
+        cleaned = ''.join('_' if c in self.INVALID_CHARS else c for c in name)
+        cleaned = cleaned.rstrip(' .')
+        return cleaned or 'Unnamed'
+
+    def _long_path(self, path: str) -> str:
+        r"""Prefix an absolute Windows path with \\?\ so paths over 260 chars work.
+        No-op on non-Windows and on already-prefixed paths."""
+        if os.name != 'nt':
+            return path
+        abs_path = os.path.abspath(path)
+        if abs_path.startswith('\\\\?\\'):
+            return abs_path
+        if abs_path.startswith('\\\\'):
+            # UNC share \\server\share -> \\?\UNC\server\share
+            return '\\\\?\\UNC\\' + abs_path[2:]
+        return '\\\\?\\' + abs_path
+
+    def build_export_map(self) -> dict:
+        """Return {person_name: [source_path, ...]} for the requested scope. Hidden
+        faces are filtered out (unless show_hidden_photos), and each source file is
+        listed once per person even if that person has several faces in it (so a
+        collage of one person exports as a single file, not one per face)."""
+        hidden_faces = set() if self.show_hidden_photos else self.db.get_hidden_photos()
+
+        if self.scope == 'person':
+            person_ids = [self.person_id]
+        else:
+            hidden_persons = self.db.get_hidden_persons(self.clustering_id)
+            person_ids = [
+                p['person_id'] for p in self.db.get_persons_in_clustering(self.clustering_id)
+                if p['person_id'] not in hidden_persons
+            ]
+
+        # Keyed by display name so merged clusters that share a name land in one
+        # folder. Values are sets to dedupe a file across a person's many faces.
+        name_to_paths = {}
+        for pid in person_ids:
+            if pid == 0:  # Unmatched Faces is a grab-bag, not a real person
+                continue
+
+            name = self.db.get_person_name_fast(self.clustering_id, pid).replace(' (hidden)', '')
+
+            if self.scope == 'all_named' and (name.startswith('Person ') or name == 'Unmatched Faces'):
+                continue
+
+            paths = name_to_paths.setdefault(name, set())
+            for photo in self.db.get_photos_by_person(self.clustering_id, pid):
+                if photo['face_id'] in hidden_faces:
+                    continue
+                paths.add(photo['file_path'])
+
+        return {name: sorted(paths) for name, paths in name_to_paths.items() if paths}
+
+    def export_one(self, src: str, person_folder: str) -> str:
+        """Copy or hardlink one file into person_folder, resolving same-name
+        collisions with _1/_2 suffixes. Returns 'exported', 'missing', or 'failed'."""
+        if not os.path.exists(self._long_path(src)):
+            self.api.update_status(f"WARNING: Source missing - {src}")
+            return 'missing'
+
+        filename = os.path.basename(src)
+        stem, ext = os.path.splitext(filename)
+        dest_path = os.path.join(person_folder, filename)
+
+        dup = 1
+        while os.path.exists(self._long_path(dest_path)):
+            dest_path = os.path.join(person_folder, f"{stem}_{dup}{ext}")
+            dup += 1
+
+        try:
+            if self.mode == 'hardlink':
+                try:
+                    os.link(self._long_path(src), self._long_path(dest_path))
+                except OSError:
+                    # cross-volume, or a filesystem without hardlink support
+                    shutil.copy2(self._long_path(src), self._long_path(dest_path))
+            else:
+                shutil.copy2(self._long_path(src), self._long_path(dest_path))
+            return 'exported'
+        except Exception as e:
+            self.api.update_status(f"ERROR: Failed to export {filename}: {e}")
+            return 'failed'
+
+    def _finish(self, summary: dict):
+        self.api.export_complete(summary)
+
+    def run(self):
+        try:
+            self.api.update_status("Preparing export...")
+            export_map = self.build_export_map()
+
+            people_count = len(export_map)
+            total = sum(len(paths) for paths in export_map.values())
+
+            if total == 0:
+                self.api.update_status("Export: nothing to export")
+                self._finish({'exported': 0, 'skipped_missing': 0, 'failed': 0,
+                              'people': 0, 'cancelled': False, 'dest': self.dest_folder})
+                return
+
+            self.api.update_status(
+                f"Exporting {total} photos for {people_count} "
+                f"{'person' if people_count == 1 else 'people'} (mode: {self.mode})...")
+
+            try:
+                os.makedirs(self.dest_folder, exist_ok=True)
+            except Exception as e:
+                self.api.update_status(f"ERROR: Cannot create destination folder: {e}")
+                self._finish({'exported': 0, 'skipped_missing': 0, 'failed': total,
+                              'people': people_count, 'cancelled': False,
+                              'dest': self.dest_folder, 'error': str(e)})
+                return
+
+            exported = skipped_missing = failed = processed = 0
+            cancelled = False
+
+            for name, paths in export_map.items():
+                if self._cancel.is_set():
+                    cancelled = True
+                    break
+
+                person_folder = os.path.join(self.dest_folder, self.sanitize_folder_name(name))
+                try:
+                    os.makedirs(person_folder, exist_ok=True)
+                except Exception as e:
+                    self.api.update_status(f"ERROR: Cannot create folder for '{name}': {e}")
+                    failed += len(paths)
+                    processed += len(paths)
+                    self.api.update_progress(processed, total, label="Exporting")
+                    continue
+
+                for src in paths:
+                    if self._cancel.is_set():
+                        cancelled = True
+                        break
+
+                    processed += 1
+                    result = self.export_one(src, person_folder)
+                    if result == 'exported':
+                        exported += 1
+                    elif result == 'missing':
+                        skipped_missing += 1
+                    else:
+                        failed += 1
+
+                    if processed % 10 == 0 or processed == total:
+                        self.api.update_progress(processed, total, label="Exporting")
+
+                if cancelled:
+                    break
+
+            summary = {
+                'exported': exported,
+                'skipped_missing': skipped_missing,
+                'failed': failed,
+                'people': people_count,
+                'cancelled': cancelled,
+                'dest': self.dest_folder,
+            }
+            status = "Export cancelled" if cancelled else "Export complete"
+            self.api.update_status(
+                f"{status}: {exported} exported, {skipped_missing} missing, {failed} failed")
+            self._finish(summary)
+
+        except Exception as e:
+            self.api.update_status(f"ERROR: Export failed: {e}")
+            import traceback
+            traceback.print_exc()
+            self._finish({'exported': 0, 'skipped_missing': 0, 'failed': 0,
+                          'people': 0, 'cancelled': False,
+                          'dest': self.dest_folder, 'error': str(e)})
