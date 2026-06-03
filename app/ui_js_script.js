@@ -1246,6 +1246,24 @@ let people = [];
             }
         }
 
+        // Surface otherwise-silent JS errors and promise rejections into the log so
+        // frontend-only bugs (no Python traceback) are visible. Writes straight to the
+        // bridge (not addLogEntry) to avoid any chance of a logging recursion.
+        function logJsFailure(tag, msg) {
+            const line = '[' + tag + '] ' + msg;
+            console.error(line);
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.log_message) {
+                try { window.pywebview.api.log_message('ERROR', line); } catch (e) {}
+            }
+        }
+        window.addEventListener('error', (ev) => {
+            logJsFailure('JSERROR', (ev.message || 'error') + ' @ ' + (ev.filename || '') + ':' + (ev.lineno || ''));
+        });
+        window.addEventListener('unhandledrejection', (ev) => {
+            const r = ev.reason;
+            logJsFailure('JSREJECT', r && r.message ? r.message : String(r));
+        });
+
 
 
         async function loadAllSettings() {
