@@ -805,9 +805,11 @@ class API:
         return self._settings.get('view_mode', 'entire_photo')
     
     def set_view_mode(self, mode):
+        # Only persist the setting. The frontend's view-mode handler updates the grid
+        # in place via refreshThumbnails(); a backend reloadCurrentPhotos() here (a
+        # leftover from the pre-virtualization grid) raced that refresh and left the
+        # grid stuck on "Loading photos..." (bug #1).
         self._settings.set('view_mode', mode)
-        if self._window:
-            self._window.evaluate_js('reloadCurrentPhotos()')
     
     def get_sort_mode(self):
         return self._settings.get('sort_mode', 'names_asc')
