@@ -1277,9 +1277,16 @@
             margin: 6px 0;
         }
 
-        .export-mode-row {
-            display: flex;
-            gap: 12px;
+        .export-note {
+            font-style: italic;
+            font-size: 13px;
+            color: #a0a0a0;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .export-actions {
+            flex-wrap: wrap;
             align-items: center;
         }
 
