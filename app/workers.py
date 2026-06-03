@@ -608,6 +608,7 @@ class ExportWorker(threading.Thread):
 
     scope:
         'person'    - export a single person_id (folder named after that person)
+        'selected'  - export the given list of person_ids
         'all_named' - export every named person, skipping auto "Person X",
                       "Unmatched Faces", and persons the user has hidden
     mode:
@@ -618,7 +619,7 @@ class ExportWorker(threading.Thread):
     INVALID_CHARS = set('<>:"/\\|?*')
 
     def __init__(self, db, api, dest_folder, scope, clustering_id,
-                 person_id=None, mode='copy', show_hidden_photos=False):
+                 person_id=None, person_ids=None, mode='copy', show_hidden_photos=False):
         super().__init__()
         self.db = db
         self.api = api
@@ -626,6 +627,7 @@ class ExportWorker(threading.Thread):
         self.scope = scope
         self.clustering_id = clustering_id
         self.person_id = person_id
+        self.person_ids = person_ids or []
         self.mode = mode if mode in ('copy', 'hardlink') else 'copy'
         self.show_hidden_photos = show_hidden_photos
         self.daemon = True
@@ -663,6 +665,9 @@ class ExportWorker(threading.Thread):
 
         if self.scope == 'person':
             person_ids = [self.person_id]
+        elif self.scope == 'selected':
+            # Exactly what the user picked; the picker already applied visibility rules.
+            person_ids = list(self.person_ids)
         else:
             hidden_persons = self.db.get_hidden_persons(self.clustering_id)
             person_ids = [
@@ -690,31 +695,58 @@ class ExportWorker(threading.Thread):
 
         return {name: sorted(paths) for name, paths in name_to_paths.items() if paths}
 
+    def _is_same_file(self, src_lp: str, dest_lp: str) -> bool:
+        """Decide whether dest is already a copy of src, so a re-run (e.g. after a
+        crash mid-export) skips it instead of making a duplicate. Hardlinks share an
+        inode (samefile). shutil.copy2 preserves size and mtime, so for copies an
+        equal size plus mtime within 2s (covers FAT/exFAT mtime resolution) means it
+        was already exported."""
+        try:
+            if os.path.samefile(src_lp, dest_lp):
+                return True
+        except OSError:
+            pass
+        try:
+            s = os.stat(src_lp)
+            d = os.stat(dest_lp)
+            return s.st_size == d.st_size and abs(s.st_mtime - d.st_mtime) <= 2
+        except OSError:
+            return False
+
     def export_one(self, src: str, person_folder: str) -> str:
-        """Copy or hardlink one file into person_folder, resolving same-name
-        collisions with _1/_2 suffixes. Returns 'exported', 'missing', or 'failed'."""
-        if not os.path.exists(self._long_path(src)):
+        """Copy or hardlink one file into person_folder. Returns 'exported',
+        'skipped_exists' (already present from a prior run), 'missing', or 'failed'.
+
+        The name/_1/_2 chain is walked checking identity at each step: if a
+        candidate name already holds this exact file it is skipped (idempotent
+        resume); if it holds a different file the next suffix is tried (genuine
+        collision between two sources that share a basename)."""
+        src_lp = self._long_path(src)
+        if not os.path.exists(src_lp):
             self.api.update_status(f"WARNING: Source missing - {src}")
             return 'missing'
 
         filename = os.path.basename(src)
         stem, ext = os.path.splitext(filename)
-        dest_path = os.path.join(person_folder, filename)
+        candidate = os.path.join(person_folder, filename)
 
         dup = 1
-        while os.path.exists(self._long_path(dest_path)):
-            dest_path = os.path.join(person_folder, f"{stem}_{dup}{ext}")
+        while os.path.exists(self._long_path(candidate)):
+            if self._is_same_file(src_lp, self._long_path(candidate)):
+                return 'skipped_exists'
+            candidate = os.path.join(person_folder, f"{stem}_{dup}{ext}")
             dup += 1
 
         try:
+            dest_lp = self._long_path(candidate)
             if self.mode == 'hardlink':
                 try:
-                    os.link(self._long_path(src), self._long_path(dest_path))
+                    os.link(src_lp, dest_lp)
                 except OSError:
                     # cross-volume, or a filesystem without hardlink support
-                    shutil.copy2(self._long_path(src), self._long_path(dest_path))
+                    shutil.copy2(src_lp, dest_lp)
             else:
-                shutil.copy2(self._long_path(src), self._long_path(dest_path))
+                shutil.copy2(src_lp, dest_lp)
             return 'exported'
         except Exception as e:
             self.api.update_status(f"ERROR: Failed to export {filename}: {e}")
@@ -750,7 +782,7 @@ class ExportWorker(threading.Thread):
                               'dest': self.dest_folder, 'error': str(e)})
                 return
 
-            exported = skipped_missing = failed = processed = 0
+            exported = skipped_missing = skipped_exists = failed = processed = 0
             cancelled = False
 
             for name, paths in export_map.items():
@@ -777,6 +809,8 @@ class ExportWorker(threading.Thread):
                     result = self.export_one(src, person_folder)
                     if result == 'exported':
                         exported += 1
+                    elif result == 'skipped_exists':
+                        skipped_exists += 1
                     elif result == 'missing':
                         skipped_missing += 1
                     else:
@@ -790,6 +824,7 @@ class ExportWorker(threading.Thread):
 
             summary = {
                 'exported': exported,
+                'skipped_exists': skipped_exists,
                 'skipped_missing': skipped_missing,
                 'failed': failed,
                 'people': people_count,
@@ -798,7 +833,8 @@ class ExportWorker(threading.Thread):
             }
             status = "Export cancelled" if cancelled else "Export complete"
             self.api.update_status(
-                f"{status}: {exported} exported, {skipped_missing} missing, {failed} failed")
+                f"{status}: {exported} exported, {skipped_exists} already present, "
+                f"{skipped_missing} missing, {failed} failed")
             self._finish(summary)
 
         except Exception as e:

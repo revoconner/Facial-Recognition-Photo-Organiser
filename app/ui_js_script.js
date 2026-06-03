@@ -1703,6 +1703,10 @@ let people = [];
 
                 if (item.getAttribute('data-panel') === 'general') {
                 updateCacheSize(); }
+
+                if (item.getAttribute('data-panel') === 'export') {
+                    loadExportPeople();
+                }
             });
         });
 
@@ -1811,19 +1815,28 @@ let people = [];
 
         let pendingExport = null;  // { label, startFn } awaiting destination-warning confirmation
 
+        // Export mode (copy / hardlink) is chosen once in the Export Photos panel and
+        // shared by every export path. Defaults to copy if the dropdown isn't present.
+        function getExportMode() {
+            const dropdown = document.getElementById('exportModeDropdown');
+            return dropdown ? dropdown.value : 'copy';
+        }
+
         async function exportPerson(clusteringId, personId, name) {
             closeAllMenus();
             const dest = await pywebview.api.select_folder();
             if (!dest) return;
+            const mode = getExportMode();
             await beginExport(`Exporting ${name}`, dest,
-                () => pywebview.api.export_person_photos(clusteringId, personId, dest, 'copy'));
+                () => pywebview.api.export_person_photos(clusteringId, personId, dest, mode));
         }
 
         async function exportAllNamed() {
             const dest = await pywebview.api.select_folder();
             if (!dest) return;
+            const mode = getExportMode();
             await beginExport('Exporting all named people', dest,
-                () => pywebview.api.export_all_named(dest, 'copy'));
+                () => pywebview.api.export_all_named(dest, mode));
         }
 
         // Runs destination pre-flight checks; warns and waits for confirmation if the
@@ -1894,6 +1907,7 @@ let people = [];
             } else if (summary.cancelled) {
                 title = 'Export Cancelled';
                 lines = [`${summary.exported} photos exported before cancelling`];
+                if (summary.skipped_exists) lines.push(`${summary.skipped_exists} already present (skipped)`);
                 if (summary.skipped_missing) lines.push(`${summary.skipped_missing} skipped (source missing)`);
                 if (summary.failed) lines.push(`${summary.failed} failed`);
             } else if (summary.exported === 0 && summary.people === 0) {
@@ -1905,6 +1919,7 @@ let people = [];
                     `${summary.exported} photos exported`,
                     `${summary.people} ${summary.people === 1 ? 'person' : 'people'}`
                 ];
+                if (summary.skipped_exists) lines.push(`${summary.skipped_exists} already present (skipped)`);
                 if (summary.skipped_missing) lines.push(`${summary.skipped_missing} skipped (source missing)`);
                 if (summary.failed) lines.push(`${summary.failed} failed`);
             }
@@ -1960,6 +1975,79 @@ let people = [];
         document.getElementById('exportConfirmCancelBtn').addEventListener('click', () => {
             document.getElementById('exportConfirmOverlay').classList.remove('active');
             pendingExport = null;
+        });
+
+        // Export Photos settings section: multi-select people list with search.
+        let exportPeople = [];
+        let exportSelected = new Set();
+
+        async function loadExportPeople() {
+            try {
+                exportPeople = await pywebview.api.get_people_for_export();
+            } catch (error) {
+                console.error('Error loading people for export:', error);
+                exportPeople = [];
+            }
+            // Drop any selections that no longer exist (visibility changed, recluster, etc.)
+            const validIds = new Set(exportPeople.map(p => p.person_id));
+            exportSelected.forEach(id => { if (!validIds.has(id)) exportSelected.delete(id); });
+            renderExportPeople();
+        }
+
+        function renderExportPeople() {
+            const container = document.getElementById('exportPeopleList');
+            const filter = (document.getElementById('exportSearchInput').value || '').toLowerCase();
+            const filtered = exportPeople.filter(p => p.name.toLowerCase().includes(filter));
+
+            container.innerHTML = '';
+            if (filtered.length === 0) {
+                container.innerHTML = '<div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No people available</div>';
+                return;
+            }
+
+            filtered.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'folder-item export-person-item' + (exportSelected.has(p.person_id) ? ' selected' : '');
+                item.textContent = p.name;
+                item.addEventListener('click', () => {
+                    if (exportSelected.has(p.person_id)) {
+                        exportSelected.delete(p.person_id);
+                        item.classList.remove('selected');
+                    } else {
+                        exportSelected.add(p.person_id);
+                        item.classList.add('selected');
+                    }
+                });
+                container.appendChild(item);
+            });
+        }
+
+        document.getElementById('exportSearchInput').addEventListener('input', renderExportPeople);
+
+        document.getElementById('exportSelectAllBtn').addEventListener('click', () => {
+            const filter = (document.getElementById('exportSearchInput').value || '').toLowerCase();
+            exportPeople
+                .filter(p => p.name.toLowerCase().includes(filter))
+                .forEach(p => exportSelected.add(p.person_id));
+            renderExportPeople();
+        });
+
+        document.getElementById('exportClearBtn').addEventListener('click', () => {
+            exportSelected.clear();
+            renderExportPeople();
+        });
+
+        document.getElementById('exportSelectedBtn').addEventListener('click', async () => {
+            if (exportSelected.size === 0) {
+                showExportError('Select at least one person to export.');
+                return;
+            }
+            const ids = Array.from(exportSelected);
+            const dest = await pywebview.api.select_folder();
+            if (!dest) return;
+            const mode = getExportMode();
+            const label = `Exporting ${ids.length} ${ids.length === 1 ? 'person' : 'people'}`;
+            await beginExport(label, dest, () => pywebview.api.export_selected(ids, dest, mode));
         });
 
         let selectedIncludeFolder = null;

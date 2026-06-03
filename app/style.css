@@ -1277,6 +1277,12 @@
             margin: 6px 0;
         }
 
+        .export-mode-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
         .export-cancel-btn {
             margin-left: 12px;
             padding: 4px 14px;

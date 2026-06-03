@@ -256,7 +256,58 @@ class API:
             return {'success': False, 'message': 'No clustering available to export'}
         return self._start_export('all_named', clustering['clustering_id'], dest, mode)
 
-    def _start_export(self, scope, clustering_id, dest, mode, person_id=None):
+    def export_selected(self, person_ids, dest, mode='copy'):
+        """Start a background export of the given list of person_ids into
+        dest/<name>/. Used by the Export Photos settings section."""
+        clustering = self._db.get_active_clustering()
+        if not clustering:
+            return {'success': False, 'message': 'No clustering available to export'}
+        if not person_ids:
+            return {'success': False, 'message': 'No people selected'}
+        return self._start_export('selected', clustering['clustering_id'], dest, mode,
+                                  person_ids=person_ids)
+
+    def get_people_for_export(self):
+        """Lightweight people list for the export picker: [{person_id, name, ...}],
+        honoring the same visibility settings as the sidebar (show_hidden,
+        hide_unnamed) but without building thumbnails. "Unmatched Faces" is excluded
+        since it is not a real person."""
+        clustering = self._db.get_active_clustering()
+        if not clustering:
+            return []
+
+        clustering_id = clustering['clustering_id']
+        persons = self._db.get_persons_in_clustering(clustering_id)
+        hidden_persons = self._db.get_hidden_persons(clustering_id)
+        show_hidden = self._settings.get('show_hidden', False)
+        hide_unnamed = self._settings.get('hide_unnamed_persons', False)
+
+        result = []
+        for person in persons:
+            person_id = person['person_id']
+            if person_id == 0:
+                continue
+
+            is_hidden = person_id in hidden_persons
+            if is_hidden and not show_hidden:
+                continue
+
+            name = self._db.get_person_name_fast(clustering_id, person_id)
+            if name == 'Unmatched Faces':
+                continue
+            if hide_unnamed and name.startswith("Person "):
+                continue
+
+            result.append({
+                'person_id': person_id,
+                'clustering_id': clustering_id,
+                'name': name + (' (hidden)' if is_hidden else ''),
+                'is_hidden': is_hidden,
+            })
+
+        return result
+
+    def _start_export(self, scope, clustering_id, dest, mode, person_id=None, person_ids=None):
         if self._export_worker is not None and self._export_worker.is_alive():
             return {'success': False, 'message': 'An export is already running'}
         if not dest:
@@ -265,7 +316,8 @@ class API:
         show_hidden_photos = self._settings.get('show_hidden_photos', False)
         self._export_worker = ExportWorker(
             self._db, self, dest, scope, clustering_id,
-            person_id=person_id, mode=mode, show_hidden_photos=show_hidden_photos)
+            person_id=person_id, person_ids=person_ids, mode=mode,
+            show_hidden_photos=show_hidden_photos)
         self._export_worker.start()
         return {'success': True}
 
