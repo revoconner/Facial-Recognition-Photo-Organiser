@@ -17,6 +17,14 @@ let people = [];
         let allPersonPhotos = [];
         let currentPhotoSort = 'default';
         let photoFilter = { exts: null, pathText: '' };  // exts null = all extensions
+        // Grouping (F2): 'none' or a mode like 'folder' / 'date_month' / 'device'.
+        // gridGroups is the laid-out group descriptors (null = flat grid). collapsedGroups
+        // holds the keys of collapsed sections; renderedHeaders maps groupIndex -> node.
+        let currentPhotoGroup = 'none';
+        let gridGroups = null;
+        let collapsedGroups = new Set();
+        const renderedHeaders = new Map();
+        const GROUP_HEADER_H = 40;
         let lightboxCurrentIndex = 0;
         let transferContext = null;
         let hideUnnamedPersons = false;
@@ -506,6 +514,8 @@ let people = [];
             clearSelection();
             lightboxPhotos = [];
             renderedItems.clear();
+            renderedHeaders.clear();
+            collapsedGroups.clear();   // collapse state is per-person
             thumbCache.clear();
             photoGrid.style.height = '';
             photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">Loading photos...</div>';
@@ -526,10 +536,12 @@ let people = [];
 
                 if (allPersonPhotos.length === 0) {
                     lightboxPhotos = [];
+                    gridGroups = null;       // no stale grouped layout
                     computeGridGeometry();   // reset gridGeom.total to 0 (no stale layout)
                     photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos found</div>';
                     updatePhotoCountTitle();
                     updateFilterButtonLabel();
+                    updateGroupButtonLabel();
                     return;
                 }
 
@@ -583,6 +595,135 @@ let people = [];
             const name = p.name || '';
             const dot = name.lastIndexOf('.');
             return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+        }
+
+        // Parent folder of a photo (derived from its path, so always available).
+        function photoDir(p) {
+            const path = p.path || '';
+            const i = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'));
+            return i >= 0 ? path.slice(0, i) : '';
+        }
+
+        // ---- Grouping options + key/label -------------------------------------------
+        // Clickable group modes, grouped into categories (rendered in the Group panel).
+        // facet = the metadata field that must clear the 50% threshold for the mode to be
+        // offered (null = always available, path-derived).
+        const PHOTO_GROUP_OPTIONS = [
+            { value: 'folder',     label: 'File path',          cat: 'Folders',    facet: null },
+            { value: 'date_days',  label: 'Days',               cat: 'Date taken', facet: 'date_taken' },
+            { value: 'date_week',  label: 'Weeks',              cat: 'Date taken', facet: 'date_taken' },
+            { value: 'date_month', label: 'Months',             cat: 'Date taken', facet: 'date_taken' },
+            { value: 'date_year',  label: 'Years',              cat: 'Date taken', facet: 'date_taken' },
+            { value: 'device',     label: 'Camera make/model',  cat: 'Others',     facet: 'device' },
+        ];
+        const PHOTO_GROUP_CATEGORIES = ['Folders', 'Date taken', 'Others'];
+
+        // Inlined group-header icons (from app/svg/{expand,collapse}-group.svg) so they
+        // render without depending on the static file server. Expanded shows expand-group,
+        // collapsed shows collapse-group (per the spec).
+        const SVG_EXPAND = '<svg viewBox="-230.4 -230.4 2380.80 2380.80" width="13" height="13" fill="#cfcfcf" stroke="#cfcfcf" stroke-width="59.52"><path d="M959.921.01 453 506.933l152.28 152.28 246.946-246.944v1095.475L605.28 1260.798 453 1413.078 959.921 1920l506.921-506.921-152.28-152.281-246.946 246.945V412.268l246.945 246.945 152.281-152.281z" fill-rule="evenodd"/></svg>';
+        const SVG_COLLAPSE = '<svg viewBox="0 0 16 16" width="13" height="13" fill="#cfcfcf"><path d="M4.414,15.414L8,11.828L11.586,15.414L13,14L8,9L3,14L4.414,15.414ZM11.586,0.586L8,4.172L4.414,0.586L3,2L8,7L13,2L11.586,0.586Z"/></svg>';
+
+        function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+        // ISO-8601 week number (Mon-based) and its week-year.
+        function isoWeek(d) {
+            const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            const day = (date.getUTCDay() + 6) % 7;     // Mon=0..Sun=6
+            date.setUTCDate(date.getUTCDate() - day + 3); // nearest Thursday
+            const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+            const week = 1 + Math.round(
+                ((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+            return { year: date.getUTCFullYear(), week };
+        }
+
+        // {key, label, sortKey} for a photo under a grouping mode. key===null => the
+        // photo has no value for this facet (goes to the "No Data Available" group).
+        function groupKeyLabel(p, mode) {
+            const m = p.meta || {};
+            if (mode === 'folder') {
+                const d = photoDir(p);
+                return d ? { key: d, label: d, sortKey: 0 } : { key: null };
+            }
+            if (mode === 'device') {
+                const dev = ((m.camera_make || '') + ' ' + (m.camera_model || '')).trim();
+                return dev ? { key: dev.toLowerCase(), label: dev, sortKey: 0 } : { key: null };
+            }
+            if (mode.indexOf('date_') === 0) {
+                const ts = m.date_taken;
+                if (ts === null || ts === undefined) return { key: null };
+                const d = new Date(ts * 1000);
+                if (mode === 'date_days') {
+                    return {
+                        key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
+                        label: d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
+                        sortKey: ts,
+                    };
+                }
+                if (mode === 'date_month') {
+                    return {
+                        key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`,
+                        label: d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' }),
+                        sortKey: d.getFullYear() * 12 + d.getMonth(),
+                    };
+                }
+                if (mode === 'date_year') {
+                    return { key: String(d.getFullYear()), label: String(d.getFullYear()), sortKey: d.getFullYear() };
+                }
+                if (mode === 'date_week') {
+                    const w = isoWeek(d);
+                    return { key: `${w.year}-W${pad2(w.week)}`, label: `Week ${w.week}, ${w.year}`, sortKey: w.year * 53 + w.week };
+                }
+            }
+            return { key: null };
+        }
+
+        // Partition an already-sorted list into ordered group descriptors and return the
+        // flattened photo list (group order, within-group sort preserved). Date groups are
+        // ordered newest-first; folder/device alphabetically; "No Data Available" last.
+        function buildGroups(sorted, mode) {
+            const map = new Map();
+            let noData = null;
+            for (const p of sorted) {
+                const kl = groupKeyLabel(p, mode);
+                if (kl.key === null) {
+                    if (!noData) noData = { key: '__nodata__', label: 'No Data Available', sortKey: -Infinity, photos: [] };
+                    noData.photos.push(p);
+                    continue;
+                }
+                let g = map.get(kl.key);
+                if (!g) { g = { key: kl.key, label: kl.label, sortKey: kl.sortKey, photos: [] }; map.set(kl.key, g); }
+                g.photos.push(p);
+            }
+
+            const groups = Array.from(map.values());
+            const dateMode = mode.indexOf('date_') === 0;
+            groups.sort((a, b) => {
+                if (dateMode) return b.sortKey - a.sortKey;           // newest first
+                const la = a.label.toLowerCase(), lb = b.label.toLowerCase();
+                return la < lb ? -1 : (la > lb ? 1 : 0);              // alphabetical
+            });
+            if (noData) groups.push(noData);                          // always last
+
+            const flat = [];
+            const descriptors = [];
+            for (const g of groups) {
+                descriptors.push({
+                    key: g.key, label: g.label,
+                    startIndex: flat.length, count: g.photos.length,
+                    collapsed: collapsedGroups.has(g.key),
+                });
+                for (const p of g.photos) flat.push(p);
+            }
+            return { flat, groups: descriptors };
+        }
+
+        // Is a grouping mode usable for the current person (facet clears the threshold)?
+        function groupModeAvailable(mode) {
+            if (mode === 'none') return true;
+            const opt = PHOTO_GROUP_OPTIONS.find(o => o.value === mode);
+            if (!opt) return false;
+            return !opt.facet || facetFraction(allPersonPhotos, opt.facet) >= FACET_THRESHOLD;
         }
 
         function photoSortKey(p, field) {
@@ -681,10 +822,23 @@ let people = [];
             // this person, buildSortOptions() shows 'Default', and the order must match.
             const dropdown = document.getElementById('photoSortDropdown');
             const mode = dropdown && dropdown.value ? dropdown.value : currentPhotoSort;
-            lightboxPhotos = sortPhotos(filterPhotos(allPersonPhotos), mode);
+            const sorted = sortPhotos(filterPhotos(allPersonPhotos), mode);
+
+            // Group (if the chosen mode is available for this person). lightboxPhotos is
+            // the flattened group order so the grid AND the lightbox follow it.
+            const groupMode = groupModeAvailable(currentPhotoGroup) ? currentPhotoGroup : 'none';
+            if (groupMode === 'none') {
+                lightboxPhotos = sorted;
+                gridGroups = null;
+            } else {
+                const built = buildGroups(sorted, groupMode);
+                lightboxPhotos = built.flat;
+                gridGroups = built.groups;
+            }
 
             clearSelection();
             renderedItems.clear();
+            renderedHeaders.clear();
             const photoGrid = document.getElementById('photoGrid');
             photoGrid.innerHTML = '';
             // Always recompute geometry so gridGeom.total tracks the (possibly empty)
@@ -698,6 +852,7 @@ let people = [];
 
             updatePhotoCountTitle();
             updateFilterButtonLabel();
+            updateGroupButtonLabel();
         }
 
         function updatePhotoCountTitle() {
@@ -805,6 +960,71 @@ let people = [];
             }
         });
 
+        // ---- Group panel (single-select, button + panel like Filter) ----------------
+        let photoGroupPanel = null;
+
+        function setPhotoGroup(mode) {
+            currentPhotoGroup = mode;
+            try { pywebview.api.set_photo_group_mode(mode); } catch (err) {}
+            collapsedGroups.clear();   // collapse state is per-grouping
+            applyPhotoView();
+        }
+
+        function updateGroupButtonLabel() {
+            const btn = document.getElementById('photoGroupBtn');
+            if (!btn) return;
+            const active = gridGroups !== null;
+            btn.textContent = active ? 'Grouped' : 'Group';
+            btn.classList.toggle('active', active);
+        }
+
+        function openPhotoGroupPanel() {
+            closeAllMenus();
+            if (!photoGroupPanel) {
+                photoGroupPanel = document.createElement('div');
+                photoGroupPanel.className = 'context-menu filter-panel';
+                document.body.appendChild(photoGroupPanel);
+                photoGroupPanel.addEventListener('click', (e) => e.stopPropagation());
+            }
+            photoGroupPanel.innerHTML = '';
+
+            const addItem = (label, value, isActive) => {
+                const item = document.createElement('div');
+                item.className = 'context-menu-item' + (isActive ? ' active' : '');
+                item.textContent = label;
+                item.addEventListener('click', () => { setPhotoGroup(value); closeAllMenus(); });
+                photoGroupPanel.appendChild(item);
+            };
+            const addLabel = (text) => {
+                const el = document.createElement('div');
+                el.className = 'filter-panel-label';
+                el.textContent = text;
+                photoGroupPanel.appendChild(el);
+            };
+
+            addItem('No grouping', 'none', currentPhotoGroup === 'none');
+            for (const cat of PHOTO_GROUP_CATEGORIES) {
+                const opts = PHOTO_GROUP_OPTIONS.filter(o => o.cat === cat &&
+                    (!o.facet || facetFraction(allPersonPhotos, o.facet) >= FACET_THRESHOLD));
+                if (!opts.length) continue;
+                addLabel(cat);
+                opts.forEach(o => addItem(o.label, o.value, currentPhotoGroup === o.value));
+            }
+
+            photoGroupPanel.classList.add('show');
+            activeMenu = { element: photoGroupPanel, parent: document.getElementById('photoGroupBtn') };
+            positionMenu(photoGroupPanel, document.getElementById('photoGroupBtn'));
+        }
+
+        document.getElementById('photoGroupBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (photoGroupPanel && photoGroupPanel.classList.contains('show')) {
+                closeAllMenus();
+            } else {
+                openPhotoGroupPanel();
+            }
+        });
+
         /**
          * Recompute column count and cell size from the grid's current width and the
          * user's grid-size setting, then set the grid's full virtual height.
@@ -826,25 +1046,64 @@ let people = [];
             const cellW = (width - (cols - 1) * GRID_GAP) / cols;
             const cellH = cellW;                 // square cells
             const rowH = cellH + GRID_GAP;
-            const rows = Math.ceil(total / cols);
 
             gridGeom = { cols, cellW, cellH, rowH, total };
 
-            // Full height so the scrollbar reflects every row; trailing gap removed.
-            photoGrid.style.height = (rows > 0 ? rows * rowH - GRID_GAP : 0) + 'px';
+            if (gridGroups) {
+                // Lay each group out as a header followed by its rows of cells (no rows
+                // when collapsed). headerTop / cellsTop / rows are read back when rendering.
+                let y = 0;
+                for (const g of gridGroups) {
+                    g.headerTop = y;
+                    y += GROUP_HEADER_H;
+                    g.cellsTop = y;
+                    g.rows = g.collapsed ? 0 : Math.ceil(g.count / cols);
+                    y += g.rows * rowH;
+                }
+                photoGrid.style.height = (y > 0 ? y : 0) + 'px';
+            } else {
+                // Full height so the scrollbar reflects every row; trailing gap removed.
+                const rows = Math.ceil(total / cols);
+                photoGrid.style.height = (rows > 0 ? rows * rowH - GRID_GAP : 0) + 'px';
+            }
         }
 
         /**
          * Absolutely position a cell node for its index using the current geometry.
          */
+        // The group (descriptor) a flat index belongs to, via binary search on startIndex.
+        function groupOfIndex(index) {
+            if (!gridGroups) return null;
+            let lo = 0, hi = gridGroups.length - 1;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                const g = gridGroups[mid];
+                if (index < g.startIndex) hi = mid - 1;
+                else if (index >= g.startIndex + g.count) lo = mid + 1;
+                else return g;
+            }
+            return null;
+        }
+
         function positionPhotoItem(node, index) {
             const cols = gridGeom.cols;
-            const col = index % cols;
-            const row = Math.floor(index / cols);
-            node.style.left = (col * (gridGeom.cellW + GRID_GAP)) + 'px';
-            node.style.top = (row * gridGeom.rowH) + 'px';
             node.style.width = gridGeom.cellW + 'px';
             node.style.height = gridGeom.cellH + 'px';
+
+            if (gridGroups) {
+                const g = groupOfIndex(index);
+                if (!g) return;
+                const local = index - g.startIndex;
+                const col = local % cols;
+                const row = Math.floor(local / cols);
+                node.style.left = (col * (gridGeom.cellW + GRID_GAP)) + 'px';
+                node.style.top = (g.cellsTop + row * gridGeom.rowH) + 'px';
+            } else {
+                const col = index % cols;
+                const row = Math.floor(index / cols);
+                node.style.left = (col * (gridGeom.cellW + GRID_GAP)) + 'px';
+                node.style.top = (row * gridGeom.rowH) + 'px';
+            }
         }
 
         /**
@@ -855,6 +1114,8 @@ let people = [];
          * roughly the visible area no matter how many photos the person has.
          */
         function renderGridWindow(force) {
+            if (gridGroups) { renderGroupedWindow(); return; }
+
             const container = document.querySelector('.photo-grid-container');
             const photoGrid = document.getElementById('photoGrid');
 
@@ -895,6 +1156,92 @@ let people = [];
                     photoGrid.appendChild(node);
                 }
             }
+        }
+
+        /**
+         * Grouped equivalent of renderGridWindow: walks the group descriptors and renders
+         * the headers and cells whose y-range intersects the viewport (plus a buffer),
+         * recycling everything outside it. Cells use their flat index (into lightboxPhotos)
+         * so clicks/lightbox/selection work unchanged.
+         */
+        function renderGroupedWindow() {
+            const container = document.querySelector('.photo-grid-container');
+            const photoGrid = document.getElementById('photoGrid');
+            if (!container || !photoGrid || !gridGroups || lightboxPhotos.length === 0) return;
+
+            const cols = gridGeom.cols;
+            const rowH = gridGeom.rowH;
+            const scrollTop = container.scrollTop;
+            const viewH = container.clientHeight;
+            const bufPx = GRID_BUFFER_ROWS * rowH;
+            const vTop = scrollTop - bufPx;
+            const vBottom = scrollTop + viewH + bufPx;
+
+            const visibleCells = new Set();
+            const visibleHeaders = new Set();
+
+            for (let gi = 0; gi < gridGroups.length; gi++) {
+                const g = gridGroups[gi];
+                const blockBottom = g.cellsTop + g.rows * rowH;   // rows = 0 when collapsed
+                if (blockBottom < vTop || g.headerTop > vBottom) continue;
+
+                if (g.headerTop <= vBottom && (g.headerTop + GROUP_HEADER_H) >= vTop) {
+                    visibleHeaders.add(gi);
+                    if (!renderedHeaders.has(gi)) {
+                        const hnode = createGroupHeader(gi);
+                        renderedHeaders.set(gi, hnode);
+                        photoGrid.appendChild(hnode);
+                    } else {
+                        renderedHeaders.get(gi).style.top = g.headerTop + 'px';
+                    }
+                }
+
+                if (!g.collapsed && g.rows > 0) {
+                    let firstRow = Math.max(0, Math.floor((vTop - g.cellsTop) / rowH));
+                    let lastRow = Math.min(g.rows - 1, Math.floor((vBottom - g.cellsTop) / rowH));
+                    for (let r = firstRow; r <= lastRow; r++) {
+                        for (let c = 0; c < cols; c++) {
+                            const local = r * cols + c;
+                            if (local >= g.count) break;
+                            const flatIdx = g.startIndex + local;
+                            visibleCells.add(flatIdx);
+                            if (!renderedItems.has(flatIdx)) {
+                                const node = createPhotoItem(flatIdx);
+                                if (!node) continue;
+                                renderedItems.set(flatIdx, node);
+                                photoGrid.appendChild(node);
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const [idx, node] of renderedItems) {
+                if (!visibleCells.has(idx)) { node.remove(); renderedItems.delete(idx); }
+            }
+            for (const [gi, node] of renderedHeaders) {
+                if (!visibleHeaders.has(gi)) { node.remove(); renderedHeaders.delete(gi); }
+            }
+        }
+
+        /**
+         * Build a collapsible group-header row (icon + label + count). Click is handled
+         * by the delegated grid listener (onGridClick) via the data-gi attribute.
+         */
+        function createGroupHeader(gi) {
+            const g = gridGroups[gi];
+            const node = document.createElement('div');
+            node.className = 'group-header';
+            node.dataset.gi = gi;
+            node.style.top = g.headerTop + 'px';
+            node.style.height = GROUP_HEADER_H + 'px';
+            node.innerHTML =
+                `<span class="group-header-icon">${g.collapsed ? SVG_COLLAPSE : SVG_EXPAND}</span>` +
+                `<span class="group-header-label"></span>` +
+                `<span class="group-header-count"></span>`;
+            node.querySelector('.group-header-label').textContent = g.label;
+            node.querySelector('.group-header-count').textContent = `(${g.count})`;
+            return node;
         }
 
         /**
@@ -987,6 +1334,26 @@ let people = [];
             for (const [idx, node] of renderedItems) {
                 positionPhotoItem(node, idx);
             }
+            if (gridGroups) {
+                for (const [gi, node] of renderedHeaders) {
+                    if (gridGroups[gi]) node.style.top = gridGroups[gi].headerTop + 'px';
+                }
+            }
+            renderGridWindow(true);
+        }
+
+        // Collapse/expand a group section and re-lay-out (everything below it shifts).
+        function toggleGroupCollapse(gi) {
+            const g = gridGroups && gridGroups[gi];
+            if (!g) return;
+            if (g.collapsed) { collapsedGroups.delete(g.key); g.collapsed = false; }
+            else { collapsedGroups.add(g.key); g.collapsed = true; }
+
+            renderedItems.forEach(node => node.remove());
+            renderedItems.clear();
+            renderedHeaders.forEach(node => node.remove());
+            renderedHeaders.clear();
+            computeGridGeometry();
             renderGridWindow(true);
         }
 
@@ -1101,6 +1468,12 @@ let people = [];
          * the old per-cell listeners did.
          */
         function onGridClick(e) {
+            const header = e.target.closest('.group-header');
+            if (header) {
+                toggleGroupCollapse(parseInt(header.dataset.gi, 10));
+                return;
+            }
+
             const item = e.target.closest('.photo-item');
             if (!item) return;
 
@@ -1596,6 +1969,8 @@ let people = [];
 
                 currentPhotoSort = await pywebview.api.get_photo_sort_mode();
                 buildSortOptions();
+
+                currentPhotoGroup = await pywebview.api.get_photo_group_mode();
 
                 const closeToTray = await pywebview.api.get_close_to_tray();
                 document.getElementById('closeToTrayToggle').checked = closeToTray;

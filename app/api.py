@@ -980,6 +980,12 @@ class API:
     def set_photo_sort_mode(self, mode):
         self._settings.set('photo_sort_mode', mode)
 
+    def get_photo_group_mode(self):
+        return self._settings.get('photo_group_mode', 'none')
+
+    def set_photo_group_mode(self, mode):
+        self._settings.set('photo_group_mode', mode)
+
     def get_log_level(self):
         return self._settings.get('log_level', 'INFO')
 
