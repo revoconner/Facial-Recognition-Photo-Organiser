@@ -7,6 +7,17 @@ from typing import List, Optional, Tuple, Set, Dict
 from collections import Counter
 import numpy as np
 
+# Bumped when the set of captured photo metadata changes; photos with a lower
+# meta_version are re-read on the next scan (see workers.ScanWorker.backfill_metadata).
+CURRENT_META_VERSION = 1
+
+# photos-table columns that update_photo_metadata is allowed to write (the "hot"
+# facets we filter/sort on constantly). Anything else goes in the photo_metadata EAV.
+_META_HOT_COLUMNS = {
+    'date_taken', 'date_modified', 'date_created', 'camera_make', 'camera_model',
+    'file_ext', 'file_size', 'width', 'height',
+}
+
 
 class FaceDatabase:
     def __init__(self, db_folder: str):
@@ -156,7 +167,20 @@ class FaceDatabase:
                 FOREIGN KEY (face_id) REFERENCES faces(face_id)
             )
         ''')
-        
+
+        # Long-tail photo metadata (F2). Hot facets live in columns on photos (added by
+        # _migrate_add_metadata_columns); advanced/rare keys (ISO, focal length, lens...)
+        # live here so new facets don't churn the schema.
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS photo_metadata (
+                photo_id INTEGER NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT,
+                PRIMARY KEY (photo_id, key),
+                FOREIGN KEY (photo_id) REFERENCES photos(photo_id)
+            )
+        ''')
+
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_status ON photos(scan_status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_path ON photos(file_path)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_hash ON photos(file_hash)')
@@ -168,9 +192,19 @@ class FaceDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_combined ON face_tags(tag_name, face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tag_primary_photos ON tag_primary_photos(tag_name)')
-        
+
+        # Add the metadata columns before indexing them (they don't exist on the base
+        # photos table nor on an upgraded DB until this runs).
+        self._migrate_add_metadata_columns(cursor)
+
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_date_taken ON photos(date_taken)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_camera ON photos(camera_make, camera_model)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_ext ON photos(file_ext)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photos_meta_version ON photos(meta_version)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_photo_metadata_key ON photo_metadata(key, value)')
+
         self.conn.commit()
-        
+
         self._migrate_add_is_manual_column(cursor)
     
     def _migrate_add_is_manual_column(self, cursor):
@@ -185,7 +219,36 @@ class FaceDatabase:
                 print("Migration complete: 'is_manual' column added")
         except Exception as e:
             print(f"Migration error (non-critical): {e}")
-    
+
+    def _migrate_add_metadata_columns(self, cursor):
+        """Add the F2 hot-facet columns to photos if missing (additive, in place - no
+        rescan of faces). Existing rows get NULL/0 and are backfilled on the next scan."""
+        new_columns = [
+            ('date_taken', 'REAL'),
+            ('date_modified', 'REAL'),
+            ('date_created', 'REAL'),
+            ('camera_make', 'TEXT'),
+            ('camera_model', 'TEXT'),
+            ('file_ext', 'TEXT'),
+            ('file_size', 'INTEGER'),
+            ('width', 'INTEGER'),
+            ('height', 'INTEGER'),
+            ('meta_version', 'INTEGER DEFAULT 0'),
+        ]
+        try:
+            cursor.execute("PRAGMA table_info(photos)")
+            existing = {row[1] for row in cursor.fetchall()}
+            added = []
+            for name, decl in new_columns:
+                if name not in existing:
+                    cursor.execute(f'ALTER TABLE photos ADD COLUMN {name} {decl}')
+                    added.append(name)
+            if added:
+                self.conn.commit()
+                print(f"Migration complete: added photos columns {added}")
+        except Exception as e:
+            print(f"Migration error (non-critical): {e}")
+
     def _get_temp_table_name(self) -> str:
         self._temp_table_counter += 1
         return f"temp_ids_{self._temp_table_counter}"
@@ -264,6 +327,46 @@ class FaceDatabase:
         cursor.execute('SELECT photo_id FROM photos WHERE file_path = ?', (file_path,))
         row = cursor.fetchone()
         return row[0] if row else None
+
+    def update_photo_metadata(self, photo_id: int, hot: dict, eav: dict):
+        """Write captured metadata for one photo (F2). `hot` maps photos-table columns
+        (filtered to the allowed hot facets) to values; `eav` maps long-tail keys for
+        photo_metadata. Sets meta_version so the photo isn't re-read next scan.
+
+        Does NOT commit - the caller batches commits (see ScanWorker), so writing
+        metadata for thousands of photos doesn't fsync per row."""
+        cursor = self.conn.cursor()
+
+        columns = {k: v for k, v in (hot or {}).items() if k in _META_HOT_COLUMNS}
+        columns['meta_version'] = CURRENT_META_VERSION
+        set_clause = ', '.join(f"{col} = ?" for col in columns)
+        cursor.execute(
+            f'UPDATE photos SET {set_clause} WHERE photo_id = ?',
+            list(columns.values()) + [photo_id]
+        )
+
+        for key, value in (eav or {}).items():
+            cursor.execute('''
+                INSERT INTO photo_metadata (photo_id, key, value)
+                VALUES (?, ?, ?)
+                ON CONFLICT(photo_id, key) DO UPDATE SET value = excluded.value
+            ''', (photo_id, key, str(value)))
+
+    def get_photos_missing_metadata(self, limit: Optional[int] = None) -> List[Tuple[int, str]]:
+        """Completed photos whose metadata predates CURRENT_META_VERSION (e.g. scanned
+        before metadata capture existed). These are read - without re-detection - on the
+        next scan (fold-in backfill). Returns (photo_id, file_path) rows."""
+        cursor = self.conn.cursor()
+        query = '''
+            SELECT photo_id, file_path FROM photos
+            WHERE scan_status = 'completed' AND COALESCE(meta_version, 0) < ?
+        '''
+        params: list = [CURRENT_META_VERSION]
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+        cursor.execute(query, params)
+        return [(row[0], row[1]) for row in cursor.fetchall()]
     
     def get_all_scanned_paths(self) -> Set[str]:
         cursor = self.conn.cursor()
@@ -518,7 +621,9 @@ class FaceDatabase:
         total_count = self.get_person_photo_count_fast(clustering_id, person_id)
         
         cursor.execute('''
-            SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
+            SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2,
+                   p.date_taken, p.date_modified, p.date_created, p.camera_make, p.camera_model,
+                   p.file_ext, p.file_size, p.width, p.height
             FROM photos p
             JOIN faces f ON p.photo_id = f.photo_id
             JOIN cluster_assignments ca ON f.face_id = ca.face_id
@@ -539,7 +644,9 @@ class FaceDatabase:
             
             if remaining_limit > 0:
                 cursor.execute('''
-                    SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2
+                    SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2,
+                           p.date_taken, p.date_modified, p.date_created, p.camera_make, p.camera_model,
+                           p.file_ext, p.file_size, p.width, p.height
                     FROM photos p
                     JOIN faces f ON p.photo_id = f.photo_id
                     JOIN face_tags ft ON f.face_id = ft.face_id

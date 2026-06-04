@@ -15,6 +15,7 @@ import networkx as nx
 import torch
 
 from utils import get_insightface_root
+from metadata import read_photo_metadata
 
 GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
@@ -158,50 +159,96 @@ class ScanWorker(threading.Thread):
         
         new_photos = all_image_files - scanned_paths
         photos_to_scan = list(new_photos | pending_paths)
-        
+
+        self.api.set_new_photos_found(len(new_photos) > 0)
+
         if len(photos_to_scan) == 0:
             self.api.update_status("No new photos to scan")
-            self.api.set_new_photos_found(False)
-            self.api.scan_complete()
-            return
-        
-        self.api.set_new_photos_found(len(new_photos) > 0)
-        
-        total = len(photos_to_scan)
-        total_photos = len(all_image_files)
-        scanned_count = total_photos - total
-        
-        self.api.update_status(f"Found {len(new_photos)} new photos, {len(pending_paths)} incomplete")
-        
-        if len(new_photos) > 0:
-            self.api.update_status(f"New photos detected: {len(new_photos)} files")
-            new_photos_list = sorted(list(new_photos))
-            for i, photo_path in enumerate(new_photos_list[:10]):
-                self.api.update_status(f"  NEW: {os.path.basename(photo_path)}")
-            if len(new_photos_list) > 10:
-                self.api.update_status(f"  ... and {len(new_photos_list) - 10} more")
-        
-        if len(pending_paths) > 0:
-            self.api.update_status(f"Incomplete photos to retry: {len(pending_paths)} files")
-            pending_list = sorted(list(pending_paths))
-            for i, photo_path in enumerate(pending_list[:10]):
-                self.api.update_status(f"  RETRY: {os.path.basename(photo_path)}")
-            if len(pending_list) > 10:
-                self.api.update_status(f"  ... and {len(pending_list) - 10} more")
-        
-        self.api.update_status(f"Starting scan of {total} photos in batches of {self.batch_size}...")
-        
-        for batch_start in range(0, total, self.batch_size):
-            batch_end = min(batch_start + self.batch_size, total)
-            batch = photos_to_scan[batch_start:batch_end]
-            
-            self.process_batch(batch, scanned_count + batch_start, total_photos, new_photos)
-            
-            should_throttle = self.api.get_dynamic_resources() and not self.api.is_window_foreground()
-            if should_throttle:
-                time.sleep(0.5)
-        
+        else:
+            total = len(photos_to_scan)
+            total_photos = len(all_image_files)
+            scanned_count = total_photos - total
+
+            self.api.update_status(f"Found {len(new_photos)} new photos, {len(pending_paths)} incomplete")
+
+            if len(new_photos) > 0:
+                self.api.update_status(f"New photos detected: {len(new_photos)} files")
+                new_photos_list = sorted(list(new_photos))
+                for i, photo_path in enumerate(new_photos_list[:10]):
+                    self.api.update_status(f"  NEW: {os.path.basename(photo_path)}")
+                if len(new_photos_list) > 10:
+                    self.api.update_status(f"  ... and {len(new_photos_list) - 10} more")
+
+            if len(pending_paths) > 0:
+                self.api.update_status(f"Incomplete photos to retry: {len(pending_paths)} files")
+                pending_list = sorted(list(pending_paths))
+                for i, photo_path in enumerate(pending_list[:10]):
+                    self.api.update_status(f"  RETRY: {os.path.basename(photo_path)}")
+                if len(pending_list) > 10:
+                    self.api.update_status(f"  ... and {len(pending_list) - 10} more")
+
+            self.api.update_status(f"Starting scan of {total} photos in batches of {self.batch_size}...")
+
+            for batch_start in range(0, total, self.batch_size):
+                batch_end = min(batch_start + self.batch_size, total)
+                batch = photos_to_scan[batch_start:batch_end]
+
+                self.process_batch(batch, scanned_count + batch_start, total_photos, new_photos)
+
+                should_throttle = self.api.get_dynamic_resources() and not self.api.is_window_foreground()
+                if should_throttle:
+                    time.sleep(0.5)
+
+        # Tell the UI the scan is done first, so the people list (and any clustering)
+        # isn't blocked by a long first-time metadata pass.
         self.api.scan_complete()
+
+        # If scan_complete kicked off a re-cluster, let it finish before the metadata
+        # backfill writes. SQLite (even in WAL) allows only one writer; running the
+        # backfill concurrently with the clustering save competed for that lock and
+        # aborted clustering with "database is locked". Clustering is the priority.
+        self.api.wait_for_active_clustering()
+
+        # Fold-in metadata backfill (F2): read metadata for already-completed photos that
+        # don't have it yet, with no re-detection. Runs after clustering so it proceeds
+        # in the background on this worker thread; it's resumable (meta_version) and runs
+        # every scan until the whole library is captured, then finds nothing to do.
+        self.backfill_metadata()
+
+    def backfill_metadata(self):
+        """Read filesystem + EXIF metadata for completed photos missing it (no face
+        detection). Commits in batches and honors the dynamic-resource throttle. This is
+        how libraries scanned before metadata capture existed get populated."""
+        missing = self.db.get_photos_missing_metadata()
+        if not missing:
+            return
+
+        total = len(missing)
+        self.api.update_status(f"Reading metadata for {total} photos (no re-detection needed)...")
+
+        processed = 0
+        for photo_id, file_path in missing:
+            if os.path.exists(file_path):
+                try:
+                    hot, eav = read_photo_metadata(file_path)
+                    self.db.update_photo_metadata(photo_id, hot, eav)
+                except Exception as e:
+                    self.api.update_status(
+                        f"WARNING: metadata read failed - {os.path.basename(file_path)}: {e}")
+
+            processed += 1
+
+            if processed % 100 == 0 or processed == total:
+                self.db.conn.commit()
+                self.api.update_progress(processed, total, label="Reading metadata")
+            if processed % 1000 == 0:
+                self.api.update_status(f"Metadata: {processed}/{total}")
+
+            if self.api.get_dynamic_resources() and not self.api.is_window_foreground():
+                time.sleep(0.005)
+
+        self.db.conn.commit()
+        self.api.update_status(f"Metadata read complete: {total} photos")
     
     def process_batch(self, batch: List[str], start_idx: int, total_photos: int, new_photos: set):
         batch_data = []
@@ -270,12 +317,18 @@ class ScanWorker(threading.Thread):
                 embedding_norm = embedding / np.linalg.norm(embedding)
                 bbox = face.bbox.tolist()
                 face_data.append({'embedding': embedding_norm, 'bbox': bbox})
-            
+
+            # Capture photo metadata (F2) while we have the file open. Dimensions come
+            # from the already-decoded image so there's no second decode.
+            h, w = image.shape[:2]
+            hot, eav = read_photo_metadata(file_path, width=w, height=h)
+
             return {
                 'file_path': file_path,
                 'photo_id': photo_id,
                 'status': 'completed',
-                'faces': face_data
+                'faces': face_data,
+                'metadata': (hot, eav)
             }
             
         except Exception as e:
@@ -288,12 +341,16 @@ class ScanWorker(threading.Thread):
             
             for photo_data in batch_data:
                 photo_id = photo_data['photo_id']
-                
+
                 for face_data in photo_data['faces']:
                     face_id = self.db.add_face(photo_id, face_data['embedding'], face_data['bbox'])
-                
+
                 self.db.update_photo_status(photo_id, photo_data['status'])
-            
+
+                if photo_data.get('metadata'):
+                    hot, eav = photo_data['metadata']
+                    self.db.update_photo_metadata(photo_id, hot, eav)
+
             self.db.conn.commit()
             
         except Exception as e:

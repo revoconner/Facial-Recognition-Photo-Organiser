@@ -26,6 +26,7 @@ class Settings:
             'wildcard_exclusions': '',
             'view_mode': 'entire_photo',
             'sort_mode': 'names_asc',
+            'photo_sort_mode': 'default',
             'hide_unnamed_persons': False,
             'scan_frequency': 'restart_1_day',
             'last_scan_time': None,

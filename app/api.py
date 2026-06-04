@@ -261,6 +261,15 @@ class API:
             threshold = self.get_threshold()
             self._cluster_worker = ClusterWorker(self._db, threshold, self)
             self._cluster_worker.start()
+
+    def wait_for_active_clustering(self):
+        """Block until any in-progress clustering finishes. ScanWorker calls this before
+        the metadata backfill so the two don't both write to SQLite at once - concurrent
+        writers exhaust WAL's single-writer lock and raised 'database is locked', which
+        aborted clustering. Clustering is the priority; the backfill is background."""
+        worker = self._cluster_worker
+        if worker is not None and worker.is_alive():
+            worker.join()
     
     def export_person_photos(self, clustering_id, person_id, dest, mode='copy'):
         """Start a background export of one person's photos into dest/<name>/."""
@@ -688,7 +697,20 @@ class API:
                 'is_hidden': is_hidden,
                 # bbox is always included so the front end can switch between the
                 # whole-photo and zoom-to-face crops without another round trip.
-                'bbox': [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']]
+                'bbox': [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']],
+                # Captured metadata (F2) for in-grid sort/filter/group. Any field may be
+                # None (not captured yet, or absent from the photo).
+                'meta': {
+                    'date_taken': data.get('date_taken'),
+                    'date_modified': data.get('date_modified'),
+                    'date_created': data.get('date_created'),
+                    'camera_make': data.get('camera_make'),
+                    'camera_model': data.get('camera_model'),
+                    'file_ext': data.get('file_ext'),
+                    'file_size': data.get('file_size'),
+                    'width': data.get('width'),
+                    'height': data.get('height'),
+                }
             })
 
         return {'photos': photos, 'total_count': len(photos)}
@@ -951,6 +973,12 @@ class API:
 
     def set_sort_mode(self, mode):
         self._settings.set('sort_mode', mode)
+
+    def get_photo_sort_mode(self):
+        return self._settings.get('photo_sort_mode', 'default')
+
+    def set_photo_sort_mode(self, mode):
+        self._settings.set('photo_sort_mode', mode)
 
     def get_log_level(self):
         return self._settings.get('log_level', 'INFO')

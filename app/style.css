@@ -1296,6 +1296,59 @@
             align-items: center;
         }
 
+        #photoFilterBtn.active {
+            background: #3b82f6;
+            color: #ffffff;
+        }
+
+        .filter-panel {
+            padding: 12px;
+            min-width: 210px;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .filter-panel-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #808080;
+            margin: 10px 0 4px;
+        }
+
+        .filter-panel-label:first-child {
+            margin-top: 0;
+        }
+
+        .filter-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 2px;
+            font-size: 13px;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+
+        .filter-path-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .filter-panel-empty {
+            font-size: 13px;
+            color: #808080;
+            padding: 4px 2px;
+        }
+
         .export-cancel-btn {
             margin-left: 12px;
             padding: 4px 14px;

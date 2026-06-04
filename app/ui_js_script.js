@@ -12,6 +12,11 @@ let people = [];
         let currentSortMode = 'names_asc';
         let renameContext = null;
         let lightboxPhotos = [];
+        // F2 sort/filter: allPersonPhotos is the full per-person list; lightboxPhotos
+        // (used by the grid AND the lightbox) is the sorted+filtered view of it.
+        let allPersonPhotos = [];
+        let currentPhotoSort = 'default';
+        let photoFilter = { exts: null, pathText: '' };  // exts null = all extensions
         let lightboxCurrentIndex = 0;
         let transferContext = null;
         let hideUnnamedPersons = false;
@@ -513,22 +518,275 @@ let people = [];
                 const result = await pywebview.api.get_person_photo_list(clustering_id, person_id);
                 if (mySeq !== gridReqSeq) return;   // a newer load superseded this one
 
-                lightboxPhotos = (result && Array.isArray(result.photos)) ? result.photos : [];
+                allPersonPhotos = (result && Array.isArray(result.photos)) ? result.photos : [];
+                // Filter is per-person (extensions differ between people); reset it on
+                // every load. The sort preference persists across people.
+                photoFilter = { exts: null, pathText: '' };
+                buildSortOptions();
 
-                if (lightboxPhotos.length === 0) {
+                if (allPersonPhotos.length === 0) {
+                    lightboxPhotos = [];
                     photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos found</div>';
+                    updatePhotoCountTitle();
+                    updateFilterButtonLabel();
                     return;
                 }
 
                 photoGrid.innerHTML = '';
-                computeGridGeometry();
-                renderGridWindow(true);
+                applyPhotoView();
             } catch (error) {
                 console.error('Error loading photos:', error);
                 addLogEntry('ERROR loading photos: ' + error.toString());
                 photoGrid.innerHTML = `<div style="color: #ff6b6b; padding: 20px;">Error loading photos: ${error.toString()}</div>`;
             }
         }
+
+        // ---- F2: per-person photo sort + filter -------------------------------------
+        // A facet (date/size/device) is only offered as a sort option when at least this
+        // fraction of the person's photos have a value for it (the "50% rule"). Name,
+        // path and extension are derived from the filename, so they're always available.
+        const FACET_THRESHOLD = 0.5;
+
+        // Sort options in display order. facet = the metadata field that must clear the
+        // threshold for the option to appear (null = always available).
+        const PHOTO_SORT_OPTIONS = [
+            { value: 'default',       label: 'Default order',          facet: null },
+            { value: 'name_asc',      label: 'Name (A-Z)',             facet: null },
+            { value: 'name_desc',     label: 'Name (Z-A)',             facet: null },
+            { value: 'path_asc',      label: 'File path (A-Z)',        facet: null },
+            { value: 'taken_desc',    label: 'Date taken (newest)',    facet: 'date_taken' },
+            { value: 'taken_asc',     label: 'Date taken (oldest)',    facet: 'date_taken' },
+            { value: 'modified_desc', label: 'Date modified (newest)', facet: 'date_modified' },
+            { value: 'modified_asc',  label: 'Date modified (oldest)', facet: 'date_modified' },
+            { value: 'created_desc',  label: 'Date created (newest)',  facet: 'date_created' },
+            { value: 'created_asc',   label: 'Date created (oldest)',  facet: 'date_created' },
+            { value: 'size_desc',     label: 'Largest first',          facet: 'file_size' },
+            { value: 'size_asc',      label: 'Smallest first',         facet: 'file_size' },
+            { value: 'device_asc',    label: 'Device',                 facet: 'device' },
+        ];
+
+        // mode -> [keyName, direction]
+        const PHOTO_SORT_DEFS = {
+            name_asc: ['name', 'asc'], name_desc: ['name', 'desc'],
+            path_asc: ['path', 'asc'],
+            taken_desc: ['date_taken', 'desc'], taken_asc: ['date_taken', 'asc'],
+            modified_desc: ['date_modified', 'desc'], modified_asc: ['date_modified', 'asc'],
+            created_desc: ['date_created', 'desc'], created_asc: ['date_created', 'asc'],
+            size_desc: ['file_size', 'desc'], size_asc: ['file_size', 'asc'],
+            device_asc: ['device', 'asc'],
+        };
+
+        function photoExt(p) {
+            if (p.meta && p.meta.file_ext) return p.meta.file_ext;
+            const name = p.name || '';
+            const dot = name.lastIndexOf('.');
+            return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+        }
+
+        function photoSortKey(p, field) {
+            const m = p.meta || {};
+            switch (field) {
+                case 'name': return (p.name || '').toLowerCase();
+                case 'path': return (p.path || '').toLowerCase();
+                case 'date_taken': return m.date_taken;
+                case 'date_modified': return m.date_modified;
+                case 'date_created': return m.date_created;
+                case 'file_size': return m.file_size;
+                case 'device': {
+                    const d = ((m.camera_make || '') + ' ' + (m.camera_model || '')).trim().toLowerCase();
+                    return d || null;
+                }
+                default: return null;
+            }
+        }
+
+        function facetFraction(photos, field) {
+            if (photos.length === 0) return 0;
+            let have = 0;
+            for (const p of photos) {
+                const k = photoSortKey(p, field);
+                if (k !== null && k !== undefined && k !== '') have++;
+            }
+            return have / photos.length;
+        }
+
+        function buildSortOptions() {
+            const dropdown = document.getElementById('photoSortDropdown');
+            if (!dropdown) return;
+            dropdown.innerHTML = '';
+            let sawCurrent = false;
+            for (const opt of PHOTO_SORT_OPTIONS) {
+                if (opt.facet && facetFraction(allPersonPhotos, opt.facet) < FACET_THRESHOLD) continue;
+                const o = document.createElement('option');
+                o.value = opt.value;
+                o.textContent = opt.label;
+                dropdown.appendChild(o);
+                if (opt.value === currentPhotoSort) sawCurrent = true;
+            }
+            // If the saved sort isn't available for this person, show Default (without
+            // overwriting the saved preference).
+            dropdown.value = sawCurrent ? currentPhotoSort : 'default';
+        }
+
+        function sortPhotos(list, mode) {
+            const def = PHOTO_SORT_DEFS[mode];
+            if (!def) return list;   // 'default' / unknown -> keep API order
+            const [field, dir] = def;
+            const factor = dir === 'asc' ? 1 : -1;
+            return list.slice().sort((a, b) => {
+                const ka = photoSortKey(a, field);
+                const kb = photoSortKey(b, field);
+                const na = (ka === null || ka === undefined || ka === '');
+                const nb = (kb === null || kb === undefined || kb === '');
+                if (na && nb) return 0;
+                if (na) return 1;    // missing values always sort to the bottom
+                if (nb) return -1;
+                if (ka < kb) return -1 * factor;
+                if (ka > kb) return 1 * factor;
+                return 0;
+            });
+        }
+
+        function filterPhotos(list) {
+            let out = list;
+            if (photoFilter.exts) {
+                out = out.filter(p => photoFilter.exts.has(photoExt(p)));
+            }
+            if (photoFilter.pathText) {
+                out = out.filter(p => (p.path || '').toLowerCase().includes(photoFilter.pathText));
+            }
+            return out;
+        }
+
+        // Recompute the displayed list (lightboxPhotos) from allPersonPhotos and re-render.
+        function applyPhotoView() {
+            // Use the dropdown's effective value: if the saved sort isn't available for
+            // this person, buildSortOptions() shows 'Default', and the order must match.
+            const dropdown = document.getElementById('photoSortDropdown');
+            const mode = dropdown && dropdown.value ? dropdown.value : currentPhotoSort;
+            lightboxPhotos = sortPhotos(filterPhotos(allPersonPhotos), mode);
+
+            clearSelection();
+            renderedItems.clear();
+            const photoGrid = document.getElementById('photoGrid');
+            if (lightboxPhotos.length === 0) {
+                photoGrid.style.height = '';
+                photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos match the current filter</div>';
+            } else {
+                photoGrid.innerHTML = '';
+                computeGridGeometry();
+                renderGridWindow(true);
+            }
+
+            updatePhotoCountTitle();
+            updateFilterButtonLabel();
+        }
+
+        function updatePhotoCountTitle() {
+            if (!currentPerson) return;
+            const shown = lightboxPhotos.length;
+            const total = allPersonPhotos.length;
+            const suffix = (shown === total) ? ` (${total})` : ` (${shown} of ${total})`;
+            document.getElementById('contentTitle').textContent = `${currentPerson.name}'s Photos${suffix}`;
+        }
+
+        function updateFilterButtonLabel() {
+            const btn = document.getElementById('photoFilterBtn');
+            if (!btn) return;
+            const active = (photoFilter.exts ? 1 : 0) + (photoFilter.pathText ? 1 : 0);
+            btn.textContent = active ? `Filter (${active})` : 'Filter';
+            btn.classList.toggle('active', active > 0);
+        }
+
+        function buildExtCounts() {
+            const counts = {};
+            for (const p of allPersonPhotos) {
+                const ext = photoExt(p) || '(none)';
+                counts[ext] = (counts[ext] || 0) + 1;
+            }
+            return counts;
+        }
+
+        let photoFilterPanel = null;
+
+        function openPhotoFilterPanel() {
+            closeAllMenus();
+            if (!photoFilterPanel) {
+                photoFilterPanel = document.createElement('div');
+                photoFilterPanel.className = 'context-menu filter-panel';
+                document.body.appendChild(photoFilterPanel);
+                // Keep clicks inside the panel from bubbling to the document handler that
+                // closes menus.
+                photoFilterPanel.addEventListener('click', (e) => e.stopPropagation());
+            }
+
+            const counts = buildExtCounts();
+            const exts = Object.keys(counts).sort();
+            const checked = photoFilter.exts;   // Set or null (null = all)
+
+            let html = '<div class="filter-panel-label">File type</div>';
+            if (exts.length === 0) {
+                html += '<div class="filter-panel-empty">No photos</div>';
+            } else {
+                for (const ext of exts) {
+                    const isChecked = (checked === null) || checked.has(ext);
+                    html += `<label class="filter-check"><input type="checkbox" data-ext="${ext}" ${isChecked ? 'checked' : ''}> ${ext} (${counts[ext]})</label>`;
+                }
+            }
+            html += '<div class="filter-panel-label">Path contains</div>';
+            const safePath = photoFilter.pathText.replace(/"/g, '&quot;');
+            html += `<input type="text" class="filter-path-input" id="photoPathFilterInput" placeholder="text in file path" value="${safePath}">`;
+            html += '<div class="context-menu-item" data-action="clear-filters">Clear filters</div>';
+            photoFilterPanel.innerHTML = html;
+
+            photoFilterPanel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const allExts = Object.keys(buildExtCounts());
+                    const checkedExts = Array.from(photoFilterPanel.querySelectorAll('input[type="checkbox"]'))
+                        .filter(c => c.checked)
+                        .map(c => c.getAttribute('data-ext'));
+                    // All checked -> no extension filter; otherwise the checked set.
+                    photoFilter.exts = (checkedExts.length === allExts.length) ? null : new Set(checkedExts);
+                    applyPhotoView();
+                });
+            });
+
+            const pathInput = photoFilterPanel.querySelector('#photoPathFilterInput');
+            if (pathInput) {
+                pathInput.addEventListener('input', () => {
+                    photoFilter.pathText = pathInput.value.trim().toLowerCase();
+                    applyPhotoView();
+                });
+            }
+
+            const clearItem = photoFilterPanel.querySelector('[data-action="clear-filters"]');
+            if (clearItem) {
+                clearItem.addEventListener('click', () => {
+                    photoFilter = { exts: null, pathText: '' };
+                    applyPhotoView();
+                    closeAllMenus();
+                });
+            }
+
+            photoFilterPanel.classList.add('show');
+            activeMenu = { element: photoFilterPanel, parent: document.getElementById('photoFilterBtn') };
+            positionMenu(photoFilterPanel, document.getElementById('photoFilterBtn'));
+        }
+
+        document.getElementById('photoSortDropdown').addEventListener('change', (e) => {
+            currentPhotoSort = e.target.value;
+            try { pywebview.api.set_photo_sort_mode(currentPhotoSort); } catch (err) {}
+            applyPhotoView();
+        });
+
+        document.getElementById('photoFilterBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (photoFilterPanel && photoFilterPanel.classList.contains('show')) {
+                closeAllMenus();
+            } else {
+                openPhotoFilterPanel();
+            }
+        });
 
         /**
          * Recompute column count and cell size from the grid's current width and the
@@ -1311,6 +1569,9 @@ let people = [];
 
                 const logLevel = await pywebview.api.get_log_level();
                 document.getElementById('logLevelDropdown').value = logLevel;
+
+                currentPhotoSort = await pywebview.api.get_photo_sort_mode();
+                buildSortOptions();
 
                 const closeToTray = await pywebview.api.get_close_to_tray();
                 document.getElementById('closeToTrayToggle').checked = closeToTray;
