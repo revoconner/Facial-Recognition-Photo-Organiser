@@ -16,8 +16,8 @@ from utils import get_appdata_path, create_tray_icon
 from database import FaceDatabase
 from thumbnail_cache import ThumbnailCache
 from settings import Settings
-from workers import ScanWorker, ClusterWorker
-from logger import get_logger
+from workers import ScanWorker, ClusterWorker, ExportWorker
+from logger import get_logger, activate_gui_log, set_level
 
 log = get_logger("api")
 
@@ -49,6 +49,24 @@ class API:
         self._setup_window_events()
         if self._close_to_tray:
             self._setup_tray()
+
+    def get_log_history(self):
+        """Called by the front end once it is ready. Returns every log line buffered
+        since process start (so the GUI log shows the early startup lines that were
+        logged before the window existed) and switches the logger to forwarding new
+        lines live into the GUI via _push_log_to_gui."""
+        return activate_gui_log(self._push_log_to_gui)
+
+    def _push_log_to_gui(self, text):
+        """Callback for GuiLogHandler: append one preformatted line to the UI log.
+        Must not log through the felicity logger (would recurse); failures are ignored."""
+        if not self._window:
+            return
+        import json
+        try:
+            self._window.evaluate_js('appendBackendLog(' + json.dumps(text) + ')')
+        except Exception:
+            pass
     
     def _setup_window_events(self):
         def on_closing():
@@ -813,9 +831,19 @@ class API:
     
     def get_sort_mode(self):
         return self._settings.get('sort_mode', 'names_asc')
-    
+
     def set_sort_mode(self, mode):
         self._settings.set('sort_mode', mode)
+
+    def get_log_level(self):
+        return self._settings.get('log_level', 'INFO')
+
+    def set_log_level(self, level):
+        """Set the active logging verbosity (e.g. 'INFO' for Normal, 'DEBUG') and
+        persist it so it survives a restart."""
+        self._settings.set('log_level', level)
+        set_level(level)
+        log.info("Log level set to %s", level)
     
     def select_folder(self):
         try:

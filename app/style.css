@@ -1181,6 +1181,12 @@
             margin-bottom: 24px;
         }
 
+        .log-header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
         .save-log-btn {
             padding: 8px 20px;
             background: #3a3a3a;

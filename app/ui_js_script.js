@@ -10,7 +10,6 @@ let people = [];
         let minPhotosCount = 2;
         let currentPhotoContext = null;
         let currentSortMode = 'names_asc';
-        let menuCloseTimeout = null;
         let renameContext = null;
         let lightboxPhotos = [];
         let lightboxCurrentIndex = 0;
@@ -189,6 +188,25 @@ let people = [];
 
             menu.style.top = top + 'px';
             menu.style.left = left + 'px';
+        }
+
+        // Position a menu at a point (used for right-click), clamped to the viewport.
+        // The menu must already be visible so its size can be measured.
+        function positionMenuAt(menu, x, y) {
+            const menuRect = menu.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let left = x;
+            let top = y;
+
+            if (left + menuRect.width > viewportWidth) left = viewportWidth - menuRect.width - 8;
+            if (top + menuRect.height > viewportHeight) top = viewportHeight - menuRect.height - 8;
+            if (left < 0) left = 8;
+            if (top < 0) top = 8;
+
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
         }
 
         function sortPeople(peopleArray, mode) {
@@ -422,30 +440,15 @@ let people = [];
                     positionMenu(contextMenu, kebabBtn);
                 });
 
-                kebabBtn.addEventListener('mouseenter', () => {
-                    if (menuCloseTimeout) {
-                        clearTimeout(menuCloseTimeout);
-                        menuCloseTimeout = null;
-                    }
-                });
-
-                kebabBtn.addEventListener('mouseleave', () => {
-                    menuCloseTimeout = setTimeout(() => {
-                        closeAllMenus();
-                    }, 200);
-                });
-
-                contextMenu.addEventListener('mouseenter', () => {
-                    if (menuCloseTimeout) {
-                        clearTimeout(menuCloseTimeout);
-                        menuCloseTimeout = null;
-                    }
-                });
-
-                contextMenu.addEventListener('mouseleave', () => {
-                    menuCloseTimeout = setTimeout(() => {
-                        closeAllMenus();
-                    }, 200);
+                // Right-click anywhere on the person row opens the same menu at the cursor.
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeAllMenus();
+                    contextMenu.classList.add('show');
+                    item.classList.add('menu-active');
+                    activeMenu = { element: contextMenu, parent: item };
+                    positionMenuAt(contextMenu, e.clientX, e.clientY);
                 });
             });
         }
@@ -755,7 +758,7 @@ let people = [];
          * context used by the menu actions and, when there is already an active
          * selection, adds the clicked photo to it (preserving the old behaviour).
          */
-        function openPhotoMenu(item, index, faceId) {
+        function openPhotoMenu(item, index, faceId, x, y) {
             closeAllMenus();
 
             const photo = lightboxPhotos[index];
@@ -780,7 +783,25 @@ let people = [];
             sharedContextMenu.classList.add('show');
             item.classList.add('menu-active');
             activeMenu = { element: sharedContextMenu, parent: item };
-            positionMenu(sharedContextMenu, item.querySelector('.kebab-menu'));
+            // Right-click passes a cursor point; the kebab click anchors to the button.
+            if (typeof x === 'number' && typeof y === 'number') {
+                positionMenuAt(sharedContextMenu, x, y);
+            } else {
+                positionMenu(sharedContextMenu, item.querySelector('.kebab-menu'));
+            }
+        }
+
+        /**
+         * Delegated right-click handler for the grid: open the photo menu at the cursor.
+         */
+        function onGridContextMenu(e) {
+            const item = e.target.closest('.photo-item');
+            if (!item) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt(item.getAttribute('data-index'));
+            const faceId = parseInt(item.getAttribute('data-face-id'));
+            openPhotoMenu(item, index, faceId, e.clientX, e.clientY);
         }
 
         /**
@@ -855,15 +876,10 @@ let people = [];
                 else if (action === 'unhide-photo') unhidePhotos();
                 else if (action === 'transfer-tag') openTransferDialog();
             });
-            sharedContextMenu.addEventListener('mouseenter', () => {
-                if (menuCloseTimeout) { clearTimeout(menuCloseTimeout); menuCloseTimeout = null; }
-            });
-            sharedContextMenu.addEventListener('mouseleave', () => {
-                menuCloseTimeout = setTimeout(closeAllMenus, 200);
-            });
 
             photoGrid.addEventListener('click', onGridClick);
             photoGrid.addEventListener('dblclick', onGridDblClick);
+            photoGrid.addEventListener('contextmenu', onGridContextMenu);
             container.addEventListener('scroll', onGridScroll, { passive: true });
 
             // Recompute columns/cell size when the grid is resized, throttled to one
@@ -1205,8 +1221,24 @@ let people = [];
         }
 
         function updateStatusMessage(message) {
+            // Only drive the status line. The message already reaches the log viewer
+            // through the backend logger -> GuiLogHandler -> appendBackendLog path, so
+            // appending here too would double every status line.
             document.getElementById('progressText').textContent = message;
-            addLogEntry(message);
+        }
+
+        // Append one line to the in-app log viewer. The line is already fully formatted
+        // by the backend logger (timestamp, level, name), so it is rendered verbatim and
+        // the GUI log matches the console/file. Called by the backend GuiLogHandler (via
+        // api._push_log_to_gui), so it must NOT mirror back to log_message or it would loop.
+        function appendBackendLog(text) {
+            const logViewer = document.getElementById('logViewer');
+            if (!logViewer) return;
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = text;
+            logViewer.appendChild(entry);
+            logViewer.scrollTop = logViewer.scrollHeight;
         }
 
         function updateProgress(current, total, percent) {
@@ -1228,19 +1260,12 @@ let people = [];
             }
         }
 
+        // Log a frontend-originated event. It's sent to the backend logger, which both
+        // writes the persistent file log and echoes it back into the in-app log viewer
+        // via appendBackendLog - so there's a single, unified path into the log (no
+        // direct DOM write here, which would duplicate the echoed line). Guarded and
+        // fire-and-forget: the bridge may not exist yet during early startup.
         function addLogEntry(message) {
-            const logViewer = document.getElementById('logViewer');
-            const now = new Date();
-            const timestamp = now.toLocaleString();
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.textContent = `[${timestamp}] ${message}`;
-            logViewer.appendChild(entry);
-            logViewer.scrollTop = logViewer.scrollHeight;
-
-            // Mirror UI log entries into the persistent backend log file, so a saved
-            // or attached log captures both frontend and backend events. Guarded and
-            // fire-and-forget: the bridge may not exist yet during early startup.
             if (window.pywebview && window.pywebview.api && window.pywebview.api.log_message) {
                 try { window.pywebview.api.log_message('INFO', message); } catch (e) {}
             }
@@ -1274,7 +1299,10 @@ let people = [];
                 
                 const scanFrequency = await pywebview.api.get_scan_frequency();
                 document.getElementById('scanFrequencyDropdown').value = scanFrequency;
-                
+
+                const logLevel = await pywebview.api.get_log_level();
+                document.getElementById('logLevelDropdown').value = logLevel;
+
                 const closeToTray = await pywebview.api.get_close_to_tray();
                 document.getElementById('closeToTrayToggle').checked = closeToTray;
                 
@@ -1354,6 +1382,16 @@ let people = [];
         }
 
 
+        document.getElementById('logLevelDropdown').addEventListener('change', async (e) => {
+            const level = e.target.value;
+            try {
+                await pywebview.api.set_log_level(level);
+                addLogEntry('Log detail set to: ' + (level === 'DEBUG' ? 'Debug' : 'Normal'));
+            } catch (error) {
+                console.error('Error setting log level:', error);
+            }
+        });
+
         document.getElementById('scanFrequencyDropdown').addEventListener('change', async (e) => {
             const frequency = e.target.value;
             try {
@@ -1416,8 +1454,18 @@ let people = [];
 
         async function initialize() {
             try {
+                // Pull everything logged before the GUI existed (startup + early backend
+                // lines) and render it, then live lines follow via appendBackendLog. This
+                // also activates live forwarding, so do it before anything else logs.
+                try {
+                    const history = await pywebview.api.get_log_history();
+                    if (Array.isArray(history)) history.forEach(line => appendBackendLog(line));
+                } catch (e) {
+                    console.error('Log history load failed:', e);
+                }
+
                 addLogEntry('Application started');
-                
+
                 const sysInfo = await pywebview.api.get_system_info();
                 document.getElementById('pytorchVersion').textContent = `PyTorch ${sysInfo.pytorch_version}`;
                 document.getElementById('gpuStatus').textContent = sysInfo.gpu_available ? 'GPU Available' : 'CPU Only';
@@ -1518,32 +1566,6 @@ let people = [];
                     closeAllMenus();
                 }
             });
-            
-            filterMenu.addEventListener('mouseenter', () => {
-                if (menuCloseTimeout) {
-                    clearTimeout(menuCloseTimeout);
-                    menuCloseTimeout = null;
-                }
-            });
-            
-            filterMenu.addEventListener('mouseleave', () => {
-                menuCloseTimeout = setTimeout(() => {
-                    closeAllMenus();
-                }, 200);
-            });
-        });
-
-        document.getElementById('filterBtn').addEventListener('mouseenter', () => {
-            if (menuCloseTimeout) {
-                clearTimeout(menuCloseTimeout);
-                menuCloseTimeout = null;
-            }
-        });
-
-        document.getElementById('filterBtn').addEventListener('mouseleave', () => {
-            menuCloseTimeout = setTimeout(() => {
-                closeAllMenus();
-            }, 200);
         });
 
         document.getElementById('jumpToBtn').addEventListener('click', () => {
@@ -2163,10 +2185,6 @@ let people = [];
         }
 
         function closeAllMenus() {
-            if (menuCloseTimeout) {
-                clearTimeout(menuCloseTimeout);
-                menuCloseTimeout = null;
-            }
             document.querySelectorAll('.context-menu').forEach(m => {
                 m.classList.remove('show');
             });
@@ -2208,9 +2226,12 @@ let people = [];
             });
         });
 
+        // Suppress the native browser menu everywhere. Right-clicks on a person row or
+        // a photo cell are handled by their own listeners (which stopPropagation), so
+        // this only runs for empty/other areas - where it also closes any open menu.
         document.addEventListener('contextmenu', function(e) {
             e.preventDefault();
-            return false;
+            closeAllMenus();
         });
 
         document.getElementById('conflictProceedBtn').addEventListener('click', handleConflictProceed);

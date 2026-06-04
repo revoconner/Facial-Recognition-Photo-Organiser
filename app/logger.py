@@ -64,7 +64,7 @@ def setup_logging(log_dir, level_name="INFO"):
     containing characters outside the system code page (e.g. 'U+018F') never raise a
     UnicodeEncodeError while logging.
     """
-    global _configured
+    global _configured, _gui_handler
 
     logger = logging.getLogger(_LOGGER_NAME)
     logger.setLevel(_resolve_level(level_name))
@@ -95,6 +95,14 @@ def setup_logging(log_dir, level_name="INFO"):
         stream_handler.setFormatter(fmt)
         logger.addHandler(stream_handler)
 
+        # In-app log viewer handler. Same format as file/console so the GUI log
+        # mirrors them exactly. It buffers from here (process start) so lines logged
+        # before the window exists are not lost; the API hands the backlog to the UI
+        # once the front end is ready (see activate_gui_log / api.get_log_history).
+        _gui_handler = GuiLogHandler()
+        _gui_handler.setFormatter(fmt)
+        logger.addHandler(_gui_handler)
+
         # Don't also propagate to the root logger (would double-log).
         logger.propagate = False
         _configured = True
@@ -105,6 +113,64 @@ def setup_logging(log_dir, level_name="INFO"):
 def set_level(level_name):
     """Change the active log level at runtime (e.g. from a settings toggle)."""
     logging.getLogger(_LOGGER_NAME).setLevel(_resolve_level(level_name))
+
+
+class GuiLogHandler(logging.Handler):
+    """Buffers formatted log lines from process start, then forwards them live to the
+    in-app log viewer once a callback is supplied (api._push_log_to_gui). This lets the
+    GUI mirror the console - including everything logged before the window existed - and
+    is essential in the packaged build, which has no console at all.
+
+    Exceptions are swallowed so logging never breaks the app, and the callback must NOT
+    log through this logger or it would recurse. The logger's level governs what reaches
+    here (Normal -> INFO and up, Debug -> everything)."""
+
+    def __init__(self, max_buffer=5000):
+        super().__init__()
+        self._buffer = []
+        self._max_buffer = max_buffer
+        self._callback = None
+
+    def activate_and_snapshot(self, callback):
+        """Switch to live forwarding and return everything buffered so far, atomically
+        so the handover neither drops nor duplicates a line. Returns a list of lines."""
+        self.acquire()
+        try:
+            self._callback = callback
+            return list(self._buffer)
+        finally:
+            self.release()
+
+    def emit(self, record):
+        try:
+            line = self.format(record)
+        except Exception:
+            return
+        self.acquire()
+        try:
+            self._buffer.append(line)
+            if len(self._buffer) > self._max_buffer:
+                del self._buffer[:-self._max_buffer]
+            callback = self._callback
+        finally:
+            self.release()
+        if callback is not None:
+            try:
+                callback(line)
+            except Exception:
+                pass
+
+
+_gui_handler = None
+
+
+def activate_gui_log(emit_callback):
+    """Begin mirroring logs to the GUI and return the backlog (lines logged before the
+    GUI was ready) so the front end can render them. emit_callback(text) pushes one line
+    to the UI. Returns [] if logging hasn't been set up yet."""
+    if _gui_handler is None:
+        return []
+    return _gui_handler.activate_and_snapshot(emit_callback)
 
 
 def get_logger(name=None):

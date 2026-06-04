@@ -30,7 +30,7 @@ class Settings:
             'scan_frequency': 'restart_1_day',
             'last_scan_time': None,
             'show_face_tags_preview': True,
-            'log_level': 'DEBUG'
+            'log_level': 'INFO'
         }
         
         self.settings = self.load()

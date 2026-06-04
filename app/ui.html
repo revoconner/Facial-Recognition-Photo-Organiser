@@ -443,14 +443,18 @@
                 <div class="content-panel" id="log-panel">
                     <div class="log-header">
                         <div class="panel-title">View Log</div>
-                        <button class="save-log-btn" id="saveLogBtn">
-                            <span>Save Log</span>
-                        </button>
+                        <div class="log-header-actions">
+                            <select class="view-dropdown" id="logLevelDropdown" title="Log detail level">
+                                <option value="INFO">Normal</option>
+                                <option value="DEBUG">Debug</option>
+                            </select>
+                            <button class="save-log-btn" id="saveLogBtn">
+                                <span>Save Log</span>
+                            </button>
+                        </div>
                     </div>
                     
-                    <div class="log-viewer" id="logViewer">
-                        <div class="log-entry">Application started</div>
-                    </div>
+                    <div class="log-viewer" id="logViewer"></div>
                 </div>
             </div>
         </div>
