@@ -548,33 +548,34 @@ let people = [];
         // path and extension are derived from the filename, so they're always available.
         const FACET_THRESHOLD = 0.5;
 
-        // Sort options in display order. facet = the metadata field that must clear the
-        // threshold for the option to appear (null = always available).
+        // Sort options grouped into categories (rendered as <optgroup>s). cat=null is the
+        // ungrouped default at the top. facet = the metadata field that must clear the
+        // 50% threshold for the option to appear (null = always available, path-derived).
         const PHOTO_SORT_OPTIONS = [
-            { value: 'default',       label: 'Default order',          facet: null },
-            { value: 'name_asc',      label: 'Name (A-Z)',             facet: null },
-            { value: 'name_desc',     label: 'Name (Z-A)',             facet: null },
-            { value: 'path_asc',      label: 'File path (A-Z)',        facet: null },
-            { value: 'taken_desc',    label: 'Date taken (newest)',    facet: 'date_taken' },
-            { value: 'taken_asc',     label: 'Date taken (oldest)',    facet: 'date_taken' },
-            { value: 'modified_desc', label: 'Date modified (newest)', facet: 'date_modified' },
-            { value: 'modified_asc',  label: 'Date modified (oldest)', facet: 'date_modified' },
-            { value: 'created_desc',  label: 'Date created (newest)',  facet: 'date_created' },
-            { value: 'created_asc',   label: 'Date created (oldest)',  facet: 'date_created' },
-            { value: 'size_desc',     label: 'Largest first',          facet: 'file_size' },
-            { value: 'size_asc',      label: 'Smallest first',         facet: 'file_size' },
-            { value: 'device_asc',    label: 'Device',                 facet: 'device' },
+            { value: 'default',       label: 'Default Sort Order',         cat: null,    facet: null },
+            { value: 'name_asc',      label: 'File name (A-Z)',            cat: 'Names',  facet: null },
+            { value: 'name_desc',     label: 'File name (Z-A)',            cat: 'Names',  facet: null },
+            { value: 'pathname_asc',  label: 'File path + name (A-Z)',     cat: 'Names',  facet: null },
+            { value: 'pathname_desc', label: 'File path + name (Z-A)',     cat: 'Names',  facet: null },
+            { value: 'taken_desc',    label: 'Date taken (newest)',        cat: 'Dates',  facet: 'date_taken' },
+            { value: 'taken_asc',     label: 'Date taken (oldest)',        cat: 'Dates',  facet: 'date_taken' },
+            { value: 'modified_desc', label: 'Date modified (newest)',     cat: 'Dates',  facet: 'date_modified' },
+            { value: 'modified_asc',  label: 'Date modified (oldest)',     cat: 'Dates',  facet: 'date_modified' },
+            { value: 'created_desc',  label: 'Date created (newest)',      cat: 'Dates',  facet: 'date_created' },
+            { value: 'created_asc',   label: 'Date created (oldest)',      cat: 'Dates',  facet: 'date_created' },
+            { value: 'size_desc',     label: 'Larger first',               cat: 'Size',   facet: 'file_size' },
+            { value: 'size_asc',      label: 'Smaller first',              cat: 'Size',   facet: 'file_size' },
         ];
+        const PHOTO_SORT_CATEGORIES = ['Names', 'Dates', 'Size'];
 
         // mode -> [keyName, direction]
         const PHOTO_SORT_DEFS = {
             name_asc: ['name', 'asc'], name_desc: ['name', 'desc'],
-            path_asc: ['path', 'asc'],
+            pathname_asc: ['path', 'asc'], pathname_desc: ['path', 'desc'],
             taken_desc: ['date_taken', 'desc'], taken_asc: ['date_taken', 'asc'],
             modified_desc: ['date_modified', 'desc'], modified_asc: ['date_modified', 'asc'],
             created_desc: ['date_created', 'desc'], created_asc: ['date_created', 'asc'],
             size_desc: ['file_size', 'desc'], size_asc: ['file_size', 'asc'],
-            device_asc: ['device', 'asc'],
         };
 
         function photoExt(p) {
@@ -616,14 +617,29 @@ let people = [];
             if (!dropdown) return;
             dropdown.innerHTML = '';
             let sawCurrent = false;
-            for (const opt of PHOTO_SORT_OPTIONS) {
-                if (opt.facet && facetFraction(allPersonPhotos, opt.facet) < FACET_THRESHOLD) continue;
+
+            const available = PHOTO_SORT_OPTIONS.filter(opt =>
+                !opt.facet || facetFraction(allPersonPhotos, opt.facet) >= FACET_THRESHOLD);
+
+            const addOption = (parent, opt) => {
                 const o = document.createElement('option');
                 o.value = opt.value;
                 o.textContent = opt.label;
-                dropdown.appendChild(o);
+                parent.appendChild(o);
                 if (opt.value === currentPhotoSort) sawCurrent = true;
+            };
+
+            // Ungrouped (Default) first, then a labelled <optgroup> per non-empty category.
+            available.filter(o => o.cat === null).forEach(o => addOption(dropdown, o));
+            for (const cat of PHOTO_SORT_CATEGORIES) {
+                const opts = available.filter(o => o.cat === cat);
+                if (!opts.length) continue;
+                const group = document.createElement('optgroup');
+                group.label = cat;
+                opts.forEach(o => addOption(group, o));
+                dropdown.appendChild(group);
             }
+
             // If the saved sort isn't available for this person, show Default (without
             // overwriting the saved preference).
             dropdown.value = sawCurrent ? currentPhotoSort : 'default';
@@ -747,7 +763,6 @@ let people = [];
                     const checkedExts = Array.from(photoFilterPanel.querySelectorAll('input[type="checkbox"]'))
                         .filter(c => c.checked)
                         .map(c => c.getAttribute('data-ext'));
-                    // All checked -> no extension filter; otherwise the checked set.
                     photoFilter.exts = (checkedExts.length === allExts.length) ? null : new Set(checkedExts);
                     applyPhotoView();
                 });

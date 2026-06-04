@@ -1306,6 +1306,21 @@
             min-width: 210px;
             max-height: 420px;
             overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #2a2a2a transparent;
+        }
+
+        .filter-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .filter-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .filter-panel::-webkit-scrollbar-thumb {
+            background: #3a3a3a;
+            border-radius: 3px;
         }
 
         .filter-panel-label {

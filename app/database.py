@@ -372,7 +372,7 @@ class FaceDatabase:
         cursor = self.conn.cursor()
         cursor.execute('SELECT file_path FROM photos WHERE scan_status = "completed"')
         return {row[0] for row in cursor.fetchall()}
-    
+
     def get_pending_and_error_paths(self) -> List[str]:
         cursor = self.conn.cursor()
         cursor.execute('''
