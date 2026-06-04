@@ -1309,16 +1309,17 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 0 6px;
+            padding: 0 12px;
             box-sizing: border-box;
             cursor: pointer;
             color: #e0e0e0;
-            border-bottom: 1px solid #2a2a2a;
+            background: #0d0d0d;
+            border-radius: 8px;
             user-select: none;
         }
 
         .group-header:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: #161616;
         }
 
         .group-header-icon {

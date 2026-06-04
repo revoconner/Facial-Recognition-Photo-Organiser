@@ -619,8 +619,9 @@ let people = [];
         const PHOTO_GROUP_CATEGORIES = ['Folders', 'Date taken', 'Others'];
 
         // Inlined group-header icons (from app/svg/{expand,collapse}-group.svg) so they
-        // render without depending on the static file server. Expanded shows expand-group,
-        // collapsed shows collapse-group (per the spec).
+        // render without depending on the static file server. The icon shows the ACTION a
+        // click performs: a collapsed group shows expand-group; an expanded group shows
+        // collapse-group.
         const SVG_EXPAND = '<svg viewBox="-230.4 -230.4 2380.80 2380.80" width="13" height="13" fill="#cfcfcf" stroke="#cfcfcf" stroke-width="59.52"><path d="M959.921.01 453 506.933l152.28 152.28 246.946-246.944v1095.475L605.28 1260.798 453 1413.078 959.921 1920l506.921-506.921-152.28-152.281-246.946 246.945V412.268l246.945 246.945 152.281-152.281z" fill-rule="evenodd"/></svg>';
         const SVG_COLLAPSE = '<svg viewBox="0 0 16 16" width="13" height="13" fill="#cfcfcf"><path d="M4.414,15.414L8,11.828L11.586,15.414L13,14L8,9L3,14L4.414,15.414ZM11.586,0.586L8,4.172L4.414,0.586L3,2L8,7L13,2L11.586,0.586Z"/></svg>';
 
@@ -1236,7 +1237,7 @@ let people = [];
             node.style.top = g.headerTop + 'px';
             node.style.height = GROUP_HEADER_H + 'px';
             node.innerHTML =
-                `<span class="group-header-icon">${g.collapsed ? SVG_COLLAPSE : SVG_EXPAND}</span>` +
+                `<span class="group-header-icon">${g.collapsed ? SVG_EXPAND : SVG_COLLAPSE}</span>` +
                 `<span class="group-header-label"></span>` +
                 `<span class="group-header-count"></span>`;
             node.querySelector('.group-header-label').textContent = g.label;

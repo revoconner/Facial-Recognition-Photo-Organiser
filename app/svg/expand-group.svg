@@ -1,7 +1,19 @@
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Transformed by: SVG Repo Mixer Tools -->
-<svg fill="#fff" width="800px" height="800px" viewBox="-230.4 -230.4 2380.80 2380.80" xmlns="http://www.w3.org/2000/svg" stroke="#fff" stroke-width="59.52">
-<g id="SVGRepo_bgCarrier" stroke-width="0"/>
-<g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"/>
-<g id="SVGRepo_iconCarrier"> <path d="M959.921.01 453 506.933l152.28 152.28 246.946-246.944v1095.475L605.28 1260.798 453 1413.078 959.921 1920l506.921-506.921-152.28-152.281-246.946 246.945V412.268l246.945 246.945 152.281-152.281z" fill-rule="evenodd"/> </g>
-</svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 228 228">
+  <!-- Generator: Adobe Illustrator 29.5.1, SVG Export Plug-In . SVG Version: 2.1.0 Build 141)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #fff;
+      }
+
+      .st1 {
+        fill: none;
+      }
+    </style>
+  </defs>
+  <g id="SVGRepo_iconCarrier">
+    <rect id="icon-bound" class="st1" x="0" y="99.75" width="228" height="28.5"/>
+    <path id="expand-collapse" class="st0" d="M165.1,136.6l-51.1,51.1-51.1-51.1-20.15,20.15,71.25,71.25,71.25-71.25-20.15-20.15ZM62.9,91.4l51.1-51.1,51.1,51.1,20.15-20.15L114,0,42.75,71.25l20.15,20.15Z"/>
+  </g>
+</svg>
