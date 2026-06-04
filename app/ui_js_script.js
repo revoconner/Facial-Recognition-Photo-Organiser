@@ -526,6 +526,7 @@ let people = [];
 
                 if (allPersonPhotos.length === 0) {
                     lightboxPhotos = [];
+                    computeGridGeometry();   // reset gridGeom.total to 0 (no stale layout)
                     photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos found</div>';
                     updatePhotoCountTitle();
                     updateFilterButtonLabel();
@@ -669,12 +670,13 @@ let people = [];
             clearSelection();
             renderedItems.clear();
             const photoGrid = document.getElementById('photoGrid');
+            photoGrid.innerHTML = '';
+            // Always recompute geometry so gridGeom.total tracks the (possibly empty)
+            // list - otherwise a later scroll renders against a stale total.
+            computeGridGeometry();
             if (lightboxPhotos.length === 0) {
-                photoGrid.style.height = '';
                 photoGrid.innerHTML = '<div style="color: #a0a0a0; padding: 20px;">No photos match the current filter</div>';
             } else {
-                photoGrid.innerHTML = '';
-                computeGridGeometry();
                 renderGridWindow(true);
             }
 
@@ -840,11 +842,15 @@ let people = [];
         function renderGridWindow(force) {
             const container = document.querySelector('.photo-grid-container');
             const photoGrid = document.getElementById('photoGrid');
-            if (!container || !photoGrid || gridGeom.total === 0) return;
+
+            // Clamp to the live list length so a stale gridGeom (list shrank or emptied,
+            // e.g. a person that loaded empty during a recluster, or a filter that matched
+            // nothing) can never index past lightboxPhotos and read undefined.
+            const total = Math.min(gridGeom.total, lightboxPhotos.length);
+            if (!container || !photoGrid || total === 0) return;
 
             const cols = gridGeom.cols;
             const rowH = gridGeom.rowH;
-            const total = gridGeom.total;
 
             const scrollTop = container.scrollTop;
             const viewH = container.clientHeight;
@@ -869,6 +875,7 @@ let people = [];
             for (let i = firstIdx; i <= lastIdx; i++) {
                 if (!renderedItems.has(i)) {
                     const node = createPhotoItem(i);
+                    if (!node) continue;
                     renderedItems.set(i, node);
                     photoGrid.appendChild(node);
                 }
@@ -884,6 +891,7 @@ let people = [];
          */
         function createPhotoItem(index) {
             const photo = lightboxPhotos[index];
+            if (!photo) return null;   // stale index (list changed under a render pass)
 
             const node = document.createElement('div');
             node.className = 'photo-item';
@@ -918,6 +926,7 @@ let people = [];
          * view mode is dropped instead of painting into a recycled cell.
          */
         async function loadThumb(node, photo) {
+            if (!photo) return;   // stale index (list changed under a render pass)
             const img = node.querySelector('img');
             if (!img) return;
 
