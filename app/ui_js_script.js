@@ -400,17 +400,26 @@ let people = [];
                 
                 let menuHTML = '';
                 
+                const cleanPersonName = person.name.replace(' (hidden)', '');
+                const escapedName = cleanPersonName.replace(/'/g, "\\'");
+                // "Unmatched Faces" is a grab-bag, not a real person, so it is not exportable.
+                const exportItem = cleanPersonName !== 'Unmatched Faces'
+                    ? `<div class="context-menu-item" onclick="exportPerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Export photos...</div>`
+                    : '';
+
                 if (person.is_hidden) {
-                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>`;
+                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Rename</div>`;
                     if (showDevOptions) {
                         menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
                     }
+                    menuHTML += exportItem;
                     menuHTML += `<div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>`;
                 } else {
-                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${person.name.replace(/'/g, "\\'")}')">Rename</div>`;
+                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Rename</div>`;
                     if (showDevOptions) {
                         menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
                     }
+                    menuHTML += exportItem;
                     menuHTML += `<div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>`;
                 }
                 
@@ -1241,9 +1250,9 @@ let people = [];
             logViewer.scrollTop = logViewer.scrollHeight;
         }
 
-        function updateProgress(current, total, percent) {
+        function updateProgress(current, total, percent, label) {
             document.getElementById('progressFill').style.width = percent + '%';
-            document.getElementById('progressText').textContent = `Scanning: ${current}/${total}`;
+            document.getElementById('progressText').textContent = `${label || 'Scanning'}: ${current}/${total}`;
         }
 
         function hideProgress() {
@@ -1716,6 +1725,10 @@ let people = [];
 
                 if (item.getAttribute('data-panel') === 'general') {
                 updateCacheSize(); }
+
+                if (item.getAttribute('data-panel') === 'export') {
+                    loadExportPeople();
+                }
             });
         });
 
@@ -1797,6 +1810,266 @@ let people = [];
                 console.error('Error saving log:', error);
                 addLogEntry('Error saving log: ' + error);
             }
+        });
+
+        // Photo export (F1). Copies a person's photos, or all named people, into
+        // per-person subfolders under a destination the user picks. The backend
+        // ExportWorker does the work and reports back via showExportComplete().
+        let isExporting = false;
+
+        function startExportUI(label) {
+            isExporting = true;
+            const progressSection = document.getElementById('progressSection');
+            progressSection.style.display = 'flex';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = (label || 'Exporting') + '...';
+            const cancelBtn = document.getElementById('exportCancelBtn');
+            cancelBtn.style.display = 'inline-flex';
+            cancelBtn.disabled = false;
+        }
+
+        function endExportUI() {
+            isExporting = false;
+            document.getElementById('exportCancelBtn').style.display = 'none';
+            // No clustering runs after an export, so hide the shared progress bar here.
+            document.getElementById('progressSection').style.display = 'none';
+        }
+
+        let pendingExport = null;  // { label, startFn } awaiting destination-warning confirmation
+
+        // Export mode (copy / hardlink) is chosen once in the Export Photos panel and
+        // shared by every export path. Defaults to copy if the dropdown isn't present.
+        function getExportMode() {
+            const dropdown = document.getElementById('exportModeDropdown');
+            return dropdown ? dropdown.value : 'copy';
+        }
+
+        async function exportPerson(clusteringId, personId, name) {
+            closeAllMenus();
+            const dest = await pywebview.api.select_folder();
+            if (!dest) return;
+            const mode = getExportMode();
+            await beginExport(`Exporting ${name}`, dest,
+                () => pywebview.api.export_person_photos(clusteringId, personId, dest, mode));
+        }
+
+        async function exportAllNamed() {
+            const dest = await pywebview.api.select_folder();
+            if (!dest) return;
+            const mode = getExportMode();
+            await beginExport('Exporting all named people', dest,
+                () => pywebview.api.export_all_named(dest, mode));
+        }
+
+        // Runs destination pre-flight checks; warns and waits for confirmation if the
+        // destination is risky, otherwise starts the export immediately.
+        async function beginExport(label, dest, startFn) {
+            let checks = { inside_scanned: false, non_empty: false };
+            try {
+                checks = await pywebview.api.check_export_destination(dest);
+            } catch (error) {
+                console.error('Export destination check failed:', error);
+            }
+
+            const warnings = [];
+            if (checks.inside_scanned) {
+                warnings.push('This destination is inside a folder Felicity scans. Exported copies may be detected and added to the library on the next scan.');
+            }
+            if (checks.non_empty) {
+                warnings.push('This destination is not empty. Existing files are kept; any new copy whose name clashes gets a _1, _2 suffix.');
+            }
+
+            if (warnings.length === 0) {
+                startExportUI(label);
+                await runExport(startFn);
+                return;
+            }
+
+            pendingExport = { label, startFn };
+            const body = document.getElementById('exportConfirmBody');
+            body.innerHTML = '';
+            warnings.forEach(text => {
+                const line = document.createElement('div');
+                line.className = 'export-result-line';
+                line.textContent = text;
+                body.appendChild(line);
+            });
+            document.getElementById('exportConfirmOverlay').classList.add('active');
+        }
+
+        async function runExport(startFn) {
+            try {
+                const res = await startFn();
+                if (!res || !res.success) {
+                    endExportUI();
+                    showExportError(res ? res.message : 'Export failed to start');
+                }
+            } catch (error) {
+                endExportUI();
+                showExportError('Export failed to start: ' + error);
+            }
+        }
+
+        async function cancelExport() {
+            document.getElementById('exportCancelBtn').disabled = true;
+            try {
+                await pywebview.api.cancel_export();
+            } catch (error) {
+                console.error('Error cancelling export:', error);
+            }
+        }
+
+        // Called from the backend (ExportWorker) when an export finishes.
+        function showExportComplete(summary) {
+            endExportUI();
+            let title, lines;
+            if (summary.error) {
+                title = 'Export Failed';
+                lines = [summary.error];
+            } else if (summary.cancelled) {
+                title = 'Export Cancelled';
+                lines = [`${summary.exported} photos exported before cancelling`];
+                if (summary.skipped_exists) lines.push(`${summary.skipped_exists} already present (skipped)`);
+                if (summary.skipped_missing) lines.push(`${summary.skipped_missing} skipped (source missing)`);
+                if (summary.failed) lines.push(`${summary.failed} failed`);
+            } else if (summary.exported === 0 && summary.people === 0) {
+                title = 'Nothing to Export';
+                lines = ['No people with photos were found to export.'];
+            } else {
+                title = 'Export Complete';
+                lines = [
+                    `${summary.exported} photos exported`,
+                    `${summary.people} ${summary.people === 1 ? 'person' : 'people'}`
+                ];
+                if (summary.skipped_exists) lines.push(`${summary.skipped_exists} already present (skipped)`);
+                if (summary.skipped_missing) lines.push(`${summary.skipped_missing} skipped (source missing)`);
+                if (summary.failed) lines.push(`${summary.failed} failed`);
+            }
+            showExportDialog(title, lines, summary.error ? null : summary.dest);
+        }
+
+        function showExportDialog(title, lines, dest) {
+            document.getElementById('exportResultTitle').textContent = title;
+            const body = document.getElementById('exportResultBody');
+            body.innerHTML = '';
+            lines.forEach(text => {
+                const line = document.createElement('div');
+                line.className = 'export-result-line';
+                line.textContent = text;
+                body.appendChild(line);
+            });
+            const openBtn = document.getElementById('exportOpenFolderBtn');
+            if (dest) {
+                openBtn.style.display = 'inline-flex';
+                openBtn.onclick = () => pywebview.api.open_photo(dest);
+            } else {
+                openBtn.style.display = 'none';
+            }
+            document.getElementById('exportOverlay').classList.add('active');
+        }
+
+        function showExportError(message) {
+            showExportDialog('Export Failed', [message], null);
+        }
+
+        document.getElementById('exportAllBtn').addEventListener('click', exportAllNamed);
+
+        document.getElementById('exportCloseBtn').addEventListener('click', () => {
+            document.getElementById('exportOverlay').classList.remove('active');
+        });
+
+        document.getElementById('exportOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('exportOverlay')) {
+                document.getElementById('exportOverlay').classList.remove('active');
+            }
+        });
+
+        document.getElementById('exportConfirmProceedBtn').addEventListener('click', async () => {
+            document.getElementById('exportConfirmOverlay').classList.remove('active');
+            if (pendingExport) {
+                const { label, startFn } = pendingExport;
+                pendingExport = null;
+                startExportUI(label);
+                await runExport(startFn);
+            }
+        });
+
+        document.getElementById('exportConfirmCancelBtn').addEventListener('click', () => {
+            document.getElementById('exportConfirmOverlay').classList.remove('active');
+            pendingExport = null;
+        });
+
+        // Export Photos settings section: multi-select people list with search.
+        let exportPeople = [];
+        let exportSelected = new Set();
+
+        async function loadExportPeople() {
+            try {
+                exportPeople = await pywebview.api.get_people_for_export();
+            } catch (error) {
+                console.error('Error loading people for export:', error);
+                exportPeople = [];
+            }
+            // Drop any selections that no longer exist (visibility changed, recluster, etc.)
+            const validIds = new Set(exportPeople.map(p => p.person_id));
+            exportSelected.forEach(id => { if (!validIds.has(id)) exportSelected.delete(id); });
+            renderExportPeople();
+        }
+
+        function renderExportPeople() {
+            const container = document.getElementById('exportPeopleList');
+            const filter = (document.getElementById('exportSearchInput').value || '').toLowerCase();
+            const filtered = exportPeople.filter(p => p.name.toLowerCase().includes(filter));
+
+            container.innerHTML = '';
+            if (filtered.length === 0) {
+                container.innerHTML = '<div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No people available</div>';
+                return;
+            }
+
+            filtered.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'folder-item export-person-item' + (exportSelected.has(p.person_id) ? ' selected' : '');
+                item.textContent = p.name;
+                item.addEventListener('click', () => {
+                    if (exportSelected.has(p.person_id)) {
+                        exportSelected.delete(p.person_id);
+                        item.classList.remove('selected');
+                    } else {
+                        exportSelected.add(p.person_id);
+                        item.classList.add('selected');
+                    }
+                });
+                container.appendChild(item);
+            });
+        }
+
+        document.getElementById('exportSearchInput').addEventListener('input', renderExportPeople);
+
+        document.getElementById('exportSelectAllBtn').addEventListener('click', () => {
+            const filter = (document.getElementById('exportSearchInput').value || '').toLowerCase();
+            exportPeople
+                .filter(p => p.name.toLowerCase().includes(filter))
+                .forEach(p => exportSelected.add(p.person_id));
+            renderExportPeople();
+        });
+
+        document.getElementById('exportClearBtn').addEventListener('click', () => {
+            exportSelected.clear();
+            renderExportPeople();
+        });
+
+        document.getElementById('exportSelectedBtn').addEventListener('click', async () => {
+            if (exportSelected.size === 0) {
+                showExportError('Select at least one person to export.');
+                return;
+            }
+            const ids = Array.from(exportSelected);
+            const dest = await pywebview.api.select_folder();
+            if (!dest) return;
+            const mode = getExportMode();
+            const label = `Exporting ${ids.length} ${ids.length === 1 ? 'person' : 'people'}`;
+            await beginExport(label, dest, () => pywebview.api.export_selected(ids, dest, mode));
         });
 
         let selectedIncludeFolder = null;

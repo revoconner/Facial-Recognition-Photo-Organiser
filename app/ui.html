@@ -126,6 +126,7 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                     <div class="progress-text" id="progressText">Initializing...</div>
+                    <button class="export-cancel-btn" id="exportCancelBtn" style="display: none;" onclick="cancelExport()">Cancel</button>
                 </div>
             </div>
             <div class="status-bar">
@@ -175,6 +176,7 @@
                 <div class="settings-nav">
                     <div class="nav-item active" data-panel="general">General Settings</div>
                     <div class="nav-item" data-panel="folders">Folders to Scan</div>
+                    <div class="nav-item" data-panel="export">Export Photos</div>
                     <div class="nav-item" data-panel="log">View Log</div>
                 </div>
                 
@@ -439,7 +441,57 @@
                         <button class="recalibrate-btn" id="rescanBtn" style="width: 100%; padding: 12px;">Rescan For Changes</button>
                     </div>
                 </div>
-                
+
+                <div class="content-panel" id="export-panel">
+                    <div class="panel-title">Export Photos</div>
+
+                    <div class="folder-section">
+                        <div class="folder-section-title">
+                            <span>Export select people</span>
+                            <span class="info-icon">
+                                i
+                                <div class="tooltip">Who appears in this list follows your visibility settings (hidden and unnamed people). A person's hidden photos are only exported when "show hidden photos" is on. Photos are copied into one subfolder per person under a destination you pick; your original photos are never moved or changed.</div>
+                            </span>
+                        </div>
+                        <div class="export-note">
+                            Mirrors the app's visibility settings when exporting. This means two things:
+                            <br>1. Any person not shown in the app UI because they are hidden will not appear here. This includes unnamed people or any other filters.
+                            <br>2. A person's hidden photos will not be exported unless "show hidden photos" is toggled on.
+                        </div>
+                        <input type="text" class="wildcard-input" id="exportSearchInput" placeholder="Search people...">
+                        <div class="folder-list-container" id="exportPeopleList">
+                            <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No people available</div>
+                        </div>
+                        <div class="folder-controls export-actions">
+                            <select class="view-dropdown" id="exportModeDropdown" style="min-width: 130px;">
+                                <option value="copy" selected>Copy</option>
+                                <option value="hardlink">Hardlink</option>
+                            </select>
+                            <span class="info-icon">
+                                i
+                                <div class="tooltip">Copy makes independent duplicates and works on any drive. Hardlink uses no extra disk space, but only when the destination is on the same drive as your photos (it falls back to copy across drives). A hardlinked file shares its data with your original, so editing it in another app would also change the original. This mode applies to all exports.</div>
+                            </span>
+                            <button class="recalibrate-btn" id="exportSelectedBtn">Export Selected</button>
+                            <button class="folder-btn" id="exportSelectAllBtn">
+                                <span>Select all</span>
+                            </button>
+                            <button class="folder-btn remove" id="exportClearBtn">
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="folder-section">
+                        <div class="folder-section-title">
+                            <span>Export all people</span>
+                        </div>
+                        <div class="export-note">
+                            Exports all people's photos as shown in the app to a location you choose. The same filtering rules apply as above, that is, it mirrors the app's visibility settings when exporting.
+                        </div>
+                        <button class="recalibrate-btn" id="exportAllBtn" style="width: 100%; padding: 12px;">Export All Named People</button>
+                    </div>
+                </div>
+
                 <div class="content-panel" id="log-panel">
                     <div class="log-header">
                         <div class="panel-title">View Log</div>
@@ -478,6 +530,7 @@
                     <div class="help-item">Photo scan be CPU intensive task, to reduce cpu usage, close to tray during scan</div>
                     <div class="help-item">To add more folders or remove folders, as well as exclude subfolders where photos are, do so in the settings</div>
                     <div class="help-item">Any images that are added to disk, or removed from disk will be scanned at next restart,</br> or on the next restart after a day, or a week, or manually. You can change the frequency in settings</div>
+                    <div class="help-item">Export a person's photos from their menu, or use Settings > Export Photos to export selected or all people into folders (one folder per person). Your original photos are never changed</div>
                 </div>
                 
                 <button class="close-help-btn" id="closeHelpBtn" style="max-width: 20%;">Close Quick Help</button>
@@ -571,6 +624,36 @@
             <div class="transfer-list" id="transferList">
             </div>
             <button class="transfer-cancel" id="transferCancelBtn">Cancel</button>
+        </div>
+    </div>
+
+    <div class="cleanup-overlay" id="exportOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title" id="exportResultTitle">Export Complete</div>
+            <div class="export-result-body" id="exportResultBody"></div>
+            <div class="folder-controls" style="justify-content: center; margin-top: 24px;">
+                <button class="folder-btn" id="exportOpenFolderBtn">
+                    <span>Open Folder</span>
+                </button>
+                <button class="folder-btn remove" id="exportCloseBtn">
+                    <span>Close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="cleanup-overlay" id="exportConfirmOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title">Before exporting</div>
+            <div class="export-result-body" id="exportConfirmBody"></div>
+            <div class="folder-controls" style="justify-content: center; margin-top: 24px;">
+                <button class="folder-btn" id="exportConfirmProceedBtn">
+                    <span>Continue</span>
+                </button>
+                <button class="folder-btn remove" id="exportConfirmCancelBtn">
+                    <span>Cancel</span>
+                </button>
+            </div>
         </div>
     </div>
 
