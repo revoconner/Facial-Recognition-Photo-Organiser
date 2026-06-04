@@ -1320,6 +1320,10 @@
 
         .group-header:hover {
             background: #161616;
+            /* The hover fill is close to the grid background; an inset 1px ring in the
+               normal header color separates a hovered (often collapsed) header from its
+               neighbours without resizing the element the way a border would. */
+            box-shadow: inset 0 0 0 1px #0d0d0d;
         }
 
         .group-header-icon {

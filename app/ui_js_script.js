@@ -609,14 +609,38 @@ let people = [];
         // facet = the metadata field that must clear the 50% threshold for the mode to be
         // offered (null = always available, path-derived).
         const PHOTO_GROUP_OPTIONS = [
-            { value: 'folder',     label: 'File path',          cat: 'Folders',    facet: null },
-            { value: 'date_days',  label: 'Days',               cat: 'Date taken', facet: 'date_taken' },
-            { value: 'date_week',  label: 'Weeks',              cat: 'Date taken', facet: 'date_taken' },
-            { value: 'date_month', label: 'Months',             cat: 'Date taken', facet: 'date_taken' },
-            { value: 'date_year',  label: 'Years',              cat: 'Date taken', facet: 'date_taken' },
-            { value: 'device',     label: 'Camera make/model',  cat: 'Others',     facet: 'device' },
+            { value: 'folder',         label: 'File path',         cat: 'Folders',       facet: null },
+            { value: 'date_days',      label: 'Days',              cat: 'Date taken',    facet: 'date_taken' },
+            { value: 'date_week',      label: 'Weeks',             cat: 'Date taken',    facet: 'date_taken' },
+            { value: 'date_month',     label: 'Months',            cat: 'Date taken',    facet: 'date_taken' },
+            { value: 'date_year',      label: 'Years',             cat: 'Date taken',    facet: 'date_taken' },
+            { value: 'modified_days',  label: 'Days',              cat: 'Date modified', facet: 'date_modified' },
+            { value: 'modified_week',  label: 'Weeks',             cat: 'Date modified', facet: 'date_modified' },
+            { value: 'modified_month', label: 'Months',            cat: 'Date modified', facet: 'date_modified' },
+            { value: 'modified_year',  label: 'Years',             cat: 'Date modified', facet: 'date_modified' },
+            { value: 'created_days',   label: 'Days',              cat: 'Date created',  facet: 'date_created' },
+            { value: 'created_week',   label: 'Weeks',             cat: 'Date created',  facet: 'date_created' },
+            { value: 'created_month',  label: 'Months',            cat: 'Date created',  facet: 'date_created' },
+            { value: 'created_year',   label: 'Years',             cat: 'Date created',  facet: 'date_created' },
+            { value: 'device',         label: 'Camera make/model', cat: 'Others',        facet: 'device' },
         ];
-        const PHOTO_GROUP_CATEGORIES = ['Folders', 'Date taken', 'Others'];
+        const PHOTO_GROUP_CATEGORIES = ['Folders', 'Date taken', 'Date modified', 'Date created', 'Others'];
+
+        // Date grouping modes -> which metadata field to bucket and the granularity.
+        const DATE_GROUP_MODES = {
+            date_days: { field: 'date_taken', bucket: 'days' },
+            date_week: { field: 'date_taken', bucket: 'week' },
+            date_month: { field: 'date_taken', bucket: 'month' },
+            date_year: { field: 'date_taken', bucket: 'year' },
+            modified_days: { field: 'date_modified', bucket: 'days' },
+            modified_week: { field: 'date_modified', bucket: 'week' },
+            modified_month: { field: 'date_modified', bucket: 'month' },
+            modified_year: { field: 'date_modified', bucket: 'year' },
+            created_days: { field: 'date_created', bucket: 'days' },
+            created_week: { field: 'date_created', bucket: 'week' },
+            created_month: { field: 'date_created', bucket: 'month' },
+            created_year: { field: 'date_created', bucket: 'year' },
+        };
 
         // Inlined group-header icons (from app/svg/{expand,collapse}-group.svg) so they
         // render without depending on the static file server. The icon shows the ACTION a
@@ -650,28 +674,29 @@ let people = [];
                 const dev = ((m.camera_make || '') + ' ' + (m.camera_model || '')).trim();
                 return dev ? { key: dev.toLowerCase(), label: dev, sortKey: 0 } : { key: null };
             }
-            if (mode.indexOf('date_') === 0) {
-                const ts = m.date_taken;
+            const dm = DATE_GROUP_MODES[mode];
+            if (dm) {
+                const ts = m[dm.field];
                 if (ts === null || ts === undefined) return { key: null };
                 const d = new Date(ts * 1000);
-                if (mode === 'date_days') {
+                if (dm.bucket === 'days') {
                     return {
                         key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
                         label: d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
                         sortKey: ts,
                     };
                 }
-                if (mode === 'date_month') {
+                if (dm.bucket === 'month') {
                     return {
                         key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`,
                         label: d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' }),
                         sortKey: d.getFullYear() * 12 + d.getMonth(),
                     };
                 }
-                if (mode === 'date_year') {
+                if (dm.bucket === 'year') {
                     return { key: String(d.getFullYear()), label: String(d.getFullYear()), sortKey: d.getFullYear() };
                 }
-                if (mode === 'date_week') {
+                if (dm.bucket === 'week') {
                     const w = isoWeek(d);
                     return { key: `${w.year}-W${pad2(w.week)}`, label: `Week ${w.week}, ${w.year}`, sortKey: w.year * 53 + w.week };
                 }
@@ -698,7 +723,7 @@ let people = [];
             }
 
             const groups = Array.from(map.values());
-            const dateMode = mode.indexOf('date_') === 0;
+            const dateMode = !!DATE_GROUP_MODES[mode];
             groups.sort((a, b) => {
                 if (dateMode) return b.sortKey - a.sortKey;           // newest first
                 const la = a.label.toLowerCase(), lb = b.label.toLowerCase();
