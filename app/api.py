@@ -3,6 +3,8 @@ import os
 import base64
 import threading
 import time
+import ctypes
+from ctypes import wintypes
 from pathlib import Path
 from typing import Optional, List
 from io import BytesIO
@@ -22,6 +24,36 @@ from workers import ScanWorker, ClusterWorker, ExportWorker
 from logger import get_logger, activate_gui_log, set_level
 
 log = get_logger("api")
+
+
+# Win32 date/time formatting so the preview shows dates in the user's regional format
+# (Settings -> Time & language -> Date & time), including any custom short-date/time the
+# user configured - which Python's strftime/locale can't read. Passing NULL for the
+# locale name uses LOCALE_NAME_USER_DEFAULT. Resolved once; left as None (with an ISO
+# fallback in _fmt_dt) if unavailable, e.g. on a non-Windows host.
+class _SYSTEMTIME(ctypes.Structure):
+    _fields_ = [
+        ('wYear', wintypes.WORD), ('wMonth', wintypes.WORD),
+        ('wDayOfWeek', wintypes.WORD), ('wDay', wintypes.WORD),
+        ('wHour', wintypes.WORD), ('wMinute', wintypes.WORD),
+        ('wSecond', wintypes.WORD), ('wMilliseconds', wintypes.WORD),
+    ]
+
+_DATE_SHORTDATE = 0x00000001
+
+try:
+    _kernel32 = ctypes.windll.kernel32
+    _GetDateFormatEx = _kernel32.GetDateFormatEx
+    _GetDateFormatEx.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(_SYSTEMTIME),
+                                 wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.c_int, wintypes.LPCWSTR]
+    _GetDateFormatEx.restype = ctypes.c_int
+    _GetTimeFormatEx = _kernel32.GetTimeFormatEx
+    _GetTimeFormatEx.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(_SYSTEMTIME),
+                                 wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.c_int]
+    _GetTimeFormatEx.restype = ctypes.c_int
+except (AttributeError, OSError):
+    _GetDateFormatEx = None
+    _GetTimeFormatEx = None
 
 
 class API:
@@ -804,11 +836,34 @@ class API:
 
     @staticmethod
     def _fmt_dt(epoch):
-        """Unix epoch -> readable local datetime, or None if unparseable."""
+        """Unix epoch -> local datetime string in the user's regional date/time format
+        (via Win32), falling back to ISO 'YYYY-MM-DD HH:MM:SS' if that's unavailable.
+        Returns None if the epoch itself can't be converted."""
         try:
-            return datetime.fromtimestamp(epoch).strftime('%Y-%m-%d %H:%M:%S')
+            dt = datetime.fromtimestamp(epoch)
         except (ValueError, OSError, TypeError):
             return None
+
+        if _GetDateFormatEx and _GetTimeFormatEx:
+            try:
+                # wDayOfWeek is Sunday=0 in Win32; isoweekday() is Mon=1..Sun=7.
+                st = _SYSTEMTIME(dt.year, dt.month, dt.isoweekday() % 7, dt.day,
+                                 dt.hour, dt.minute, dt.second, 0)
+                ref = ctypes.byref(st)
+                # First call with size 0 returns the required buffer length (chars).
+                need = _GetDateFormatEx(None, _DATE_SHORTDATE, ref, None, None, 0, None)
+                if need:
+                    date_buf = ctypes.create_unicode_buffer(need)
+                    _GetDateFormatEx(None, _DATE_SHORTDATE, ref, None, date_buf, need, None)
+                    need_t = _GetTimeFormatEx(None, 0, ref, None, None, 0)
+                    time_buf = ctypes.create_unicode_buffer(need_t)
+                    _GetTimeFormatEx(None, 0, ref, None, time_buf, need_t)
+                    if date_buf.value and time_buf.value:
+                        return f"{date_buf.value} {time_buf.value}"
+            except Exception as e:
+                log.debug("Win32 date format failed: %s", e)
+
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
 
     # EXIF tags already surfaced as curated rows (so they aren't repeated in the
     # "everything else" pass), plus noisy/binary tags not worth showing.
@@ -873,7 +928,8 @@ class API:
         if taken:
             try:
                 dt = datetime.strptime(taken, '%Y:%m:%d %H:%M:%S')
-                add('Date taken', dt.strftime('%Y-%m-%d %H:%M:%S'))
+                # Same regional formatting as the filesystem dates.
+                add('Date taken', self._fmt_dt(dt.timestamp()))
             except ValueError:
                 add('Date taken', taken)
         add('Camera make', tag('Image Make'))

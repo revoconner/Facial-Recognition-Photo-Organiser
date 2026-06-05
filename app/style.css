@@ -2119,12 +2119,14 @@
 
         .lightbox-detail-row {
             display: grid;
-            grid-template-columns: 0.4fr 0.6fr;
+            grid-template-columns: 0.3fr 0.7fr;
             gap: 12px;
-            background: #0d0d0d;
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 8px;
+            padding: 10px 2px;
+            border-bottom: 1px solid #0d0d0d;
+        }
+
+        .lightbox-detail-row:last-child {
+            border-bottom: none;
         }
 
         .lightbox-detail-label {
