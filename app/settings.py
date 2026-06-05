@@ -32,6 +32,7 @@ class Settings:
             'scan_frequency': 'restart_1_day',
             'last_scan_time': None,
             'show_face_tags_preview': True,
+            'show_photo_details': True,
             'log_level': 'INFO'
         }
         

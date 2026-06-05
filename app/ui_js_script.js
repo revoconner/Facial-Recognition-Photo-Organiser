@@ -32,6 +32,10 @@ let people = [];
         let lastSelectedIndex = -1;
         let nameConflictData = null;
         let showFaceTagsPreview = true;
+        // F4: whether the preview lightbox shows its right-hand details panel. Backed by
+        // the persisted 'show_photo_details' setting; a GUI toggle will drive
+        // setShowPhotoDetails() later. When off, the image uses the full width.
+        let showPhotoDetails = true;
 
         // People-list multi-select (F9). Mirrors the grid's selectedPhotos pattern:
         // ctrl/cmd toggles, shift selects a range. selectedPeople holds person ids;
@@ -1789,9 +1793,28 @@ let people = [];
         
         function openLightbox(index) {
             lightboxCurrentIndex = index;
+            applyPhotoDetailsVisibility();
             updateLightbox();
             document.getElementById('lightboxOverlay').classList.add('active');
             document.getElementById('appContainer').classList.add('blurred');
+        }
+
+        // Show/hide the details panel per showPhotoDetails. Off => collapse the grid to
+        // a single image column and hide the panel (via .no-details on the content).
+        function applyPhotoDetailsVisibility() {
+            document.getElementById('lightboxContent')
+                .classList.toggle('no-details', !showPhotoDetails);
+        }
+
+        // Entry point for the future GUI toggle: update state, persist, reflow, and -
+        // if turning on while a photo is open - fill the panel for the current photo.
+        async function setShowPhotoDetails(enabled) {
+            showPhotoDetails = enabled;
+            try { await pywebview.api.set_show_photo_details(enabled); } catch (err) {}
+            applyPhotoDetailsVisibility();
+            if (enabled && document.getElementById('lightboxOverlay').classList.contains('active')) {
+                renderPhotoDetails(lightboxPhotos[lightboxCurrentIndex], lightboxCurrentIndex);
+            }
         }
 
         function closeLightbox() {
@@ -1956,7 +1979,9 @@ let people = [];
                 document.getElementById('lightboxImage').src = (thumbCache.get(photo.face_id) || '');
             }
 
-            renderPhotoDetails(photo, reqIndex);
+            if (showPhotoDetails) {
+                renderPhotoDetails(photo, reqIndex);
+            }
         }
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
@@ -2283,7 +2308,12 @@ let people = [];
                     
                     addLogEntry('Show face tags in preview: ' + (showFaceTagsPreview ? 'enabled' : 'disabled'));
                 });
-                
+
+                // F4: load the details-panel visibility. No GUI control yet - a toggle
+                // will call setShowPhotoDetails() later; applyPhotoDetailsVisibility runs
+                // when the lightbox opens.
+                showPhotoDetails = await pywebview.api.get_show_photo_details();
+
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 currentGridSize = parseInt(gridSize);   // virtualizer reads this for the cell size

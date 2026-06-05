@@ -1531,6 +1531,16 @@
             justify-content: center;
         }
 
+        /* F4 details panel disabled (show_photo_details off): single image column,
+           panel hidden. Everything else about the preview is unchanged. */
+        .lightbox-content.no-details {
+            grid-template-columns: 1fr;
+        }
+
+        .lightbox-content.no-details .lightbox-details {
+            display: none;
+        }
+
 
         .lightbox-nav {
             position: absolute;

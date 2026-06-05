@@ -1336,7 +1336,17 @@ class API:
 
     def set_show_face_tags_preview(self, enabled):
         self._settings.set('show_face_tags_preview', enabled)
-    
+
+    # Whether the preview lightbox shows its right-hand details panel (F4). Persisted;
+    # a GUI toggle will be wired to these later. Everything else in the preview is
+    # unchanged when off - the image just uses the full width.
+    def get_show_photo_details(self):
+        return self._settings.get('show_photo_details', True)
+
+    def set_show_photo_details(self, enabled):
+        self._settings.set('show_photo_details', enabled)
+
+
     def close(self):
         if self._tray_icon:
             try:
