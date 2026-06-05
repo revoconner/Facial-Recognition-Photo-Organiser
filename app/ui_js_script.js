@@ -565,10 +565,17 @@ let people = [];
             if (multi) {
                 let html = `<div class="context-menu-item" onclick="exportSelectedPeople()">Export Selected to Folder</div>`;
                 const sel = people.filter(p => selectedPeople.has(p.id));
+                // Pin/Unpin and Hide/Unhide each appear only when the whole selection
+                // is uniform; a mixed selection shows neither (same rule for both).
                 if (sel.every(p => !p.is_pinned)) {
                     html += `<div class="context-menu-item" onclick="pinSelectedPeople()">Pin</div>`;
                 } else if (sel.every(p => p.is_pinned)) {
                     html += `<div class="context-menu-item" onclick="unpinSelectedPeople()">Unpin</div>`;
+                }
+                if (sel.every(p => !p.is_hidden)) {
+                    html += `<div class="context-menu-item" onclick="hideSelectedPeople()">Hide</div>`;
+                } else if (sel.every(p => p.is_hidden)) {
+                    html += `<div class="context-menu-item" onclick="unhideSelectedPeople()">Unhide</div>`;
                 }
                 return html;
             }
@@ -630,6 +637,27 @@ let people = [];
             for (const p of sel) {
                 await pywebview.api.unpin_person(p.clustering_id, p.id);
             }
+            await refreshPeople();
+        }
+
+        // Hide/unhide the whole selection at once (F9). Unlike pin, the affected rows
+        // can leave the list (when show-hidden is off), so the selection is cleared
+        // afterwards rather than kept.
+        async function hideSelectedPeople() {
+            closeAllMenus();
+            const sel = people.filter(p => selectedPeople.has(p.id));
+            if (sel.length === 0) return;
+            await pywebview.api.hide_persons(sel[0].clustering_id, sel.map(p => p.id));
+            clearPeopleSelection();
+            await refreshPeople();
+        }
+
+        async function unhideSelectedPeople() {
+            closeAllMenus();
+            const sel = people.filter(p => selectedPeople.has(p.id));
+            if (sel.length === 0) return;
+            await pywebview.api.unhide_persons(sel[0].clustering_id, sel.map(p => p.id));
+            clearPeopleSelection();
             await refreshPeople();
         }
 

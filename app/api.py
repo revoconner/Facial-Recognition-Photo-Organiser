@@ -512,6 +512,19 @@ class API:
         self._db.unpin_person(clustering_id, person_id)
         return {'success': True}
 
+    # Batch hide/unhide for the people multi-selection (F9). Silent like the pin
+    # methods (no loadPeople from the backend) so the frontend refreshes once and
+    # keeps control of selection state.
+    def hide_persons(self, clustering_id, person_ids):
+        for person_id in person_ids:
+            self._db.hide_person(clustering_id, person_id)
+        return {'success': True}
+
+    def unhide_persons(self, clustering_id, person_ids):
+        for person_id in person_ids:
+            self._db.unhide_person(clustering_id, person_id)
+        return {'success': True}
+
     def hide_photo(self, face_id):
         self._db.hide_photo(face_id)
         if self._window:
