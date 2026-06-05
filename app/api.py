@@ -406,9 +406,10 @@ class API:
         hidden_persons = self._db.get_hidden_persons(clustering_id)
         show_hidden = self._settings.get('show_hidden', False)
         hide_unnamed = self._settings.get('hide_unnamed_persons', False)
-        
+        pinned_persons = self._db.get_pinned_persons(clustering_id)
+
         result = []
-        
+
         for person in persons:
             person_id = person['person_id']
             is_hidden = person_id in hidden_persons
@@ -452,6 +453,7 @@ class API:
                 'tagged_count': tagged_count,
                 'clustering_id': clustering_id,
                 'is_hidden': is_hidden,
+                'is_pinned': person_id in pinned_persons,
                 'thumbnail': thumbnail
             })
         
@@ -498,7 +500,18 @@ class API:
         self._db.unhide_person(clustering_id, person_id)
         if self._window:
             self._window.evaluate_js('loadPeople()')
-    
+
+    # Pin / unpin (F9). Unlike hide/unhide these do NOT trigger loadPeople() from
+    # the backend: the frontend re-renders in place so the current selection and
+    # any active multi-selection are preserved.
+    def pin_person(self, clustering_id, person_id):
+        self._db.pin_person(clustering_id, person_id)
+        return {'success': True}
+
+    def unpin_person(self, clustering_id, person_id):
+        self._db.unpin_person(clustering_id, person_id)
+        return {'success': True}
+
     def hide_photo(self, face_id):
         self._db.hide_photo(face_id)
         if self._window:

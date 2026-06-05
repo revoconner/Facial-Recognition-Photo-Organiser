@@ -1951,6 +1951,39 @@
             background: #3a3a3a;
             color: #ffffff;
         }
+
+        /* People multi-select highlight (F9). Uses the app accent (#3b82f6) like the
+           grid selection, but as a subtle tint + inset ring instead of a full outline.
+           The :hover rule has higher specificity than the generic person-item hover,
+           so the ring and tint survive while hovering a selected row. */
+        .person-item.selected {
+            background: rgba(59, 130, 246, 0.18);
+            box-shadow: inset 0 0 0 1px #3b82f6;
+        }
+
+        .person-item.selected:hover:not(.menu-active) {
+            background: rgba(59, 130, 246, 0.22);
+            box-shadow: inset 0 0 0 1px #3b82f6;
+        }
+
+        /* Pin indicator on the right edge of a pinned person row (F9), left of the
+           kebab slot. */
+        .person-pin {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            margin-right: 6px;
+            opacity: 0.85;
+        }
+
+        /* People selection bar: same look as the grid's .selection-info but anchored
+           left with padding (defined after .selection-info so these win) so it reads
+           as belonging to the people list, not the grid (F9). */
+        .people-selection-info {
+            left: 24px;
+            transform: none;
+        }
+
         .name-conflict-message {
             background: #1a1a1a;
             border-radius: 12px;

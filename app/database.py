@@ -148,6 +148,19 @@ class FaceDatabase:
                 FOREIGN KEY (face_id) REFERENCES faces(face_id)
             )
         ''')
+
+        # Pinned people (F9). Pinned persons float to the top of the people list.
+        # Per-clustering like hidden_persons, so pins survive a re-cluster at the
+        # same threshold.
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pinned_persons (
+                clustering_id INTEGER NOT NULL,
+                person_id INTEGER NOT NULL,
+                pinned_at REAL DEFAULT (julianday('now')),
+                PRIMARY KEY (clustering_id, person_id),
+                FOREIGN KEY (clustering_id) REFERENCES clusterings(clustering_id)
+            )
+        ''')
         
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS face_tags (
@@ -188,6 +201,7 @@ class FaceDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_assign ON cluster_assignments(clustering_id, person_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cluster_face ON cluster_assignments(clustering_id, person_id, face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_persons ON hidden_persons(clustering_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_pinned_persons ON pinned_persons(clustering_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_hidden_photos ON hidden_photos(face_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_name ON face_tags(tag_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_face_tags_combined ON face_tags(tag_name, face_id)')
@@ -723,6 +737,30 @@ class FaceDatabase:
         cursor = self.conn.cursor()
         cursor.execute('''
             SELECT person_id FROM hidden_persons
+            WHERE clustering_id = ?
+        ''', (clustering_id,))
+        return {row[0] for row in cursor.fetchall()}
+
+    def pin_person(self, clustering_id: int, person_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT OR IGNORE INTO pinned_persons (clustering_id, person_id)
+            VALUES (?, ?)
+        ''', (clustering_id, person_id))
+        self.conn.commit()
+
+    def unpin_person(self, clustering_id: int, person_id: int):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            DELETE FROM pinned_persons
+            WHERE clustering_id = ? AND person_id = ?
+        ''', (clustering_id, person_id))
+        self.conn.commit()
+
+    def get_pinned_persons(self, clustering_id: int) -> Set[int]:
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT person_id FROM pinned_persons
             WHERE clustering_id = ?
         ''', (clustering_id,))
         return {row[0] for row in cursor.fetchall()}

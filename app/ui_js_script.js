@@ -33,6 +33,13 @@ let people = [];
         let nameConflictData = null;
         let showFaceTagsPreview = true;
 
+        // People-list multi-select (F9). Mirrors the grid's selectedPhotos pattern:
+        // ctrl/cmd toggles, shift selects a range. selectedPeople holds person ids;
+        // currentPeopleOrder is the displayed order (for shift-range index math).
+        let selectedPeople = new Set();
+        let lastSelectedPersonIndex = -1;
+        let currentPeopleOrder = [];
+
         // Virtualized photo-grid state. lightboxPhotos holds the full metadata list
         // for the current person (no thumbnails); only a window of DOM cells is
         // rendered at any moment and thumbnails are loaded on demand.
@@ -239,8 +246,13 @@ let people = [];
                     sorted.sort((a, b) => b.count - a.count);
                     break;
             }
-            
-            return sorted;
+
+            // Pinned people float to the top regardless of sort mode (F9). filter()
+            // is stable, so multiple pinned keep their order among themselves from
+            // the sort above, sitting above all unpinned people.
+            const pinned = sorted.filter(p => p.is_pinned);
+            const unpinned = sorted.filter(p => !p.is_pinned);
+            return [...pinned, ...unpinned];
         }
 
         function getAvailableAlphabets(peopleArray) {
@@ -375,104 +387,261 @@ let people = [];
             });
             
             const sortedPeople = sortPeople(filteredPeople, currentSortMode);
-            
+            currentPeopleOrder = sortedPeople;
+
             sortedPeople.forEach(person => {
                 const item = document.createElement('div');
                 item.className = 'person-item';
+                item.dataset.personId = person.id;
                 if (currentPerson && person.id === currentPerson.id) {
                     item.classList.add('active');
                 }
-                
+                if (selectedPeople.has(person.id)) {
+                    item.classList.add('selected');
+                }
+
                 const color = getPersonColor(person.id);
                 const initial = person.name.charAt(0);
-                
+
                 const tagInfo = (showDevOptions && person.tagged_count > 0) ? ` (${person.tagged_count}/${person.count} tagged)` : '';
-                
+
                 let avatarHTML;
                 if (person.thumbnail) {
                     avatarHTML = `<img src="${person.thumbnail}" class="person-avatar" style="width: 44px; height: 44px; object-fit: cover;">`;
                 } else {
                     avatarHTML = `<div class="person-avatar" style="background: linear-gradient(135deg, ${color} 0%, ${color}99 100%)">${initial}</div>`;
                 }
-                
+
+                // Pin indicator on the right edge, only when pinned (F9).
+                const pinHTML = person.is_pinned ? `<span class="person-pin">${SVG_PINNED}</span>` : '';
+
                 item.innerHTML = `
                     ${avatarHTML}
                     <div class="person-info">
                         <div class="person-name">${person.name}</div>
                         <div class="person-count">${person.count} photos${tagInfo}</div>
                     </div>
+                    ${pinHTML}
                     <button class="kebab-menu">
                         <span class="kebab-dot"></span>
                         <span class="kebab-dot"></span>
                         <span class="kebab-dot"></span>
                     </button>
                 `;
-                
+
+                // The menu is populated at open time (buildPersonMenuHTML) so it
+                // reflects the live multi-selection: 2+ selected shows the group menu,
+                // otherwise the per-person menu.
                 const contextMenu = document.createElement('div');
                 contextMenu.className = 'context-menu';
-                
-                let menuHTML = '';
-                
-                const cleanPersonName = person.name.replace(' (hidden)', '');
-                const escapedName = cleanPersonName.replace(/'/g, "\\'");
-                // "Unmatched Faces" is a grab-bag, not a real person, so it is not exportable.
-                const exportItem = cleanPersonName !== 'Unmatched Faces'
-                    ? `<div class="context-menu-item" onclick="exportPerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Export photos...</div>`
-                    : '';
-
-                if (person.is_hidden) {
-                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Rename</div>`;
-                    if (showDevOptions) {
-                        menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
-                    }
-                    menuHTML += exportItem;
-                    menuHTML += `<div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>`;
-                } else {
-                    menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Rename</div>`;
-                    if (showDevOptions) {
-                        menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
-                    }
-                    menuHTML += exportItem;
-                    menuHTML += `<div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>`;
-                }
-                
-                contextMenu.innerHTML = menuHTML;
-                
                 document.body.appendChild(contextMenu);
-                
+
                 item.addEventListener('click', (e) => {
-                    if (!e.target.closest('.kebab-menu') && !e.target.closest('.context-menu')) {
-                        selectPerson(person);
-                    }
+                    if (e.target.closest('.kebab-menu') || e.target.closest('.context-menu')) return;
+                    handlePersonClick(e, person);
                 });
-                
+
                 peopleList.appendChild(item);
 
                 const kebabBtn = item.querySelector('.kebab-menu');
                 kebabBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const personItem = kebabBtn.closest('.person-item');
-                    
-                    closeAllMenus();
-                    
-                    contextMenu.classList.add('show');
-                    personItem.classList.add('menu-active');
-                    activeMenu = { element: contextMenu, parent: personItem };
-                    
-                    positionMenu(contextMenu, kebabBtn);
+                    openPersonMenu(person, item, contextMenu, () => positionMenu(contextMenu, kebabBtn));
                 });
 
                 // Right-click anywhere on the person row opens the same menu at the cursor.
                 item.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    closeAllMenus();
-                    contextMenu.classList.add('show');
-                    item.classList.add('menu-active');
-                    activeMenu = { element: contextMenu, parent: item };
-                    positionMenuAt(contextMenu, e.clientX, e.clientY);
+                    openPersonMenu(person, item, contextMenu, () => positionMenuAt(contextMenu, e.clientX, e.clientY));
                 });
             });
+        }
+
+        // People-list click dispatch (F9). Mirrors the grid: ctrl/cmd toggles a row,
+        // shift extends a range, a plain click drops any multi-selection and navigates
+        // to that person.
+        function handlePersonClick(e, person) {
+            const index = currentPeopleOrder.findIndex(p => p.id === person.id);
+            if (e.ctrlKey || e.metaKey) {
+                togglePersonSelection(person.id, index);
+            } else if (e.shiftKey) {
+                if (lastSelectedPersonIndex >= 0) {
+                    selectPersonRange(lastSelectedPersonIndex, index);
+                } else {
+                    selectedPeople.add(person.id);
+                    lastSelectedPersonIndex = index;
+                    applyPeopleSelectionClasses();
+                    updatePeopleSelectionInfo();
+                }
+            } else {
+                clearPeopleSelection();
+                selectPerson(person);
+            }
+        }
+
+        function togglePersonSelection(personId, index) {
+            if (selectedPeople.has(personId)) {
+                selectedPeople.delete(personId);
+            } else {
+                selectedPeople.add(personId);
+                lastSelectedPersonIndex = index;
+            }
+            applyPeopleSelectionClasses();
+            updatePeopleSelectionInfo();
+        }
+
+        function selectPersonRange(startIndex, endIndex) {
+            const lo = Math.min(startIndex, endIndex);
+            const hi = Math.max(startIndex, endIndex);
+            for (let i = lo; i <= hi && i < currentPeopleOrder.length; i++) {
+                selectedPeople.add(currentPeopleOrder[i].id);
+            }
+            lastSelectedPersonIndex = endIndex;
+            applyPeopleSelectionClasses();
+            updatePeopleSelectionInfo();
+        }
+
+        // Sync the 'selected' class on currently rendered rows from the selectedPeople set.
+        function applyPeopleSelectionClasses() {
+            document.querySelectorAll('.person-item').forEach(item => {
+                const pid = parseInt(item.dataset.personId, 10);
+                item.classList.toggle('selected', selectedPeople.has(pid));
+            });
+        }
+
+        function clearPeopleSelection() {
+            selectedPeople.clear();
+            lastSelectedPersonIndex = -1;
+            document.querySelectorAll('.person-item.selected').forEach(i => i.classList.remove('selected'));
+            updatePeopleSelectionInfo();
+        }
+
+        // Floating count bar for the people selection. Same look as the grid bar but
+        // left-aligned (see .people-selection-info) so it reads as belonging to the
+        // people list.
+        function updatePeopleSelectionInfo() {
+            let bar = document.getElementById('peopleSelectionInfo');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.className = 'selection-info people-selection-info';
+                bar.id = 'peopleSelectionInfo';
+                document.body.appendChild(bar);
+            }
+            const count = selectedPeople.size;
+            if (count > 0) {
+                const noun = count === 1 ? 'person' : 'people';
+                bar.innerHTML = `<div class="selection-info-text">${count} ${noun} selected<button class="clear-selection-btn" onclick="clearPeopleSelection()">Clear</button></div>`;
+                bar.classList.add('show');
+            } else {
+                bar.classList.remove('show');
+            }
+        }
+
+        // Open a person's context menu. Mirrors the grid: if a selection is active and
+        // this row isn't part of it, the row is added first, so the menu acts on the
+        // group the user is pointing at. buildPersonMenuHTML then decides single vs group.
+        function openPersonMenu(person, item, contextMenu, anchorFn) {
+            closeAllMenus();
+            if (selectedPeople.size > 0 && !selectedPeople.has(person.id)) {
+                const idx = currentPeopleOrder.findIndex(p => p.id === person.id);
+                selectedPeople.add(person.id);
+                lastSelectedPersonIndex = idx;
+                applyPeopleSelectionClasses();
+                updatePeopleSelectionInfo();
+            }
+            contextMenu.innerHTML = buildPersonMenuHTML(person);
+            contextMenu.classList.add('show');
+            item.classList.add('menu-active');
+            activeMenu = { element: contextMenu, parent: item };
+            anchorFn();
+        }
+
+        // Build the menu HTML for a person row at open time. 2+ selected (and this row
+        // among them) yields the group menu: Export Selected, plus Pin/Unpin only when
+        // the whole selection is uniformly unpinned/pinned (mixed shows neither).
+        function buildPersonMenuHTML(person) {
+            const multi = selectedPeople.size >= 2 && selectedPeople.has(person.id);
+            if (multi) {
+                let html = `<div class="context-menu-item" onclick="exportSelectedPeople()">Export Selected to Folder</div>`;
+                const sel = people.filter(p => selectedPeople.has(p.id));
+                if (sel.every(p => !p.is_pinned)) {
+                    html += `<div class="context-menu-item" onclick="pinSelectedPeople()">Pin</div>`;
+                } else if (sel.every(p => p.is_pinned)) {
+                    html += `<div class="context-menu-item" onclick="unpinSelectedPeople()">Unpin</div>`;
+                }
+                return html;
+            }
+
+            const cleanPersonName = person.name.replace(' (hidden)', '');
+            const escapedName = cleanPersonName.replace(/'/g, "\\'");
+            // "Unmatched Faces" is a grab-bag, not a real person, so it is not exportable.
+            const exportItem = cleanPersonName !== 'Unmatched Faces'
+                ? `<div class="context-menu-item" onclick="exportPerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Export photos...</div>`
+                : '';
+            const pinItem = person.is_pinned
+                ? `<div class="context-menu-item" onclick="unpinPerson(${person.clustering_id}, ${person.id})">Unpin</div>`
+                : `<div class="context-menu-item" onclick="pinPerson(${person.clustering_id}, ${person.id})">Pin</div>`;
+
+            let menuHTML = `<div class="context-menu-item" onclick="renamePerson(${person.clustering_id}, ${person.id}, '${escapedName}')">Rename</div>`;
+            if (showDevOptions) {
+                menuHTML += `<div class="context-menu-item" onclick="untagPerson(${person.clustering_id}, ${person.id})">Remove all tags</div>`;
+            }
+            menuHTML += exportItem;
+            menuHTML += pinItem;
+            menuHTML += person.is_hidden
+                ? `<div class="context-menu-item" onclick="unhidePerson(${person.clustering_id}, ${person.id})">Unhide person</div>`
+                : `<div class="context-menu-item" onclick="hidePerson(${person.clustering_id}, ${person.id})">Hide person</div>`;
+            return menuHTML;
+        }
+
+        // Re-fetch people (for the fresh is_pinned flags) and re-render without changing
+        // the current selection or the navigated person. Used after pin/unpin.
+        async function refreshPeople() {
+            people = await pywebview.api.get_people();
+            renderPeopleList();
+            updatePeopleSelectionInfo();
+        }
+
+        async function pinPerson(clusteringId, personId) {
+            closeAllMenus();
+            await pywebview.api.pin_person(clusteringId, personId);
+            await refreshPeople();
+        }
+
+        async function unpinPerson(clusteringId, personId) {
+            closeAllMenus();
+            await pywebview.api.unpin_person(clusteringId, personId);
+            await refreshPeople();
+        }
+
+        async function pinSelectedPeople() {
+            closeAllMenus();
+            const sel = people.filter(p => selectedPeople.has(p.id));
+            for (const p of sel) {
+                await pywebview.api.pin_person(p.clustering_id, p.id);
+            }
+            await refreshPeople();
+        }
+
+        async function unpinSelectedPeople() {
+            closeAllMenus();
+            const sel = people.filter(p => selectedPeople.has(p.id));
+            for (const p of sel) {
+                await pywebview.api.unpin_person(p.clustering_id, p.id);
+            }
+            await refreshPeople();
+        }
+
+        async function exportSelectedPeople() {
+            closeAllMenus();
+            const ids = Array.from(selectedPeople);
+            if (ids.length === 0) return;
+            const dest = await pywebview.api.select_folder();
+            if (!dest) return;
+            const mode = getExportMode();
+            const label = `Exporting ${ids.length} ${ids.length === 1 ? 'person' : 'people'}`;
+            await beginExport(label, dest, () => pywebview.api.export_selected(ids, dest, mode));
         }
 
         async function selectPerson(person) {
@@ -648,6 +817,10 @@ let people = [];
         // collapse-group.
         const SVG_EXPAND = '<svg viewBox="-230.4 -230.4 2380.80 2380.80" width="13" height="13" fill="#cfcfcf" stroke="#cfcfcf" stroke-width="59.52"><path d="M959.921.01 453 506.933l152.28 152.28 246.946-246.944v1095.475L605.28 1260.798 453 1413.078 959.921 1920l506.921-506.921-152.28-152.281-246.946 246.945V412.268l246.945 246.945 152.281-152.281z" fill-rule="evenodd"/></svg>';
         const SVG_COLLAPSE = '<svg viewBox="0 0 16 16" width="13" height="13" fill="#cfcfcf"><path d="M4.414,15.414L8,11.828L11.586,15.414L13,14L8,9L3,14L4.414,15.414ZM11.586,0.586L8,4.172L4.414,0.586L3,2L8,7L13,2L11.586,0.586Z"/></svg>';
+
+        // Inlined pin icon (from app/svg/pinned.svg) shown on the right edge of a
+        // pinned person row (F9).
+        const SVG_PINNED = '<svg viewBox="0 0 56 56" width="12" height="12" fill="#cfcfcf"><path d="M 14.2539 35.9688 L 25.9492 35.9688 L 25.9492 48.0156 C 25.9492 51.5781 27.4258 54.5781 28.0117 54.5781 C 28.5976 54.5781 30.0742 51.5781 30.0742 48.0156 L 30.0742 35.9688 L 41.7461 35.9688 C 43.3633 35.9688 44.5351 34.9375 44.5351 33.3672 C 44.5351 32.3828 44.2305 31.6797 43.5508 30.9532 L 36.3789 23.1719 C 35.8867 22.6563 35.5820 22.2813 35.6992 21.3203 L 36.8945 12.7657 C 36.9649 12.2735 37.0117 11.9922 37.4336 11.6875 L 43.1992 7.5157 C 44.4883 6.5781 45.0508 5.4297 45.0508 4.3750 C 45.0508 2.8047 43.7851 1.4219 41.9805 1.4219 L 14.0195 1.4219 C 12.2149 1.4219 10.9492 2.8047 10.9492 4.3750 C 10.9492 5.4297 11.5117 6.5781 12.7773 7.5157 L 18.5429 11.6875 C 18.9883 11.9922 19.0351 12.2735 19.1054 12.7657 L 20.3008 21.3203 C 20.4180 22.2813 20.1133 22.6563 19.6211 23.1719 L 12.4492 30.9532 C 11.7695 31.6797 11.4649 32.3828 11.4649 33.3672 C 11.4649 34.9375 12.6367 35.9688 14.2539 35.9688 Z"/></svg>';
 
         function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -1761,6 +1934,8 @@ let people = [];
                 }
             } else if (e.key === 'Escape' && selectedPhotos.size > 0) {
                 clearSelection();
+            } else if (e.key === 'Escape' && selectedPeople.size > 0) {
+                clearPeopleSelection();
             }
         });
 
