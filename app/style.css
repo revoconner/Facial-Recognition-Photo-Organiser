@@ -2078,7 +2078,10 @@
         }
         .lightbox-content img {
             max-width: 100%;
-            max-height: 100%;
+            /* Cap on the viewport (matches the content's 90vh), not the parent's 100%:
+               in the grid the percentage chain doesn't constrain reliably, so tall
+               portrait images overflowed the content box and got clipped at the bottom. */
+            max-height: 90vh;
             object-fit: contain;
             border-radius: 8px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
