@@ -1509,9 +1509,11 @@
         }
 
         /* F4: two-column preview - image (0.7) and a details panel (0.3). Fixed height
-           so the details panel is always full-height even when the image is short/wide. */
+           so the details panel is always full-height even when the image is short/wide.
+           Width leaves 100px gutters each side so the viewport-edge controls (prev/next
+           nav, bottom-right open-external) never overlap the image or details panel. */
         .lightbox-content {
-            width: 92vw;
+            width: calc(100vw - 200px);
             height: 90vh;
             display: grid;
             grid-template-columns: 0.7fr 0.3fr;
