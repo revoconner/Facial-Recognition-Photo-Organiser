@@ -1359,7 +1359,9 @@
             max-height: 420px;
             overflow-y: auto;
             scrollbar-width: thin;
-            scrollbar-color: #2a2a2a transparent;
+            /* Thumb uses the grid panel's bg (#1a1a1a), not the menu's own bg
+               (#2a2a2a), so the thumb stays visible against the lighter menu. */
+            scrollbar-color: #1a1a1a transparent;
         }
 
         .filter-panel::-webkit-scrollbar {
@@ -1371,7 +1373,7 @@
         }
 
         .filter-panel::-webkit-scrollbar-thumb {
-            background: #3a3a3a;
+            background: #1a1a1a;
             border-radius: 3px;
         }
 
