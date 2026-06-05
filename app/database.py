@@ -596,31 +596,39 @@ class FaceDatabase:
         
         person_name = self.get_person_name_fast(clustering_id, person_id)
         
+        # Count distinct photos, not faces (F3 collage/exact dedup): a person who
+        # appears several times in one file, or whose file exists as identical copies
+        # (same file_hash), counts once. COALESCE so photos with no hash fall back to
+        # their photo_id. Keeps the people-list count in step with the deduped grid.
         cursor.execute('''
-            SELECT COUNT(DISTINCT ca.face_id)
+            SELECT COUNT(DISTINCT COALESCE(p.file_hash, 'pid:' || p.photo_id))
             FROM cluster_assignments ca
+            JOIN faces f ON ca.face_id = f.face_id
+            JOIN photos p ON f.photo_id = p.photo_id
             LEFT JOIN face_tags ft ON ca.face_id = ft.face_id
-            WHERE ca.clustering_id = ? 
+            WHERE ca.clustering_id = ?
             AND ca.person_id = ?
             AND (ft.face_id IS NULL OR ft.is_manual = 0 OR ft.tag_name = ?)
         ''', (clustering_id, person_id, person_name))
-        
+
         count = cursor.fetchone()[0]
-        
+
         if not person_name.startswith("Person ") and person_name != "Unmatched Faces":
             cursor.execute('''
-                SELECT COUNT(DISTINCT ft.face_id)
+                SELECT COUNT(DISTINCT COALESCE(p.file_hash, 'pid:' || p.photo_id))
                 FROM face_tags ft
                 JOIN cluster_assignments ca ON ft.face_id = ca.face_id
-                WHERE ft.tag_name = ? 
+                JOIN faces f ON ft.face_id = f.face_id
+                JOIN photos p ON f.photo_id = p.photo_id
+                WHERE ft.tag_name = ?
                 AND ft.is_manual = 1
                 AND ca.clustering_id = ?
                 AND ca.person_id != ?
             ''', (person_name, clustering_id, person_id))
-            
+
             manual_count = cursor.fetchone()[0]
             count += manual_count
-        
+
         return count
     
     def get_person_photo_count(self, clustering_id: int, person_id: int) -> int:
@@ -635,14 +643,15 @@ class FaceDatabase:
         total_count = self.get_person_photo_count_fast(clustering_id, person_id)
         
         cursor.execute('''
-            SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2,
+            SELECT DISTINCT p.file_path, p.photo_id, p.file_hash, f.face_id,
+                   f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2,
                    p.date_taken, p.date_modified, p.date_created, p.camera_make, p.camera_model,
                    p.file_ext, p.file_size, p.width, p.height
             FROM photos p
             JOIN faces f ON p.photo_id = f.photo_id
             JOIN cluster_assignments ca ON f.face_id = ca.face_id
             LEFT JOIN face_tags ft ON f.face_id = ft.face_id
-            WHERE ca.clustering_id = ? 
+            WHERE ca.clustering_id = ?
             AND ca.person_id = ?
             AND (ft.face_id IS NULL OR ft.is_manual = 0 OR ft.tag_name = ?)
             ORDER BY f.face_id
@@ -658,14 +667,15 @@ class FaceDatabase:
             
             if remaining_limit > 0:
                 cursor.execute('''
-                    SELECT DISTINCT p.file_path, f.face_id, f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2,
+                    SELECT DISTINCT p.file_path, p.photo_id, p.file_hash, f.face_id,
+                           f.bbox_x1, f.bbox_y1, f.bbox_x2, f.bbox_y2,
                            p.date_taken, p.date_modified, p.date_created, p.camera_make, p.camera_model,
                            p.file_ext, p.file_size, p.width, p.height
                     FROM photos p
                     JOIN faces f ON p.photo_id = f.photo_id
                     JOIN face_tags ft ON f.face_id = ft.face_id
                     JOIN cluster_assignments ca ON f.face_id = ca.face_id
-                    WHERE ft.tag_name = ? 
+                    WHERE ft.tag_name = ?
                     AND ft.is_manual = 1
                     AND ca.clustering_id = ?
                     AND ca.person_id != ?

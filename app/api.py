@@ -6,7 +6,9 @@ import time
 from pathlib import Path
 from typing import Optional, List
 from io import BytesIO
+from datetime import datetime
 from PIL import Image, ImageOps
+import exifread
 import torch
 import webview
 import pystray
@@ -707,7 +709,14 @@ class API:
         hidden_photos = self._db.get_hidden_photos()
         show_hidden_photos = self._settings.get('show_hidden_photos', False)
 
-        photos = []
+        # F3 dedup: collapse a person's faces so each distinct file shows once.
+        # Grouping by file_hash handles BOTH a collage (many faces in one file share a
+        # photo_id and therefore a hash) and exact duplicates (identical bytes at
+        # different paths share a hash). Photos with no hash fall back to their own
+        # photo_id (collage-only). This is display-only; it never writes to the DB and
+        # is computed per person, so a file still shows for every person it contains.
+        groups = {}
+        order = []
         for data in photo_data:
             face_id = data['face_id']
             is_hidden = face_id in hidden_photos
@@ -715,12 +724,36 @@ class API:
             if is_hidden and not show_hidden_photos:
                 continue
 
+            key = data.get('file_hash') or f"pid:{data['photo_id']}"
             path = data['file_path']
+            group = groups.get(key)
+            if group is None:
+                groups[key] = {'data': data, 'path': path,
+                               'face_ids': [face_id], 'all_hidden': is_hidden}
+                order.append(key)
+            else:
+                group['face_ids'].append(face_id)
+                # Representative = shortest path, then lowest face_id (prefer the
+                # tidiest copy of an exact-duplicate set for display/thumbnail).
+                if (len(path), face_id) < (len(group['path']), group['data']['face_id']):
+                    group['data'] = data
+                    group['path'] = path
+                group['all_hidden'] = group['all_hidden'] and is_hidden
+
+        photos = []
+        for key in order:
+            group = groups[key]
+            data = group['data']
+            path = group['path']
             photos.append({
                 'path': path,
                 'name': os.path.basename(path),
-                'face_id': face_id,
-                'is_hidden': is_hidden,
+                # Representative face drives the thumbnail/selection identity; face_ids
+                # is every face of this person in the file (+ exact-dup copies) so hide
+                # and tag-transfer act on the whole photo, not just the shown face.
+                'face_id': data['face_id'],
+                'face_ids': group['face_ids'],
+                'is_hidden': group['all_hidden'],
                 # bbox is always included so the front end can switch between the
                 # whole-photo and zoom-to-face crops without another round trip.
                 'bbox': [data['bbox_x1'], data['bbox_y1'], data['bbox_x2'], data['bbox_y2']],
@@ -759,7 +792,108 @@ class API:
         except Exception as e:
             print(f"Error creating full size preview: {e}")
             return None
-    
+
+    @staticmethod
+    def _human_size(num_bytes):
+        """Bytes -> a short human string (e.g. 3.2 MB)."""
+        size = float(num_bytes)
+        for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
+            if size < 1024 or unit == 'TB':
+                return f"{int(size)} {unit}" if unit == 'B' else f"{size:.1f} {unit}"
+            size /= 1024
+
+    @staticmethod
+    def _fmt_dt(epoch):
+        """Unix epoch -> readable local datetime, or None if unparseable."""
+        try:
+            return datetime.fromtimestamp(epoch).strftime('%Y-%m-%d %H:%M:%S')
+        except (ValueError, OSError, TypeError):
+            return None
+
+    # EXIF tags already surfaced as curated rows (so they aren't repeated in the
+    # "everything else" pass), plus noisy/binary tags not worth showing.
+    _DETAIL_EXIF_SKIP = {
+        'Image Make', 'Image Model', 'EXIF DateTimeOriginal', 'Image DateTime',
+        'JPEGThumbnail', 'TIFFThumbnail', 'EXIF MakerNote', 'EXIF UserComment',
+        'EXIF ExifVersion', 'EXIF FlashPixVersion', 'EXIF ComponentsConfiguration',
+        'EXIF SceneType', 'EXIF FileSource', 'Interoperability InteroperabilityIndex',
+        'Interoperability InteroperabilityVersion',
+    }
+
+    def get_photo_details(self, image_path):
+        """Ordered [label, value] rows for the preview details panel (F4).
+
+        Read live from the file (filesystem + exifread) so it works regardless of
+        whether F2 metadata has been backfilled, and shows the full set of EXIF tags
+        the file actually carries. Only fields that have a value are returned; the
+        panel never invents data.
+        """
+        details = []
+
+        def add(label, value):
+            if value is None:
+                return
+            text = str(value).strip()
+            if text:
+                details.append([label, text])
+
+        add('Name', os.path.basename(image_path))
+        add('Path', image_path)
+        ext = Path(image_path).suffix.lower().lstrip('.')
+        add('Type', ext.upper() if ext else None)
+
+        try:
+            with Image.open(image_path) as im:
+                add('Dimensions', f"{im.size[0]} x {im.size[1]}")
+        except Exception as e:
+            log.debug("dimensions read failed for %s: %s", image_path, e)
+
+        try:
+            st = os.stat(image_path)
+            add('Size', self._human_size(st.st_size))
+            created = getattr(st, 'st_birthtime', None) or st.st_ctime
+            add('Date created', self._fmt_dt(created))
+            add('Date modified', self._fmt_dt(st.st_mtime))
+        except OSError as e:
+            log.debug("stat failed for %s: %s", image_path, e)
+
+        tags = {}
+        try:
+            with open(image_path, 'rb') as f:
+                tags = exifread.process_file(f, details=False)
+        except Exception as e:
+            log.debug("exifread failed for %s: %s", image_path, e)
+
+        def tag(name):
+            value = tags.get(name)
+            return str(value).strip() if value is not None else None
+
+        # Curated EXIF (friendly labels, formatted) shown before the raw dump.
+        taken = tag('EXIF DateTimeOriginal') or tag('Image DateTime')
+        if taken:
+            try:
+                dt = datetime.strptime(taken, '%Y:%m:%d %H:%M:%S')
+                add('Date taken', dt.strftime('%Y-%m-%d %H:%M:%S'))
+            except ValueError:
+                add('Date taken', taken)
+        add('Camera make', tag('Image Make'))
+        add('Camera model', tag('Image Model'))
+
+        # Everything else exifread surfaced, with the 'EXIF '/'Image ' prefix stripped
+        # for readability. Skips curated/noisy tags and over-long binary values.
+        for name in sorted(tags.keys()):
+            if name in self._DETAIL_EXIF_SKIP or ' ' not in name:
+                continue
+            if name.startswith(('Thumbnail', 'MakerNote')):
+                continue
+            value = str(tags.get(name)).strip()
+            if not value or len(value) > 80:
+                continue
+            label = name.split(' ', 1)[1]
+            add(label, value)
+
+        return details
+
     def create_thumbnail(self, image_path: str, size: int = 150, bbox: Optional[List[float]] = None, face_id: Optional[int] = None) -> Optional[str]:
         if face_id:
             return self._thumbnail_cache.create_thumbnail_with_cache(face_id, image_path, size, bbox)

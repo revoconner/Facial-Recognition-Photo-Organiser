@@ -1823,7 +1823,9 @@ let people = [];
             overlayContainer.innerHTML = '';
             
             const imgRect = imageElement.getBoundingClientRect();
-            const contentRect = document.getElementById('lightboxContent').getBoundingClientRect();
+            // Overlay lives inside the image pane now (F4), so position it relative to
+            // the pane's box, not the whole lightbox content grid.
+            const contentRect = document.getElementById('lightboxImagePane').getBoundingClientRect();
             
             const naturalWidth = imageElement.naturalWidth;
             const naturalHeight = imageElement.naturalHeight;
@@ -1880,10 +1882,39 @@ let people = [];
             });
         }
 
+        // Minimal HTML escape for values rendered into the details panel (paths,
+        // EXIF strings) so a stray <, > or & can't break the markup.
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Fetch and render the F4 details panel for the photo at reqIndex. Guards on
+        // reqIndex so a fast prev/next doesn't render stale details over the new photo.
+        async function renderPhotoDetails(photo, reqIndex) {
+            const rowsEl = document.getElementById('lightboxDetailsRows');
+            rowsEl.scrollTop = 0;
+            rowsEl.innerHTML = '';
+            try {
+                const details = await pywebview.api.get_photo_details(photo.path);
+                if (reqIndex !== lightboxCurrentIndex) return;
+                rowsEl.innerHTML = details.map(([label, value]) =>
+                    `<div class="lightbox-detail-row">` +
+                    `<div class="lightbox-detail-label">${escapeHtml(label)}</div>` +
+                    `<div class="lightbox-detail-value">${escapeHtml(value)}</div>` +
+                    `</div>`
+                ).join('');
+            } catch (error) {
+                console.error('Error loading photo details:', error);
+            }
+        }
+
         async function updateLightbox() {
+            const reqIndex = lightboxCurrentIndex;
             const photo = lightboxPhotos[lightboxCurrentIndex];
             document.getElementById('lightboxCounter').textContent = `${lightboxCurrentIndex + 1} of ${lightboxPhotos.length}`;
-            
+
             document.getElementById('lightboxPrev').style.display = lightboxCurrentIndex > 0 ? 'flex' : 'none';
             document.getElementById('lightboxNext').style.display = lightboxCurrentIndex < lightboxPhotos.length - 1 ? 'flex' : 'none';
             
@@ -1924,6 +1955,8 @@ let people = [];
                 console.error('Error loading full size preview:', error);
                 document.getElementById('lightboxImage').src = (thumbCache.get(photo.face_id) || '');
             }
+
+            renderPhotoDetails(photo, reqIndex);
         }
 
         document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
@@ -1976,16 +2009,18 @@ let people = [];
             }
             
             const faceIds = selectedPhotos.size > 0 ? Array.from(selectedPhotos) : [currentPhotoContext.face_id];
-            
+
             if (!faceIds.length) {
                 console.error('No face IDs available');
                 addLogEntry('ERROR: Invalid photo context');
                 closeAllMenus();
                 return;
             }
-            
+
+            // Expand to all faces of this person in each deduped photo so a transfer
+            // moves the whole photo, leaving no stray face behind (F3).
             transferContext = {
-                face_ids: faceIds,
+                face_ids: collectGroupFaceIds(faceIds),
                 current_person: currentPhotoContext.person_name
             };
             
@@ -3312,13 +3347,31 @@ let people = [];
             }
         }
 
+        // Map representative face ids (what selection and menus carry) to every face
+        // id in their deduped group, so hide and tag-transfer act on the whole photo
+        // for this person - not just the single shown face (F3). Other people's faces
+        // in the same file are untouched, so the photo still shows for them.
+        function collectGroupFaceIds(repFaceIds) {
+            const byRep = new Map();
+            for (const p of lightboxPhotos) byRep.set(p.face_id, p.face_ids || [p.face_id]);
+            const out = [];
+            const seen = new Set();
+            for (const rep of repFaceIds) {
+                for (const id of (byRep.get(rep) || [rep])) {
+                    if (!seen.has(id)) { seen.add(id); out.push(id); }
+                }
+            }
+            return out;
+        }
+
         async function hidePhotos() {
             closeAllMenus();
-            
+
             const faceIds = selectedPhotos.size > 0 ? Array.from(selectedPhotos) : [currentPhotoContext.face_id];
-            
+            const groupIds = collectGroupFaceIds(faceIds);
+
             try {
-                for (const faceId of faceIds) {
+                for (const faceId of groupIds) {
                     await pywebview.api.hide_photo(faceId);
                 }
                 addLogEntry(`${faceIds.length} photo(s) hidden`);
@@ -3331,11 +3384,12 @@ let people = [];
 
         async function unhidePhotos() {
             closeAllMenus();
-            
+
             const faceIds = selectedPhotos.size > 0 ? Array.from(selectedPhotos) : [currentPhotoContext.face_id];
-            
+            const groupIds = collectGroupFaceIds(faceIds);
+
             try {
-                for (const faceId of faceIds) {
+                for (const faceId of groupIds) {
                     await pywebview.api.unhide_photo(faceId);
                 }
                 addLogEntry(`${faceIds.length} photo(s) unhidden`);

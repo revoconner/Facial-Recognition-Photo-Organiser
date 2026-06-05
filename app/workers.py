@@ -715,9 +715,10 @@ class ExportWorker(threading.Thread):
 
     def build_export_map(self) -> dict:
         """Return {person_name: [source_path, ...]} for the requested scope. Hidden
-        faces are filtered out (unless show_hidden_photos), and each source file is
-        listed once per person even if that person has several faces in it (so a
-        collage of one person exports as a single file, not one per face)."""
+        faces are filtered out (unless show_hidden_photos). Files are deduped twice
+        (F3): a collage of one person exports as a single file (not one per face), and
+        exact duplicates - identical bytes at different paths, same file_hash - export
+        once, keeping the shortest path."""
         hidden_faces = set() if self.show_hidden_photos else self.db.get_hidden_photos()
 
         if self.scope == 'person':
@@ -732,9 +733,11 @@ class ExportWorker(threading.Thread):
                 if p['person_id'] not in hidden_persons
             ]
 
-        # Keyed by display name so merged clusters that share a name land in one
-        # folder. Values are sets to dedupe a file across a person's many faces.
-        name_to_paths = {}
+        # Keyed by display name so merged clusters that share a name land in one folder.
+        # Per name we dedupe by file_hash (keeping the shortest path) so exact-duplicate
+        # files export once; photos with no hash fall back to a path set (collage dedup
+        # alone, since one file = one path).
+        name_to_files = {}
         for pid in person_ids:
             if pid == 0:  # Unmatched Faces is a grab-bag, not a real person
                 continue
@@ -744,13 +747,25 @@ class ExportWorker(threading.Thread):
             if self.scope == 'all_named' and (name.startswith('Person ') or name == 'Unmatched Faces'):
                 continue
 
-            paths = name_to_paths.setdefault(name, set())
+            files = name_to_files.setdefault(name, {'by_hash': {}, 'no_hash': set()})
             for photo in self.db.get_photos_by_person(self.clustering_id, pid):
                 if photo['face_id'] in hidden_faces:
                     continue
-                paths.add(photo['file_path'])
+                path = photo['file_path']
+                file_hash = photo.get('file_hash')
+                if file_hash:
+                    current = files['by_hash'].get(file_hash)
+                    if current is None or (len(path), path) < (len(current), current):
+                        files['by_hash'][file_hash] = path
+                else:
+                    files['no_hash'].add(path)
 
-        return {name: sorted(paths) for name, paths in name_to_paths.items() if paths}
+        result = {}
+        for name, files in name_to_files.items():
+            paths = set(files['by_hash'].values()) | files['no_hash']
+            if paths:
+                result[name] = sorted(paths)
+        return result
 
     def _is_same_file(self, src_lp: str, dest_lp: str) -> bool:
         """Decide whether dest is already a copy of src, so a re-run (e.g. after a
