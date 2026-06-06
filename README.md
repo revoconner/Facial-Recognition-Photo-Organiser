@@ -1,6 +1,6 @@
-# Face Recognition Photo Organiser (Beta)
+# Felicity (Beta)
 
-Face Recognition Photo Organizer is an offline standalone desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
+Felicity (Previously: Face Recognition Photo Organizer) is an offline standalone desktop application for Windows that automatically finds and groups all photos of the same person across your entire photo library. Instead of manually sorting thousands of photos, the app uses artificial intelligence to recognize faces and organize them for you.
 
 A no nonsense photo organiser for windows, if you want to group people by faces without having to deal with complex UI or professional tools. 
 
