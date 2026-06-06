@@ -65,6 +65,25 @@
             </button>
         </div>
     </div>
+    <!-- Colour-vision daltonization correction filters (Phase 4). Applied to body via
+         [data-cvd]. sRGB interpolation matches the sRGB-derived correction matrices. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <filter id="cvd-protanopia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="1 0 0 0 0  -0.2549 1.2549 0 0 0  0.3031 -0.5451 1.2420 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="cvd-deuteranopia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="1 0 0 0 0  -0.4375 1.4375 0 0 0  0.2625 -0.5625 1.3 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="cvd-tritanopia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="1.05 -0.3825 0.3325 0 0  0 1.2345 -0.2345 0 0  0 0 1 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="cvd-achromatopsia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0"/>
+            </filter>
+        </defs>
+    </svg>
+
     <div class="app-container" id="appContainer">
         <div class="main-content">
             <div class="sidebar">
@@ -72,12 +91,10 @@
                     <div class="sidebar-title-row">
                         <div class="sidebar-title">People</div>
                         <div class="sidebar-controls">
-                            <button class="icon-btn" id="filterBtn" title="Filter">
-                                <div class="doner-icon">
-                                    <div class="doner-line"></div>
-                                    <div class="doner-line"></div>
-                                    <div class="doner-line"></div>
-                                </div>
+                            <button class="icon-btn" id="filterBtn" title="Sort people">
+                                <svg height="18" viewBox="2 6 20 12" fill="none" stroke="currentColor" stroke-width="1.944" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14"/>
+                                </svg>
                             </button>
                             <button class="icon-btn" id="jumpToBtn" title="Jump to">
                                 <div class="bento-icon">
@@ -122,34 +139,22 @@
         </div>
 
         <div class="bottom-bar">
-            <div class="bottom-content">
-                <button class="settings-btn" id="openSettingsBtn">Settings</button>
-                <div class="progress-section" id="progressSection" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <div class="progress-text" id="progressText">Initializing...</div>
-                    <button class="export-cancel-btn" id="exportCancelBtn" style="display: none;" onclick="cancelExport()">Cancel</button>
-                </div>
+            <button class="settings-btn" id="openSettingsBtn">Settings</button>
+            <div class="status-text" id="statusText">
+                <span id="faceCount">Found: 0 faces</span>
+                <span id="progressText" style="display: none;">Initializing...</span>
             </div>
-            <div class="status-bar">
-                <div class="status-info" id="statusInfo">
-                    <span class="status-badge">
-                        <span class="status-indicator"></span>
-                        <span id="pytorchVersion">PyTorch</span>
-                    </span>
-                    <span id="gpuStatus">Checking...</span>
-                    <span id="cudaVersion">CUDA: N/A</span>
-                    <span id="faceCount">Found: 0 faces</span>
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar" id="progressBar" style="display: none;">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <button class="help-btn" id="openHelpBtn" title="Quick Help">
-                    <svg width="14" height="14" viewBox="0 0 14 14">
-                        <circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
-                        <path d="M5 5.5 C5 4 6 3.5 7 3.5 C8 3.5 9 4 9 5.5 C9 6.5 8 7 7 7 L7 8.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
-                        <circle cx="7" cy="10.5" r="0.5" fill="currentColor"/>
-                    </svg>
-                </button>
+                <button class="export-cancel-btn" id="exportCancelBtn" style="display: none;" onclick="cancelExport()">Cancel</button>
             </div>
+            <button class="help-btn" id="openHelpBtn" title="Quick Help">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zM7.92 9.234v.102a.5.5 0 0 0 .5.5h.997a.499.499 0 0 0 .499-.499c0-1.29.998-1.979 2.34-1.979 1.308 0 2.168.689 2.168 1.67 0 .928-.482 1.359-1.686 1.91l-.344.154C11.379 11.54 11 12.21 11 13.381v.119a.5.5 0 0 0 .5.5h.997a.499.499 0 0 0 .499-.499c0-.516.138-.723.55-.912l.345-.155c1.445-.654 2.529-1.514 2.529-3.39v-.103c0-1.978-1.72-3.441-4.164-3.441-2.478 0-4.336 1.428-4.336 3.734zm2.58 7.757c0 .867.659 1.509 1.491 1.509.85 0 1.509-.642 1.509-1.509 0-.867-.659-1.491-1.509-1.491-.832 0-1.491.624-1.491 1.491z"/>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -178,14 +183,15 @@
                 
                 <div class="settings-nav">
                     <div class="nav-item active" data-panel="general">General Settings</div>
+                    <div class="nav-item" data-panel="themes">Themes and Accessibility</div>
                     <div class="nav-item" data-panel="folders">Folders to Scan</div>
                     <div class="nav-item" data-panel="export">Export Photos</div>
-                    <div class="nav-item" data-panel="log">View Log</div>
+                    <div class="nav-item" data-panel="advanced">Advanced Settings</div>
+                    <div class="nav-item" data-panel="about">About</div>
                 </div>
                 
                 <div class="settings-footer">
                     <button class="close-settings-btn" id="closeSettingsBtn">Close Settings</button>
-                    <div class="footer-credit">For personal use only - Free license</br>Version: 0.7.0.b</div>
                 </div>
             </div>
             
@@ -216,20 +222,6 @@
                     <div class="setting-group">
                         <div class="setting-row">
                             <div class="setting-label">
-                                <span>Use system resources dynamically</span>
-                                <span class="info-icon">
-                                    i
-                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage when app is minimised to system tray, and uses all resources when cpu is running in desktop mode. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
-                                </span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="dynamicResourcesToggle">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-row">
-                            <div class="setting-label">
                                 <span>Show single unmatched images</span>
                                 <span class="info-icon">
                                     i
@@ -251,13 +243,13 @@
                                 </span>
                             </div>
                             <div class="min-photos-control">
+                                <input type="number" class="min-photos-input" id="minPhotosInput"
+                                       min="0" max="999" value="2" disabled>
+                                <span style="color: var(--text-muted); font-size: 13px;">photos</span>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="minPhotosToggle">
                                     <span class="toggle-slider"></span>
                                 </label>
-                                <input type="number" class="min-photos-input" id="minPhotosInput" 
-                                       min="0" max="999" value="2" disabled>
-                                <span style="color: #a0a0a0; font-size: 13px;">photos</span>
                             </div>
                         </div>
                         <div class="setting-row">
@@ -333,7 +325,7 @@
 
                             <div class="setting-row">
                                 <div class="setting-label">
-                                    <span>Find changes in photos in the drive</span>
+                                    <span>Rescan frequency for changes in photos</span>
                                     <span class="info-icon">
                                         i
                                         <div class="tooltip">Every time the app restarts, it searches for new photos or removes old photos from the database which has been deleted to keep in sync with your drive. This results in a slow start. If you do make a lot of changes to your photos library, you can set a threshold of time before it rescans for changes after a restart. If set to manually you will have to go to "Folders to Scan" section and click the rescan button.</div>
@@ -348,38 +340,9 @@
                             </div>
 
                         
-                        <div class="setting-row">
-                            <div class="setting-label">
-                                <span>Show development options</span>
-                                <span class="info-icon">
-                                    i
-                                    <div class="tooltip">Shows internal tagging statistics and advanced options for debugging. Regular users should keep this off. Default Off</div>
-                                </span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="showDevOptionsToggle">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <div class="setting-group">
-                            <div class="setting-row">
-                                <div class="setting-label">
-                                    <span>Thumbnail Cache</span>
-                                    <span class="info-icon">
-                                        i
-                                        <div class="tooltip">Cached thumbnails speed up photo loading dramatically. First load generates cache, subsequent loads are instant. Clear cache if photos have been edited externally.</div>
-                                    </span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <span id="cacheSize" style="color: #a0a0a0; font-size: 13px;">Calculating...</span>
-                                    <button class="recalibrate-btn" id="clearCacheBtn" onclick="clearThumbnailCache()">Clear Cache</button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
-                
+
                 <div class="content-panel" id="folders-panel">
                     <div class="panel-title">Folders to Scan</div>
                     
@@ -390,6 +353,11 @@
                                 i
                                 <div class="tooltip">Include all folders that will be scanned for photos. Add folders here that contains photos. Supported: jpg, png, bmp, gif, heic, heif</div>
                             </span>
+                        </div>
+                        <div class="export-note">
+                            Folders are scanned recursively, that means it includes any subfolders.
+                            <br>To exclude any subfolder, add those in the excluded section below.
+                            <br>Any network path must be online during each scan or rescan. Paths that are offline will be detected as not being present, and the photos will be considered deleted.
                         </div>
                         <div class="folder-list-container" id="includeFolders">
                             <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders added yet</div>
@@ -414,6 +382,10 @@
                                 <div class="tooltip">Exclude subfolders of "included folders" above, that are not to be scanned. This takes precedence over include folders, so if you add the same folder to both, they will not be scanned</div>
                             </span>
                         </div>
+                        <div class="export-note">
+                            Any folder here is added recursively, that means it includes any subfolders.
+                            <br>This takes precedence over included folders, that means a folder added here will not be scanned even if the same folder is included in the section above.
+                        </div>
                         <div class="folder-list-container" id="excludeFolders">
                             <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders excluded yet</div>
                         </div>
@@ -434,10 +406,10 @@
                             <span>Wildcard Exclusion</span>
                             <span class="info-icon">
                                 i
-                                <div class="tooltip">Use wildcards like *.jpg, *.gif with extension names or *thumbnail with folder names to exclude them from being scanned, separated by commas</div>
+                                <div class="tooltip">Skip files or folders whose name matches a pattern, separated by commas. Use * as a wildcard: *.gif skips every GIF, *thumbnail* skips anything with "thumbnail" in its name, and a full path like C:\Photos\Private excludes that folder. Each pattern is matched against file and folder names while scanning, and applies on top of the excluded-folders list above.</div>
                             </span>
                         </div>
-                        <input type="text" class="wildcard-input" id="wildcardInput" placeholder="e.g., *.gif, *thumbnail, *cache*, C:\Photos\private photos ">
+                        <input type="text" class="wildcard-input" id="wildcardInput" placeholder="*.gif, *thumbnail, *cache*, C:\Photos\private photos">
                     </div>
                     
                     <div class="folder-section">
@@ -461,14 +433,15 @@
                             <br>1. Any person not shown in the app UI because they are hidden will not appear here. This includes unnamed people or any other filters.
                             <br>2. A person's hidden photos will not be exported unless "show hidden photos" is toggled on.
                         </div>
-                        <input type="text" class="wildcard-input" id="exportSearchInput" placeholder="Search people...">
+                        <input type="text" class="wildcard-input export-search" id="exportSearchInput" placeholder="Search people...">
                         <div class="folder-list-container" id="exportPeopleList">
                             <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No people available</div>
                         </div>
+                        <div class="export-note">Hardlink is disabled by default. The toggle to enable it is located in Advanced Settings.</div>
                         <div class="folder-controls export-actions">
                             <select class="view-dropdown" id="exportModeDropdown" style="min-width: 130px;">
                                 <option value="copy" selected>Copy</option>
-                                <option value="hardlink">Hardlink</option>
+                                <option value="hardlink" disabled>Hardlink</option>
                             </select>
                             <span class="info-icon">
                                 i
@@ -495,10 +468,227 @@
                     </div>
                 </div>
 
-                <div class="content-panel" id="log-panel">
-                    <div class="log-header">
-                        <div class="panel-title">View Log</div>
-                        <div class="log-header-actions">
+                <div class="content-panel" id="themes-panel">
+                    <div class="settings-subheader">Themes</div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Theme</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Choose the overall light or dark appearance of the app.</div>
+                                </span>
+                            </div>
+                            <select class="view-dropdown" id="themeDropdown" style="min-width: 160px;">
+                                <option value="dark">Dark theme</option>
+                                <option value="light">Light theme</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row" style="align-items: flex-start;">
+                            <div class="setting-label">
+                                <span>Accent color</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">The highlight colour used across the app. Each swatch previews the exact shade for the current theme.</div>
+                                </span>
+                            </div>
+                            <div class="accent-swatches" id="accentSwatches"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-subheader secondary">Accessibility</div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Increase contrast</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Adds strong borders to dividers and surfaces and uses higher-contrast accent shades, so areas that are otherwise told apart only by a subtle shade of grey become clearer.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="increaseContrastToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Bold fonts</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Increases the weight of text throughout the app for easier reading. Text that is already bold is unaffected.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="boldFontsToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Dyslexia-friendly font</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Switches the app to a typeface designed to be easier to read with dyslexia. OpenDyslexic has weighted letter bottoms; Atkinson Hyperlegible maximises the distinction between characters.</div>
+                                </span>
+                            </div>
+                            <select class="view-dropdown" id="dyslexiaFontDropdown" style="min-width: 190px;">
+                                <option value="off">Off</option>
+                                <option value="opendyslexic">OpenDyslexic</option>
+                                <option value="atkinson">Atkinson Hyperlegible</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Colour vision</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Applies a colour-correction (daltonization) filter to help distinguish colours for the chosen type of colour blindness, the whole app included. This is an assistive approximation, not a medical correction.</div>
+                                </span>
+                            </div>
+                            <select class="view-dropdown" id="colorVisionDropdown" style="min-width: 210px;">
+                                <option value="none">None</option>
+                                <option value="protanopia">Protanopia (no red)</option>
+                                <option value="deuteranopia">Deuteranopia (no green)</option>
+                                <option value="tritanopia">Tritanopia (no blue)</option>
+                                <option value="achromatopsia">Achromatopsia (no colour)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-panel" id="advanced-panel">
+                    <div class="panel-title">Advanced Settings</div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Use system resources dynamically</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage when app is minimised to system tray, and uses all resources when cpu is running in desktop mode. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="dynamicResourcesToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Show development options</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Shows internal tagging statistics and advanced options for debugging. Regular users should keep this off. Default Off</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="showDevOptionsToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-group">
+                            <div class="setting-row">
+                                <div class="setting-label">
+                                    <span>Thumbnail Cache</span>
+                                    <span class="info-icon">
+                                        i
+                                        <div class="tooltip">Cached thumbnails speed up photo loading dramatically. First load generates cache, subsequent loads are instant. Clear cache if photos have been edited externally.</div>
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span id="cacheSize" style="color: var(--text-muted); font-size: 13px;">Calculating...</span>
+                                    <button class="recalibrate-btn" id="clearCacheBtn" onclick="clearThumbnailCache()">Clear Cache</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Hardlink export</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">When on, the Export Photos screen offers Hardlink mode (uses no extra disk space, same-drive only, falls back to copy across drives). A hardlinked file shares its data with your original, so editing the copy in another app would also change the original. Off by default.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="hardlinkEnabledToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Write XMP sidecar files</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Writes a small .xmp file next to each tagged photo (only in the folders selected below), recording face regions and names so other photo apps such as digiKam or Lightroom can read them. Your original photos are never modified.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="xmpEnabledToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="folder-section">
+                        <div class="folder-section-title">
+                            <span>Folders to write XMP into</span>
+                            <span class="info-icon">
+                                i
+                                <div class="tooltip">Only the folders selected here get .xmp sidecars written on the next rescan. This list mirrors your "Folders to Scan" include list.</div>
+                            </span>
+                        </div>
+                        <div class="export-note">Sidecars are written on the next rescan, only for the folders you select. They live next to your photos: deleting Felicity or its database will not remove them, and turning XMP off later will not delete files already written.</div>
+                        <div class="folder-list-container" id="xmpFolderList">
+                            <div style="color: var(--text-dimmer); padding: 12px; text-align: center; font-size: 13px;">No folders to scan yet</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-panel" id="about-panel">
+                    <div class="settings-subheader">About</div>
+
+                    <div class="setting-group">
+                        <div class="about-text">
+                            <div class="about-title">Felicity (Previously FRPO) - Public Beta</div>
+                            Version - 0.8.0.b
+                            <br>CUDA 13.0
+                            <br>CUDA&reg; is a registered trademark of NVIDIA Corporation.
+                            <br><br>
+                            &copy; R&eacute;v O'Conner 2025 - 2026. All rights reserved.
+                            <br><br>
+                            Free to use for personal or commercial use. By using this app you agree to the EULA.
+                            <br><br>
+                            Notice: Felicity ("The Software"), including but not limited to its code, documentation, appearance, structure, and organization, where applicable, is proprietary to and copyrighted by R&eacute;v O'Conner ("Developer") and revoconner ("The Company"), and is protected by copyright laws and international treaty provisions.
+                            <br><br>
+                            The source code is available for everyone to view with restrictions. To read the full End User License Agreement, click the button below.
+                        </div>
+
+                        <div class="about-buttons">
+                            <button class="about-btn primary" id="aboutHelpBtn">Help</button>
+                            <button class="about-btn primary" id="aboutBugBtn">Report a bug</button>
+                            <button class="about-btn" id="aboutDeveloperBtn">Developer</button>
+                            <button class="about-btn" id="aboutWebsiteBtn">Website</button>
+                            <button class="about-btn" id="aboutEulaBtn">EULA</button>
+                            <button class="about-btn" id="aboutPrivacyBtn">Privacy Policy</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-subheader secondary">Log</div>
+                    <div class="setting-group">
+                        <div class="log-header-actions" style="justify-content: flex-end; margin-bottom: 14px;">
                             <select class="view-dropdown" id="logLevelDropdown" title="Log detail level">
                                 <option value="INFO">Normal</option>
                                 <option value="DEBUG">Debug</option>
@@ -507,9 +697,8 @@
                                 <span>Save Log</span>
                             </button>
                         </div>
+                        <div class="log-viewer" id="logViewer"></div>
                     </div>
-                    
-                    <div class="log-viewer" id="logViewer"></div>
                 </div>
             </div>
         </div>
@@ -666,6 +855,75 @@
                 <button class="folder-btn remove" id="exportConfirmCancelBtn">
                     <span>Cancel</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- XMP first-enable consent (Phase 5). Cannot be dismissed by clicking outside;
+         Confirm is enabled only once "I understand" is checked. -->
+    <div class="cleanup-overlay" id="xmpConsentOverlay">
+        <div class="cleanup-message" id="xmpConsentDialog">
+            <div class="cleanup-title">Enable XMP sidecar export?</div>
+            <div class="export-result-body" style="text-align: left; line-height: 1.6;">
+                This lets Felicity write a small <strong>.xmp</strong> file next to each tagged photo
+                (only in the folders you select), recording the face regions and names so other photo
+                software such as digiKam or Lightroom can read them.
+                <br><br>
+                Please note:
+                <br>&bull; These .xmp files live on your disk, next to your photos. <strong>Deleting
+                Felicity or its database does not remove them.</strong>
+                <br>&bull; They are written on the next rescan, only for the folders you select.
+                <br>&bull; <strong>Turning this off later does not delete</strong> any .xmp files
+                already written - you would remove those yourself.
+                <br><br>
+                Your original photos are never modified.
+            </div>
+            <label class="xmp-understand">
+                <input type="checkbox" id="xmpUnderstandCheck">
+                <span>I understand</span>
+            </label>
+            <div class="folder-controls" style="justify-content: center; margin-top: 20px;">
+                <button class="folder-btn" id="xmpConfirmBtn" disabled>
+                    <span>Confirm</span>
+                </button>
+                <button class="folder-btn remove" id="xmpCancelBtn">
+                    <span>Cancel</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About > Help dialog (Phase 6). -->
+    <div class="cleanup-overlay" id="aboutHelpOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title">Help</div>
+            <div class="export-result-body" style="text-align: left; line-height: 1.6;">
+                Online help is regularly updated and improved. Unless you do not have an internet
+                connection, please visit the online help page.
+            </div>
+            <div class="folder-controls" style="justify-content: center; margin-top: 24px; flex-wrap: wrap;">
+                <button class="folder-btn" id="aboutOnlineHelpBtn"><span>Online Help</span></button>
+                <button class="folder-btn" id="aboutOfflinePdfBtn"><span>Offline Help PDF</span></button>
+                <button class="folder-btn remove" id="aboutHelpCloseBtn"><span>Close</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About > Privacy Policy dialog (Phase 6). -->
+    <div class="cleanup-overlay" id="aboutPrivacyOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title">Privacy Policy</div>
+            <div class="export-result-body" style="text-align: left; line-height: 1.6;">
+                We do not collect any data whatsoever. The app only connects to the internet during a
+                first install to download the AI model. You may transfer the downloaded model using an
+                offline method to your %userprofile% home directory to avoid this. You can use this app
+                on an "air-gapped" computer if you want. And as such, we do not collect any data,
+                analytical or otherwise. If you ever discover Felicity connecting to the Internet,
+                uninstall immediately, as you may have downloaded a modified version of the app from
+                malicious sources.
+            </div>
+            <div class="folder-controls" style="justify-content: center; margin-top: 24px;">
+                <button class="folder-btn remove" id="aboutPrivacyCloseBtn"><span>Close</span></button>
             </div>
         </div>
     </div>

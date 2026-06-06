@@ -3,6 +3,7 @@ import os
 import base64
 import threading
 import time
+import webbrowser
 import ctypes
 from ctypes import wintypes
 from pathlib import Path
@@ -1008,7 +1009,32 @@ class API:
                 os.system(f'xdg-open "{path}"')
         except Exception as e:
             print(f"Error opening photo: {e}")
-    
+
+    # About-section links (Phase 6).
+    def open_url(self, url):
+        try:
+            webbrowser.open(url)
+            return {'success': True}
+        except Exception as e:
+            log.warning("Failed to open URL %s: %s", url, e)
+            return {'success': False, 'error': str(e)}
+
+    def open_help_pdf(self):
+        """Open the bundled help.pdf, which ships next to the app (next to the exe in a
+        frozen build, or the app/ folder in dev)."""
+        try:
+            base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) \
+                else os.path.dirname(os.path.abspath(__file__))
+            pdf = os.path.join(base, 'help.pdf')
+            if not os.path.exists(pdf):
+                log.warning("help.pdf not found at %s", pdf)
+                return {'success': False, 'error': 'help.pdf not found'}
+            os.startfile(pdf)
+            return {'success': True}
+        except Exception as e:
+            log.warning("Failed to open help.pdf: %s", e)
+            return {'success': False, 'error': str(e)}
+
     def save_log(self, log_content):
         try:
             import tkinter as tk
@@ -1345,6 +1371,73 @@ class API:
 
     def set_show_photo_details(self, enabled):
         self._settings.set('show_photo_details', enabled)
+
+    # Theme + accent (F7 / Phase 3). Persisted; the frontend resolves the actual accent
+    # value from the swatch table using theme x increase-contrast.
+    def get_theme(self):
+        return self._settings.get('theme', 'dark')
+
+    def set_theme(self, theme):
+        self._settings.set('theme', theme)
+
+    def get_accent_color(self):
+        return self._settings.get('accent_color', 'blue')
+
+    def set_accent_color(self, color):
+        self._settings.set('accent_color', color)
+
+    # Accessibility (Phase 4). All persisted; the frontend applies them via root
+    # data-attributes / SVG filters.
+    def get_increase_contrast(self):
+        return self._settings.get('increase_contrast', False)
+
+    def set_increase_contrast(self, enabled):
+        self._settings.set('increase_contrast', enabled)
+
+    def get_bold_fonts(self):
+        return self._settings.get('bold_fonts', False)
+
+    def set_bold_fonts(self, enabled):
+        self._settings.set('bold_fonts', enabled)
+
+    def get_dyslexia_font(self):
+        return self._settings.get('dyslexia_font', 'off')
+
+    def set_dyslexia_font(self, value):
+        self._settings.set('dyslexia_font', value)
+
+    def get_color_vision(self):
+        return self._settings.get('color_vision', 'none')
+
+    def set_color_vision(self, value):
+        self._settings.set('color_vision', value)
+
+    # Advanced (Phase 5). Hardlink-export gate, and the XMP toggle + consent + the
+    # subset of scan folders that get sidecars on the next rescan. The XMP writer itself
+    # is the separate F6 task; these just persist the user's intent.
+    def get_export_hardlink_enabled(self):
+        return self._settings.get('export_hardlink_enabled', False)
+
+    def set_export_hardlink_enabled(self, enabled):
+        self._settings.set('export_hardlink_enabled', enabled)
+
+    def get_xmp_export_enabled(self):
+        return self._settings.get('xmp_export_enabled', False)
+
+    def set_xmp_export_enabled(self, enabled):
+        self._settings.set('xmp_export_enabled', enabled)
+
+    def get_xmp_consent_given(self):
+        return self._settings.get('xmp_consent_given', False)
+
+    def set_xmp_consent_given(self, given):
+        self._settings.set('xmp_consent_given', given)
+
+    def get_xmp_folders(self):
+        return self._settings.get('xmp_folders', [])
+
+    def set_xmp_folders(self, folders):
+        self._settings.set('xmp_folders', folders)
 
 
     def close(self):

@@ -1,3 +1,63 @@
+:root {
+            /* Design tokens (Phase 0). Dark values == the original hardcoded colors, so
+               this refactor is visually a no-op. Themes (Phase 3) swap these: the light
+               theme inverts the neutral greys; accent comes from the swatch table;
+               danger stays red across themes. */
+            --bg: #1a1a1a;
+            --surface: #2a2a2a;
+            --surface-2: #3a3a3a;
+            --surface-3: #4a4a4a;
+            --surface-deep: #0d0d0d;
+            --surface-deep-2: #161616;
+            --text: #ffffff;
+            --text-2: #e0e0e0;
+            --text-3: #c0c0c0;
+            --text-muted: #a0a0a0;
+            --text-dim: #808080;
+            --text-dimmer: #606060;
+            --border: rgba(255, 255, 255, 0.05);
+            --contrast-border: rgba(255, 255, 255, 0.9);
+            --input-bg: #1a1a1a;
+            /* Make native form controls (number input, select popups, scrollbars) follow
+               the app theme instead of the OS scheme. */
+            color-scheme: dark;
+
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-rgb: 59, 130, 246;
+            --accent-on: #ffffff;
+
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --danger-2: #ef4444;
+            --danger-2-rgb: 239, 68, 68;
+            --danger-deep: #6b1d1d;
+            --danger-strong: #e81123;
+        }
+
+        /* Light theme (Phase 3): the neutral greys are inverted from the dark values
+           (255 - each channel), so surfaces/text flip while accent + danger keep their
+           own values. Borders flip to a dark alpha so they stay visible on light. The
+           accent variables are set at runtime by applyAccent() from the swatch table. */
+        :root[data-theme="light"] {
+            --bg: #e5e5e5;
+            --surface: #d5d5d5;
+            --surface-2: #c5c5c5;
+            --surface-3: #b5b5b5;
+            --surface-deep: #f2f2f2;
+            --surface-deep-2: #e9e9e9;
+            --text: #000000;
+            --text-2: #1f1f1f;
+            --text-3: #3f3f3f;
+            --text-muted: #5f5f5f;
+            --text-dim: #7f7f7f;
+            --text-dimmer: #9f9f9f;
+            --border: rgba(0, 0, 0, 0.12);
+            --contrast-border: rgba(0, 0, 0, 0.9);
+            --input-bg: #ffffff;
+            color-scheme: light;
+        }
+
 * {
             margin: 0;
             padding: 0;
@@ -6,8 +66,8 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
+            background: var(--bg);
+            color: var(--text);
             overflow: hidden;
             height: 100vh;
             -webkit-app-region: no-drag;
@@ -15,11 +75,11 @@
 
         .title-bar {
             height: 32px;
-            background: #0d0d0d;
+            background: var(--surface-deep);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
             user-select: none;
         }
 
@@ -34,7 +94,7 @@
 
         .title-bar-title {
             font-size: 12px;
-            color: #a0a0a0;
+            color: var(--text-muted);
             font-weight: 500;
         }
 
@@ -49,7 +109,7 @@
             height: 100%;
             border: none;
             background: transparent;
-            color: #a0a0a0;
+            color: var(--text-muted);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -59,13 +119,13 @@
         }
 
         .title-bar-btn:hover {
-            background: #2a2a2a;
-            color: #ffffff;
+            background: var(--surface);
+            color: var(--text);
         }
 
         .title-bar-btn.close-btn:hover {
-            background: #e81123;
-            color: #ffffff;
+            background: var(--danger-strong);
+            color: var(--text);
         }
 
         .title-bar-btn svg {
@@ -93,10 +153,10 @@
 
         .sidebar {
             width: 240px;
-            background: #0d0d0d;
+            background: var(--surface-deep);
             display: flex;
             flex-direction: column;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid var(--border);
         }
 
         .sidebar-header {
@@ -113,7 +173,7 @@
         .sidebar-title {
             font-size: 22px;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .sidebar-controls {
@@ -125,7 +185,7 @@
         .icon-btn {
             background: transparent;
             border: none;
-            color: #a0a0a0;
+            color: var(--text-muted);
             cursor: pointer;
             padding: 6px;
             display: flex;
@@ -135,11 +195,11 @@
         }
 
         .icon-btn:hover {
-            color: #ffffff;
+            color: var(--text);
         }
 
         .icon-btn.active {
-            color: #3b82f6;
+            color: var(--accent);
         }
 
         .doner-icon {
@@ -176,7 +236,7 @@
             overflow-y: auto;
             padding: 0 12px;
             scrollbar-width: thin;
-            scrollbar-color: #2a2a2a transparent;
+            scrollbar-color: var(--surface) transparent;
         }
 
         .people-list::-webkit-scrollbar {
@@ -188,12 +248,12 @@
         }
 
         .people-list::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 3px;
         }
 
         .people-list::-webkit-scrollbar-thumb:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
         .person-item {
@@ -208,13 +268,25 @@
         }
 
         .person-item:hover:not(.menu-active) {
-            background: #2a2a2a;
+            background: var(--surface);
             transform: translateX(4px);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         .person-item.active {
-            background: #2a2a2a;
+            background: var(--accent);
+        }
+
+        .person-item.active .person-name,
+        .person-item.active .person-count {
+            color: var(--accent-on);
+        }
+
+        /* On hover, the active person keeps its accent background (so its accent-on text
+           stays readable); the slide/shadow/avatar effects still come from the generic
+           hover rules. */
+        .person-item.active:hover:not(.menu-active) {
+            background: var(--accent);
         }
 
         .person-avatar {
@@ -233,7 +305,7 @@
 
         .person-item:hover:not(.menu-active) .person-avatar {
             transform: scale(1.1);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.4);
         }
 
         .person-info {
@@ -244,22 +316,22 @@
             font-size: 14px;
             font-weight: 500;
             margin-bottom: 2px;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .person-count {
             font-size: 12px;
-            color: #a0a0a0;
+            color: var(--text-muted);
         }
 
         .kebab-menu {
             opacity: 0;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             padding: 6px 10px;
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 6px;
             border: none;
-            color: #ffffff;
+            color: var(--text);
             cursor: pointer;
             display: flex;
             flex-direction: column;
@@ -272,7 +344,7 @@
         .kebab-dot {
             width: 3px;
             height: 3px;
-            background: #ffffff;
+            background: var(--text);
             border-radius: 50%;
         }
 
@@ -285,12 +357,12 @@
         }
 
         .kebab-menu:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
         .context-menu {
             position: fixed;
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 8px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
             overflow: hidden;
@@ -317,15 +389,15 @@
 
         .context-menu-item {
             padding: 12px 16px;
-            color: #ffffff;
+            color: var(--text);
             cursor: pointer;
             transition: background 0.2s ease;
             font-size: 13px;
-            background: #2a2a2a;
+            background: var(--surface);
         }
 
         .context-menu-item:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
         .alphabet-item {
@@ -337,16 +409,16 @@
             text-align: center;
             font-size: 18px;
             font-weight: 600;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .alphabet-item:hover {
-            background: #2a2a2a;
+            background: var(--surface);
             transform: translateX(4px);
         }
 
         .alphabet-item.disabled {
-            color: #4a4a4a;
+            color: var(--surface-3);
             cursor: default;
         }
 
@@ -359,7 +431,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: #1a1a1a;
+            background: var(--bg);
         }
 
         .content-header {
@@ -367,13 +439,13 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
 
         .content-title {
             font-size: 24px;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .content-controls {
@@ -390,14 +462,14 @@
 
         .size-label {
             font-size: 13px;
-            color: #a0a0a0;
+            color: var(--text-muted);
         }
 
         .size-slider {
             width: 160px;
             height: 6px;
             border-radius: 3px;
-            background: #2a2a2a;
+            background: var(--surface);
             outline: none;
             appearance: none;
             cursor: pointer;
@@ -409,39 +481,39 @@
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #3b82f6;
+            background: var(--accent);
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.4);
         }
 
         .size-slider::-webkit-slider-thumb:hover {
             transform: scale(1.2);
-            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6);
+            box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.6);
         }
 
         .size-slider::-moz-range-thumb {
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #3b82f6;
+            background: var(--accent);
             cursor: pointer;
             border: none;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.4);
         }
 
         .size-slider::-moz-range-thumb:hover {
             transform: scale(1.2);
-            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.6);
+            box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.6);
         }
 
         .view-dropdown {
             padding: 10px 16px;
-            background: #2a2a2a;
+            background: var(--surface);
             border: none;
             border-radius: 8px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 13px;
             cursor: pointer;
             transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -449,11 +521,21 @@
         }
 
         .view-dropdown:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
         .view-dropdown:focus {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.3);
+        }
+
+        /* Settings dropdowns sit on a subsection (--surface); give them a darker normal
+           bg so they stand out (hover/focus unchanged). */
+        .content-panel .view-dropdown {
+            background: var(--input-bg);
+        }
+
+        .content-panel .view-dropdown:hover {
+            background: var(--surface-2);
         }
 
         .photo-grid-container {
@@ -461,7 +543,7 @@
             overflow-y: auto;
             padding: 24px 28px;
             scrollbar-width: thin;
-            scrollbar-color: #2a2a2a transparent;
+            scrollbar-color: var(--surface) transparent;
         }
 
         .photo-grid-container::-webkit-scrollbar {
@@ -473,12 +555,12 @@
         }
 
         .photo-grid-container::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 4px;
         }
 
         .photo-grid-container::-webkit-scrollbar-thumb:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
         .photo-grid {
@@ -553,25 +635,24 @@
             z-index: 4;
         }
 
+        /* One-row bottom bar (Phase 1): Settings | status/progress text | progress bar
+           (when scanning) | Help (pushed to the right edge). */
         .bottom-bar {
-            background: #0d0d0d;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 16px 28px;
-        }
-
-        .bottom-content {
+            background: var(--surface-deep);
+            border-top: 1px solid var(--border);
+            padding: 12px 28px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
+            gap: 16px;
         }
 
         .settings-btn {
+            flex: 0 0 auto;
             padding: 10px 20px;
-            background: #2a2a2a;
+            background: var(--accent);
             border: none;
             border-radius: 8px;
-            color: #ffffff;
+            color: var(--accent-on);
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
@@ -579,21 +660,38 @@
         }
 
         .settings-btn:hover {
-            background: #3a3a3a;
+            background: var(--accent-hover);
         }
 
+        /* No box of its own - inherits the bottom-bar background. Shows the face count,
+           or the progress text while a scan/export runs (the two spans swap). */
+        .status-text {
+            flex: 0 0 auto;
+            min-width: 30vw;
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* The section stays in flow as a flex:1 filler even when the bar is hidden, so
+           the Help button stays pinned right without a margin-auto that would stop the
+           bar from growing. */
         .progress-section {
             flex: 1;
+            min-width: 0;
             display: flex;
             align-items: center;
-            gap: 16px;
-            margin: 0 32px;
+            gap: 12px;
         }
 
         .progress-bar {
             flex: 1;
+            min-width: 0;
             height: 8px;
-            background: #2a2a2a;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 4px;
             overflow: hidden;
             position: relative;
@@ -601,7 +699,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3b82f6 0%, #558be1 100%);
+            background: linear-gradient(90deg, var(--accent) 0%, rgba(var(--accent-rgb), 0.6) 100%);
             width: 35%;
             border-radius: 4px;
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -634,67 +732,12 @@
             }
         }
 
-        .progress-text {
-            font-size: 12px;
-            color: #a0a0a0;
-            white-space: nowrap;
-        }
-
-        .status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 11px;
-            color: #a0a0a0;
-            margin-top: 8px;
-            padding: 8px 12px;
-            background: #1a1a1a;
-            border-radius: 6px;
-        }
-
-        .status-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 8px;
-            background: rgba(59, 130, 246, 0.1);
-            border-radius: 4px;
-            color: #3b82f6;
-            transition: all 0.3s ease;
-        }
-
-        .status-badge:hover {
-            background: rgba(59, 130, 246, 0.2);
-        }
-
-        .status-indicator {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #3b82f6;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-        }
-
         .help-btn {
+            flex: 0 0 auto;
             padding: 6px;
             background: transparent;
             border: none;
-            color: #a0a0a0;
+            color: var(--accent);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -704,8 +747,8 @@
         }
 
         .help-btn:hover {
-            color: #3b82f6;
-            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            background: rgba(var(--accent-rgb), 0.1);
         }
 
         .settings-overlay {
@@ -742,7 +785,7 @@
             height: calc(100vh - 80px);
             max-width: 1400px;
             max-height: 900px;
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
             display: flex;
@@ -764,8 +807,8 @@
 
         .settings-sidebar {
             width: 240px;
-            background: #0d0d0d;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            background: var(--surface-deep);
+            border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             padding: 24px 0;
@@ -773,13 +816,13 @@
 
         .settings-header {
             padding: 0 20px 24px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
 
         .settings-title {
             font-size: 24px;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .settings-nav {
@@ -794,32 +837,32 @@
             cursor: pointer;
             transition: all 0.2s ease;
             font-size: 14px;
-            color: #a0a0a0;
+            color: var(--text-muted);
         }
 
         .nav-item:hover {
-            background: #2a2a2a;
-            color: #ffffff;
+            background: var(--surface);
+            color: var(--text);
         }
 
         .nav-item.active {
-            background: #2a2a2a;
-            color: #ffffff;
+            background: var(--surface);
+            color: var(--text);
             font-weight: 500;
         }
 
         .settings-footer {
             padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border);
         }
 
         .close-settings-btn {
             width: 100%;
             padding: 12px 32px;
-            background: #dc2626;
+            background: var(--danger);
             border: none;
             border-radius: 8px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
@@ -828,13 +871,13 @@
         }
 
         .close-settings-btn:hover {
-            background: #b91c1c;
+            background: var(--danger-hover);
         }
 
         .footer-credit {
             text-align: center;
             font-size: 11px;
-            color: #606060;
+            color: var(--text-dimmer);
         }
 
         .settings-content {
@@ -865,7 +908,7 @@
         }
 
         .content-panel::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 4px;
         }
 
@@ -876,7 +919,7 @@
         }
 
         .setting-group {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 12px;
             padding: 24px;
             margin-bottom: 24px;
@@ -890,7 +933,7 @@
         }
 
         .setting-row:not(:last-child) {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
 
         .setting-label {
@@ -898,32 +941,32 @@
             align-items: center;
             gap: 8px;
             font-size: 14px;
-            color: #e0e0e0;
+            color: var(--text-2);
         }
 
         .info-icon {
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            border: 1px solid #606060;
+            border: 1px solid var(--text-dimmer);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 10px;
-            color: #606060;
+            color: var(--text-dimmer);
             cursor: help;
             position: relative;
         }
 
         .info-icon:hover {
-            border-color: #808080;
-            color: #808080;
+            border-color: var(--text-dim);
+            color: var(--text-dim);
         }
 
         .tooltip {
             position: fixed;
-            background: #2a2a2a;
-            color: #e0e0e0;
+            background: var(--surface);
+            color: var(--text-2);
             padding: 12px 16px;
             border-radius: 8px;
             font-size: 12px;
@@ -944,7 +987,7 @@
             left: 50%;
             transform: translateX(-50%);
             border: 6px solid transparent;
-            border-top-color: #2a2a2a;
+            border-top-color: var(--surface);
         }
 
         .info-icon:hover .tooltip {
@@ -956,6 +999,7 @@
             align-items: center;
             gap: 16px;
             width: 100%;
+            margin-left: 24px;
         }
 
         .threshold-slider-wrapper {
@@ -969,7 +1013,7 @@
             flex: 1;
             height: 6px;
             border-radius: 3px;
-            background: #1a1a1a;
+            background: var(--bg);
             outline: none;
             appearance: none;
             cursor: pointer;
@@ -980,34 +1024,34 @@
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #3b82f6;
+            background: var(--accent);
             cursor: pointer;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.4);
         }
 
         .threshold-slider::-moz-range-thumb {
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #3b82f6;
+            background: var(--accent);
             cursor: pointer;
             border: none;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.4);
         }
 
         .threshold-value {
             min-width: 45px;
             text-align: right;
             font-size: 14px;
-            color: #a0a0a0;
+            color: var(--text-muted);
         }
 
         .recalibrate-btn {
             padding: 8px 20px;
-            background: #3b82f6;
+            background: var(--accent);
             border: none;
             border-radius: 6px;
-            color: #ffffff;
+            color: var(--accent-on);
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
@@ -1015,7 +1059,7 @@
         }
 
         .recalibrate-btn:hover {
-            background: #2563eb;
+            background: var(--accent-hover);
         }
 
         .toggle-switch {
@@ -1037,7 +1081,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: #3a3a3a;
+            background: var(--surface-2);
             border-radius: 13px;
             transition: all 0.3s ease;
         }
@@ -1049,13 +1093,13 @@
             width: 20px;
             left: 3px;
             bottom: 3px;
-            background: #ffffff;
+            background: var(--text);
             border-radius: 50%;
             transition: all 0.3s ease;
         }
 
         .toggle-switch input:checked + .toggle-slider {
-            background: #3b82f6;
+            background: var(--accent);
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
@@ -1068,7 +1112,7 @@
 
         .folder-section-title {
             font-size: 14px;
-            color: #e0e0e0;
+            color: var(--text-2);
             margin-bottom: 12px;
             font-weight: 500;
             display: flex;
@@ -1077,7 +1121,7 @@
         }
 
         .folder-list-container {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 8px;
             padding: 16px;
             height: 200px;
@@ -1093,17 +1137,17 @@
         }
 
         .folder-list-container::-webkit-scrollbar-thumb {
-            background: #3a3a3a;
+            background: var(--surface-2);
             border-radius: 3px;
         }
 
         .folder-item {
             padding: 10px 12px;
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 6px;
             margin-bottom: 8px;
             font-size: 13px;
-            color: #e0e0e0;
+            color: var(--text-2);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -1116,12 +1160,12 @@
         }
 
         .folder-item:hover {
-            background: #2a2a2a;
+            background: var(--surface);
         }
 
         .folder-item.selected {
-            background: #3b82f6;
-            color: #ffffff;
+            background: var(--accent);
+            color: var(--accent-on);
         }
 
         .folder-controls {
@@ -1132,10 +1176,10 @@
 
         .folder-btn {
             padding: 8px 16px;
-            background: #3a3a3a;
+            background: var(--surface-2);
             border: none;
             border-radius: 6px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 13px;
             cursor: pointer;
             transition: background 0.2s ease;
@@ -1145,33 +1189,49 @@
         }
 
         .folder-btn:hover {
-            background: #4a4a4a;
+            background: var(--surface-3);
         }
 
+        /* Match the Close Settings button: solid red background, light text (was red text
+           on a transparent button). */
         .folder-btn.remove {
-            color: #ef4444;
+            background: var(--danger);
+            color: var(--text);
         }
 
         .folder-btn.remove:hover {
-            background: rgba(239, 68, 68, 0.1);
+            background: var(--danger-hover);
+        }
+
+        /* Themed so it follows the app theme instead of the webview's OS form-control
+           colours (which left it dark-on-white in the light theme). */
+        .min-photos-input {
+            background: var(--input-bg);
+            color: var(--text);
+            border: 1px solid var(--surface-2);
+            border-radius: 6px;
+            padding: 8px 10px;
+            width: 64px;
+            font-size: 13px;
+            outline: none;
         }
 
         .wildcard-input {
-            background: #2a2a2a;
-            border: 1px solid #3a3a3a;
+            background: var(--surface);
+            border: 1px solid var(--surface-2);
             border-radius: 8px;
             padding: 12px 16px;
             font-family: 'Courier New', monospace;
             font-size: 13px;
-            color: #e0e0e0;
+            color: var(--text-2);
             width: 100%;
             outline: none;
             transition: all 0.2s ease;
         }
 
         .wildcard-input:focus {
-            border-color: #3b82f6;
-            background: #1a1a1a;
+            border-color: var(--accent);
+            background: var(--bg);
         }
 
         .log-header {
@@ -1188,11 +1248,11 @@
         }
 
         .save-log-btn {
-            padding: 8px 20px;
-            background: #3a3a3a;
+            padding: 10px 20px;
+            background: var(--accent);
             border: none;
-            border-radius: 6px;
-            color: #ffffff;
+            border-radius: 8px;
+            color: var(--accent-on);
             font-size: 13px;
             cursor: pointer;
             transition: background 0.2s ease;
@@ -1202,17 +1262,18 @@
         }
 
         .save-log-btn:hover {
-            background: #4a4a4a;
+            background: var(--accent-hover);
         }
 
         .log-viewer {
-            background: #0d0d0d;
+            background: var(--surface-deep);
             border-radius: 8px;
             padding: 20px;
             font-family: 'Courier New', monospace;
             font-size: 12px;
-            color: #a0a0a0;
-            height: calc(100vh - 280px);
+            color: var(--text-muted);
+            /* Shorter now that the Log shares the About panel with the section above it. */
+            height: 260px;
             overflow-y: auto;
             line-height: 1.6;
         }
@@ -1226,7 +1287,7 @@
         }
 
         .log-viewer::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 4px;
         }
 
@@ -1258,7 +1319,7 @@
         }
 
         .cleanup-message {
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             padding: 48px 64px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
@@ -1268,7 +1329,7 @@
         .cleanup-title {
             font-size: 24px;
             font-weight: 700;
-            color: #ffffff;
+            color: var(--text);
             text-align: center;
         }
 
@@ -1279,17 +1340,227 @@
 
         .export-result-line {
             font-size: 15px;
-            color: #c0c0c0;
+            color: var(--text-3);
             margin: 6px 0;
         }
 
         .export-note {
             font-style: italic;
             font-size: 13px;
-            color: #a0a0a0;
+            color: var(--text-muted);
             line-height: 1.6;
             margin-bottom: 16px;
         }
+
+        /* Breathing room between the people search box and the selectable list (Phase 2). */
+        .export-search {
+            margin-bottom: 12px;
+        }
+
+        /* XMP consent (Phase 5): the "I understand" gate and a disabled-button look. */
+        .xmp-understand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            cursor: pointer;
+            color: var(--text-2);
+            font-size: 14px;
+        }
+
+        .xmp-understand input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .folder-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* About panel (Phase 6): centred copy + a row of equal-width accent buttons. */
+        .about-text {
+            text-align: center;
+            color: var(--text-2);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .about-text .about-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .about-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        /* Most About buttons are neutral; only .primary (Help, Report a bug) is accented. */
+        .about-btn {
+            padding: 10px 16px;
+            background: var(--surface-2);
+            color: var(--text);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .about-btn:hover {
+            background: var(--surface-3);
+        }
+
+        .about-btn.primary {
+            background: var(--accent);
+            color: var(--accent-on);
+        }
+
+        .about-btn.primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* Themes & Accessibility panel (Phase 3). Two subheaders instead of a panel title. */
+        /* Same type style as a category header (.panel-title), per the brief. */
+        .settings-subheader {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 20px;
+        }
+
+        .settings-subheader.secondary {
+            margin-top: 32px;
+        }
+
+        .accent-swatches {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        /* Circle colour is set inline per swatch (the resolved value for the current
+           theme x contrast). */
+        .accent-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+            transition: transform 0.15s ease;
+        }
+
+        .accent-swatch:hover {
+            transform: scale(1.12);
+        }
+
+        .accent-swatch.selected {
+            box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+        }
+
+        /* Stripe every red/destructive button so it stays distinguishable from accent
+           buttons when the accent itself is red, OR under any colour-vision mode (where
+           hue alone won't separate red from the accent). */
+        :is(:root.accent-red,
+            :root[data-cvd="protanopia"],
+            :root[data-cvd="deuteranopia"],
+            :root[data-cvd="tritanopia"],
+            :root[data-cvd="achromatopsia"]) :is(
+            .close-settings-btn,
+            .export-cancel-btn,
+            .close-help-btn,
+            .conflict-btn.proceed,
+            .folder-btn.remove) {
+            background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 14px);
+        }
+
+        /* ===== Accessibility (Phase 4) ===== */
+
+        /* Increase contrast: borders go near-solid white/black, and surfaces that are
+           otherwise told apart only by a shade of grey get an explicit border. */
+        :root[data-contrast="high"] {
+            --border: var(--contrast-border);
+        }
+
+        :root[data-contrast="high"] .context-menu,
+        :root[data-contrast="high"] .person-item,
+        :root[data-contrast="high"] .photo-item,
+        :root[data-contrast="high"] .setting-group,
+        :root[data-contrast="high"] .folder-list-container,
+        :root[data-contrast="high"] .lightbox-detail-row,
+        :root[data-contrast="high"] .lightbox-details,
+        :root[data-contrast="high"] .settings-container,
+        :root[data-contrast="high"] .help-container,
+        :root[data-contrast="high"] .toggle-slider,
+        :root[data-contrast="high"] .accent-swatch,
+        :root[data-contrast="high"] .progress-bar,
+        :root[data-contrast="high"] .view-dropdown,
+        :root[data-contrast="high"] .wildcard-input,
+        :root[data-contrast="high"] .min-photos-input {
+            border: 1px solid var(--contrast-border);
+        }
+
+        /* Bold fonts: bump weight everywhere; already-heavy text sits at/above this so it
+           is effectively unchanged. */
+        :root[data-bold="on"] * {
+            font-weight: 600 !important;
+        }
+
+        /* Dyslexia-friendly fonts (user drops the files in app/fonts/). If a file is
+           missing the browser falls back to the default UI font, so the option is a safe
+           no-op until the fonts exist. */
+        @font-face {
+            font-family: 'OpenDyslexic';
+            src: url('fonts/OpenDyslexic-Regular.otf');
+            font-weight: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'OpenDyslexic';
+            src: url('fonts/OpenDyslexic-Bold.otf');
+            font-weight: bold;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'AtkinsonHyperlegible';
+            src: url('fonts/AtkinsonHyperlegible-Regular.ttf');
+            font-weight: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'AtkinsonHyperlegible';
+            src: url('fonts/AtkinsonHyperlegible-Bold.ttf');
+            font-weight: bold;
+            font-display: swap;
+        }
+
+        :root[data-dysfont="opendyslexic"] body,
+        :root[data-dysfont="opendyslexic"] body * {
+            font-family: 'OpenDyslexic', sans-serif !important;
+        }
+        :root[data-dysfont="atkinson"] body,
+        :root[data-dysfont="atkinson"] body * {
+            font-family: 'AtkinsonHyperlegible', sans-serif !important;
+        }
+
+        /* Colour-vision assist: daltonization correction filters (computed via the
+           standard M = I + Shift*(I - Sim) algorithm) applied to the whole app, incl.
+           photos, so a CVD user can better perceive colour differences. */
+        :root[data-cvd="protanopia"] body { filter: url(#cvd-protanopia); }
+        :root[data-cvd="deuteranopia"] body { filter: url(#cvd-deuteranopia); }
+        :root[data-cvd="tritanopia"] body { filter: url(#cvd-tritanopia); }
+        :root[data-cvd="achromatopsia"] body { filter: url(#cvd-achromatopsia); }
 
         .export-actions {
             flex-wrap: wrap;
@@ -1298,8 +1569,8 @@
 
         #photoFilterBtn.active,
         #photoGroupBtn.active {
-            background: #3b82f6;
-            color: #ffffff;
+            background: var(--accent);
+            color: var(--accent-on);
         }
 
         .group-header {
@@ -1312,18 +1583,18 @@
             padding: 0 12px;
             box-sizing: border-box;
             cursor: pointer;
-            color: #e0e0e0;
-            background: #0d0d0d;
+            color: var(--text-2);
+            background: var(--surface-deep);
             border-radius: 8px;
             user-select: none;
         }
 
         .group-header:hover {
-            background: #161616;
+            background: var(--surface-deep-2);
             /* The hover fill is close to the grid background; an inset 1px ring in the
                normal header color separates a hovered (often collapsed) header from its
                neighbours without resizing the element the way a border would. */
-            box-shadow: inset 0 0 0 1px #0d0d0d;
+            box-shadow: inset 0 0 0 1px var(--surface-deep);
         }
 
         .group-header-icon {
@@ -1345,12 +1616,12 @@
         .group-header-count {
             flex: 0 0 auto;
             font-size: 12px;
-            color: #808080;
+            color: var(--text-dim);
         }
 
         .context-menu-item.active {
-            background: #3b82f6;
-            color: #ffffff;
+            background: var(--accent);
+            color: var(--accent-on);
         }
 
         .filter-panel {
@@ -1359,9 +1630,9 @@
             max-height: 420px;
             overflow-y: auto;
             scrollbar-width: thin;
-            /* Thumb uses the grid panel's bg (#1a1a1a), not the menu's own bg
-               (#2a2a2a), so the thumb stays visible against the lighter menu. */
-            scrollbar-color: #1a1a1a transparent;
+            /* Thumb uses the grid panel's bg (var(--bg)), not the menu's own bg
+               (var(--surface)), so the thumb stays visible against the lighter menu. */
+            scrollbar-color: var(--bg) transparent;
         }
 
         .filter-panel::-webkit-scrollbar {
@@ -1373,7 +1644,7 @@
         }
 
         .filter-panel::-webkit-scrollbar-thumb {
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 3px;
         }
 
@@ -1381,7 +1652,7 @@
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            color: #808080;
+            color: var(--text-dim);
             margin: 10px 0 4px;
         }
 
@@ -1395,7 +1666,7 @@
             gap: 8px;
             padding: 4px 2px;
             font-size: 13px;
-            color: #e0e0e0;
+            color: var(--text-2);
             cursor: pointer;
         }
 
@@ -1404,17 +1675,17 @@
             box-sizing: border-box;
             padding: 6px 8px;
             margin-bottom: 8px;
-            background: #1a1a1a;
-            border: 1px solid #3a3a3a;
+            background: var(--bg);
+            border: 1px solid var(--surface-2);
             border-radius: 6px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 13px;
             outline: none;
         }
 
         .filter-panel-empty {
             font-size: 13px;
-            color: #808080;
+            color: var(--text-dim);
             padding: 4px 2px;
         }
 
@@ -1422,8 +1693,8 @@
             margin-left: 12px;
             padding: 4px 14px;
             font-size: 12px;
-            color: #ffffff;
-            background: #b91c1c;
+            color: var(--text);
+            background: var(--danger-hover);
             border: none;
             border-radius: 6px;
             cursor: pointer;
@@ -1431,12 +1702,12 @@
         }
 
         .export-cancel-btn:hover {
-            background: #dc2626;
+            background: var(--danger);
         }
 
         .export-cancel-btn:disabled {
-            background: #6b1d1d;
-            color: #a0a0a0;
+            background: var(--danger-deep);
+            color: var(--text-muted);
             cursor: default;
         }
 
@@ -1494,7 +1765,7 @@
             background: rgba(255, 255, 255, 0.1);
             border: none;
             border-radius: 50%;
-            color: #ffffff;
+            color: var(--text);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1551,7 +1822,7 @@
             background: rgba(255, 255, 255, 0.1);
             border: none;
             border-radius: 50%;
-            color: #ffffff;
+            color: var(--text);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1579,7 +1850,7 @@
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.7);
-            color: #ffffff;
+            color: var(--text);
             padding: 12px 24px;
             border-radius: 24px;
             font-size: 14px;
@@ -1602,7 +1873,7 @@
             background: rgba(255, 255, 255, 0.1);
             border: none;
             border-radius: 50%;
-            color: #ffffff;
+            color: var(--text);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -1620,7 +1891,7 @@
             width: 1000px;
             max-width: calc(100vw - 80px);
             max-height: calc(100vh - 80px);
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
             overflow: hidden;
@@ -1644,18 +1915,18 @@
         }
 
         .help-content::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 4px;
         }
 
         .help-content::-webkit-scrollbar-thumb:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
         .help-title {
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 32px;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .help-list {
@@ -1664,7 +1935,7 @@
 
         .help-item {
             font-size: 15px;
-            color: #e0e0e0;
+            color: var(--text-2);
             margin-bottom: 16px;
             line-height: 1.6;
             padding-left: 24px;
@@ -1678,17 +1949,17 @@
             top: 10px;
             width: 4px;
             height: 4px;
-            background: #3b82f6;
+            background: var(--accent);
             border-radius: 50%;
         }
 
         .close-help-btn {
             width: 100%;
             padding: 12px 32px;
-            background: #dc2626;
+            background: var(--danger);
             border: none;
             border-radius: 8px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
@@ -1696,14 +1967,14 @@
         }
 
         .close-help-btn:hover {
-            background: #b91c1c;
+            background: var(--danger-hover);
         }
 
         .no-folders-container {
             position: relative;
             width: 520px;
             max-width: calc(100vw - 80px);
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
             overflow: hidden;
@@ -1731,12 +2002,12 @@
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 16px;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .no-folders-message {
             font-size: 15px;
-            color: #a0a0a0;
+            color: var(--text-muted);
             margin-bottom: 32px;
             line-height: 1.6;
         }
@@ -1744,10 +2015,10 @@
         .no-folders-btn {
             width: 100%;
             padding: 14px 32px;
-            background: #3b82f6;
+            background: var(--accent);
             border: none;
             border-radius: 8px;
-            color: #ffffff;
+            color: var(--accent-on);
             font-size: 15px;
             font-weight: 500;
             cursor: pointer;
@@ -1755,7 +2026,7 @@
         }
 
         .no-folders-btn:hover {
-            background: #2563eb;
+            background: var(--accent-hover);
         }
 
 /* overlay for transfer people*/
@@ -1779,7 +2050,7 @@
         }
 
         .transfer-dialog {
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             padding: 24px;
             width: 400px;
@@ -1795,7 +2066,7 @@
             font-size: 20px;
             font-weight: 700;
             margin-bottom: 16px;
-            color: #ffffff;
+            color: var(--text);
         }
 
         .transfer-list {
@@ -1813,49 +2084,49 @@
         }
 
         .transfer-list::-webkit-scrollbar-thumb {
-            background: #3a3a3a;
+            background: var(--surface-2);
             border-radius: 3px;
         }
 
         .transfer-option {
             padding: 14px 16px;
             margin-bottom: 6px;
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
             font-size: 14px;
-            color: #e0e0e0;
+            color: var(--text-2);
         }
 
         .transfer-option:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
             /*transform: translateX(4px);*/
         }
 
         .transfer-option.remove {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
+            background: rgba(var(--danger-2-rgb), 0.1);
+            color: var(--danger-2);
             font-weight: 500;
         }
 
         .transfer-option.remove:hover {
-            background: rgba(239, 68, 68, 0.2);
+            background: rgba(var(--danger-2-rgb), 0.2);
         }
 
         .transfer-cancel {
             padding: 12px;
-            background: #2a2a2a;
+            background: var(--surface);
             border: none;
             border-radius: 8px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 14px;
             cursor: pointer;
             transition: background 0.2s ease;
         }
 
         .transfer-cancel:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
             /* Prevent tooltips from showing in transfer dialog */
@@ -1879,7 +2150,7 @@
 
 
         .photo-item.selected {
-            outline: 3px solid #3b82f6;
+            outline: 3px solid var(--accent);
             outline-offset: -3px;
             z-index: 5;
         }
@@ -1891,7 +2162,7 @@
             left: 8px;
             width: 24px;
             height: 24px;
-            background: #3b82f6;
+            background: var(--accent);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1907,7 +2178,7 @@
             left: 8px;
             width: 24px;
             height: 24px;
-            color: #ffffff;
+            color: var(--accent-on);
             font-size: 14px;
             font-weight: bold;
             display: flex;
@@ -1921,11 +2192,11 @@
             bottom: 80px;
             left: 50%;
             transform: translateX(-50%);
-            background: #2a2a2a;
-            border: 1px solid #3b82f6;
+            background: var(--surface);
+            border: 1px solid var(--accent);
             border-radius: 8px;
             padding: 12px 24px;
-            color: #ffffff;
+            color: var(--text);
             font-size: 13px;
             font-weight: 500;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
@@ -1956,13 +2227,13 @@
         }
 
         .selection-info-text span {
-            color: #3b82f6;
+            color: var(--accent);
         }
 
         .clear-selection-btn {
             background: transparent;
             border: none;
-            color: #a0a0a0;
+            color: var(--text-muted);
             cursor: pointer;
             padding: 4px 8px;
             margin-left: 12px;
@@ -1971,22 +2242,22 @@
         }
 
         .clear-selection-btn:hover {
-            background: #3a3a3a;
-            color: #ffffff;
+            background: var(--surface-2);
+            color: var(--text);
         }
 
-        /* People multi-select highlight (F9). Uses the app accent (#3b82f6) like the
+        /* People multi-select highlight (F9). Uses the app accent (var(--accent)) like the
            grid selection, but as a subtle tint + inset ring instead of a full outline.
            The :hover rule has higher specificity than the generic person-item hover,
            so the ring and tint survive while hovering a selected row. */
         .person-item.selected {
-            background: rgba(59, 130, 246, 0.18);
-            box-shadow: inset 0 0 0 1px #3b82f6;
+            background: rgba(var(--accent-rgb), 0.18);
+            box-shadow: inset 0 0 0 1px var(--accent);
         }
 
         .person-item.selected:hover:not(.menu-active) {
-            background: rgba(59, 130, 246, 0.22);
-            box-shadow: inset 0 0 0 1px #3b82f6;
+            background: rgba(var(--accent-rgb), 0.22);
+            box-shadow: inset 0 0 0 1px var(--accent);
         }
 
         /* Pin indicator on the right edge of a pinned person row (F9), left of the
@@ -2008,7 +2279,7 @@
         }
 
         .name-conflict-message {
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             padding: 32px 40px;
             max-width: 520px;
@@ -2018,7 +2289,7 @@
 
         .conflict-warning {
             font-size: 14px;
-            color: #e0e0e0;
+            color: var(--text-2);
             margin: 20px 0 16px;
             line-height: 1.6;
             text-align: center;
@@ -2026,7 +2297,7 @@
 
         .conflict-question {
             font-size: 15px;
-            color: #ffffff;
+            color: var(--text);
             font-weight: 600;
             margin-bottom: 28px;
             text-align: center;
@@ -2051,30 +2322,30 @@
         }
 
         .conflict-btn.proceed {
-            background: #dc2626;
-            color: #ffffff;
+            background: var(--danger);
+            color: var(--text);
         }
 
         .conflict-btn.proceed:hover {
-            background: #b91c1c;
+            background: var(--danger-hover);
         }
 
         .conflict-btn.auto-rename {
-            background: #3b82f6;
-            color: #ffffff;
+            background: var(--accent);
+            color: var(--accent-on);
         }
 
         .conflict-btn.auto-rename:hover {
-            background: #2563eb;
+            background: var(--accent-hover);
         }
 
         .conflict-btn.go-back {
-            background: #2a2a2a;
-            color: #ffffff;
+            background: var(--surface);
+            color: var(--text);
         }
 
         .conflict-btn.go-back:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
         .lightbox-content img {
             max-width: 100%;
@@ -2090,7 +2361,7 @@
         /* F4 details panel: grey panel matching the grid background, full height,
            scrollable, with darker (people-list bg) row cards. */
         .lightbox-details {
-            background: #1a1a1a;
+            background: var(--bg);
             border-radius: 12px;
             height: 100%;
             display: flex;
@@ -2103,7 +2374,7 @@
             flex: 0 0 auto;
             font-size: 18px;
             font-weight: 600;
-            color: #ffffff;
+            color: var(--text);
             padding: 20px 20px 14px;
         }
 
@@ -2112,7 +2383,7 @@
             overflow-y: auto;
             padding: 0 16px 16px;
             scrollbar-width: thin;
-            scrollbar-color: #2a2a2a transparent;
+            scrollbar-color: var(--surface) transparent;
         }
 
         .lightbox-details-rows::-webkit-scrollbar {
@@ -2124,12 +2395,12 @@
         }
 
         .lightbox-details-rows::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
+            background: var(--surface);
             border-radius: 4px;
         }
 
         .lightbox-details-rows::-webkit-scrollbar-thumb:hover {
-            background: #3a3a3a;
+            background: var(--surface-2);
         }
 
         .lightbox-detail-row {
@@ -2137,7 +2408,7 @@
             grid-template-columns: 0.3fr 0.7fr;
             gap: 12px;
             padding: 10px 2px;
-            border-bottom: 1px solid #0d0d0d;
+            border-bottom: 1px solid var(--surface-deep);
         }
 
         .lightbox-detail-row:last-child {
@@ -2145,14 +2416,14 @@
         }
 
         .lightbox-detail-label {
-            color: #a0a0a0;
+            color: var(--text-muted);
             font-size: 12px;
             text-align: left;
             word-break: break-word;
         }
 
         .lightbox-detail-value {
-            color: #ffffff;
+            color: var(--text);
             font-size: 13px;
             text-align: left;
             word-break: break-word;
@@ -2162,7 +2433,7 @@
         /* F4: accent the "open in default app" icon (blue) to set it apart from the
            white close/nav buttons. */
         #lightboxOpenExternal {
-            color: #3b82f6;
+            color: var(--accent);
         }
 
         .face-tags-overlay {
@@ -2173,9 +2444,9 @@
 
         .face-tag-box {
             position: absolute;
-            border: 2px solid #3b82f6;
+            border: 2px solid var(--accent);
             border-radius: 12px;
-            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 10px rgba(59, 130, 246, 0.5);
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 10px rgba(var(--accent-rgb), 0.5);
             pointer-events: none;
         }
 
@@ -2183,8 +2454,8 @@
             position: absolute;
             top: -26px;
             left: 0;
-            background: rgba(59, 130, 246, 0.95);
-            color: #ffffff;
+            background: rgba(var(--accent-rgb), 0.95);
+            color: var(--text);
             padding: 4px 10px;
             border-radius: 4px;
             font-size: 12px;
@@ -2199,5 +2470,5 @@
             top: 100%;
             left: 8px;
             border: 5px solid transparent;
-            border-top-color: rgba(59, 130, 246, 0.95);
+            border-top-color: rgba(var(--accent-rgb), 0.95);
         }

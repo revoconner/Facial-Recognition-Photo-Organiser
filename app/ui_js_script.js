@@ -37,6 +37,21 @@ let people = [];
         // setShowPhotoDetails() later. When off, the image uses the full width.
         let showPhotoDetails = true;
 
+        // Theme + accent (Phase 3). increaseContrast is wired by Phase 4; it already
+        // selects the accent's contrast variant here.
+        let currentTheme = 'dark';
+        let currentAccent = 'blue';
+        let increaseContrast = false;
+        let boldFonts = false;
+        let dyslexiaFont = 'off';
+        let colorVision = 'none';
+
+        // Advanced (Phase 5).
+        let exportHardlinkEnabled = false;
+        let xmpEnabled = false;
+        let xmpConsentGiven = false;
+        let xmpFolders = new Set();
+
         // People-list multi-select (F9). Mirrors the grid's selectedPhotos pattern:
         // ctrl/cmd toggles, shift selects a range. selectedPeople holds person ids;
         // currentPeopleOrder is the displayed order (for shift-range index math).
@@ -853,6 +868,199 @@ let people = [];
         // Inlined pin icon (from app/svg/pinned.svg) shown on the right edge of a
         // pinned person row (F9).
         const SVG_PINNED = '<svg viewBox="0 0 56 56" width="12" height="12" fill="#cfcfcf"><path d="M 14.2539 35.9688 L 25.9492 35.9688 L 25.9492 48.0156 C 25.9492 51.5781 27.4258 54.5781 28.0117 54.5781 C 28.5976 54.5781 30.0742 51.5781 30.0742 48.0156 L 30.0742 35.9688 L 41.7461 35.9688 C 43.3633 35.9688 44.5351 34.9375 44.5351 33.3672 C 44.5351 32.3828 44.2305 31.6797 43.5508 30.9532 L 36.3789 23.1719 C 35.8867 22.6563 35.5820 22.2813 35.6992 21.3203 L 36.8945 12.7657 C 36.9649 12.2735 37.0117 11.9922 37.4336 11.6875 L 43.1992 7.5157 C 44.4883 6.5781 45.0508 5.4297 45.0508 4.3750 C 45.0508 2.8047 43.7851 1.4219 41.9805 1.4219 L 14.0195 1.4219 C 12.2149 1.4219 10.9492 2.8047 10.9492 4.3750 C 10.9492 5.4297 11.5117 6.5781 12.7773 7.5157 L 18.5429 11.6875 C 18.9883 11.9922 19.0351 12.2735 19.1054 12.7657 L 20.3008 21.3203 C 20.4180 22.2813 20.1133 22.6563 19.6211 23.1719 L 12.4492 30.9532 C 11.7695 31.6797 11.4649 32.3828 11.4649 33.3672 C 11.4649 34.9375 12.6367 35.9688 14.2539 35.9688 Z"/></svg>';
+
+        // Accent swatch table (Phase 3). Each colour has 4 RGB variants, in the order
+        // [default-light, default-dark, contrast-light, contrast-dark]; the active one
+        // is picked by theme x increase-contrast.
+        const ACCENT_COLORS = {
+            red:    [[255,56,60],   [255,66,69],   [233,21,45],  [255,97,101]],
+            orange: [[255,141,40],  [255,146,48],  [197,83,0],   [255,160,86]],
+            yellow: [[255,204,0],   [255,214,0],   [161,106,0],  [254,223,67]],
+            green:  [[52,199,89],   [48,209,88],   [0,137,50],   [74,217,104]],
+            mint:   [[0,200,179],   [0,218,195],   [0,133,117],  [84,223,203]],
+            teal:   [[0,195,208],   [0,210,224],   [0,129,152],  [59,221,236]],
+            cyan:   [[0,192,232],   [60,211,254],  [0,126,174],  [109,217,255]],
+            blue:   [[0,136,255],   [0,145,255],   [30,110,244], [92,184,255]],
+            indigo: [[97,85,245],   [109,124,255], [86,74,222],  [167,170,255]],
+            purple: [[203,48,224],  [219,52,242],  [176,47,194], [234,141,255]],
+            pink:   [[255,45,85],   [255,55,95],   [231,18,77],  [255,138,196]],
+            brown:  [[172,127,94],  [183,138,102], [149,109,81], [219,166,121]],
+        };
+        const ACCENT_ORDER = ['red','orange','yellow','green','mint','teal','cyan','blue','indigo','purple','pink','brown'];
+
+        // Index into a colour's 4 variants for the current theme + contrast.
+        function accentVariantIndex() {
+            if (!increaseContrast) return currentTheme === 'light' ? 0 : 1;
+            return currentTheme === 'light' ? 2 : 3;
+        }
+
+        // Push the resolved accent (and a derived hover + readable on-accent text colour)
+        // into the CSS variables, and flag red so destructive areas get striped.
+        function applyAccent() {
+            const variants = ACCENT_COLORS[currentAccent] || ACCENT_COLORS.blue;
+            const [r, g, b] = variants[accentVariantIndex()];
+            const root = document.documentElement.style;
+            root.setProperty('--accent', `rgb(${r}, ${g}, ${b})`);
+            root.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
+            const darken = c => Math.round(c * 0.82);
+            root.setProperty('--accent-hover', `rgb(${darken(r)}, ${darken(g)}, ${darken(b)})`);
+            // Text colour on accent backgrounds is fixed by accent (not luminance, not
+            // theme): light text only on blue/indigo, dark text on all others.
+            const lightTextAccents = ['blue', 'indigo'];
+            root.setProperty('--accent-on', lightTextAccents.includes(currentAccent) ? '#ffffff' : '#000000');
+            document.documentElement.classList.toggle('accent-red', currentAccent === 'red');
+        }
+
+        function applyTheme() {
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            applyAccent();
+        }
+
+        // Render the 12 swatch circles in the current theme's colours, marking the active one.
+        function buildAccentSwatches() {
+            const container = document.getElementById('accentSwatches');
+            if (!container) return;
+            container.innerHTML = '';
+            const idx = accentVariantIndex();
+            ACCENT_ORDER.forEach(key => {
+                const [r, g, b] = ACCENT_COLORS[key][idx];
+                const sw = document.createElement('div');
+                sw.className = 'accent-swatch' + (key === currentAccent ? ' selected' : '');
+                sw.style.background = `rgb(${r}, ${g}, ${b})`;
+                sw.title = key.charAt(0).toUpperCase() + key.slice(1);
+                sw.addEventListener('click', () => setAccentColor(key));
+                container.appendChild(sw);
+            });
+        }
+
+        async function setTheme(theme) {
+            currentTheme = theme;
+            try { await pywebview.api.set_theme(theme); } catch (e) {}
+            applyTheme();
+            buildAccentSwatches();   // swatch colours depend on the theme
+        }
+
+        async function setAccentColor(color) {
+            currentAccent = color;
+            try { await pywebview.api.set_accent_color(color); } catch (e) {}
+            applyAccent();
+            buildAccentSwatches();   // refresh the selected ring
+        }
+
+        // Accessibility appliers (Phase 4): each just flips a root data-attribute that
+        // the CSS keys off; contrast also re-resolves the accent's contrast variant.
+        function applyContrast() {
+            document.documentElement.setAttribute('data-contrast', increaseContrast ? 'high' : 'normal');
+            applyAccent();
+            buildAccentSwatches();
+        }
+
+        function applyBold() {
+            document.documentElement.setAttribute('data-bold', boldFonts ? 'on' : 'off');
+        }
+
+        function applyDysFont() {
+            document.documentElement.setAttribute('data-dysfont', dyslexiaFont);
+        }
+
+        function applyColorVision() {
+            document.documentElement.setAttribute('data-cvd', colorVision);
+        }
+
+        async function setIncreaseContrast(on) {
+            increaseContrast = on;
+            try { await pywebview.api.set_increase_contrast(on); } catch (e) {}
+            applyContrast();
+        }
+
+        async function setBoldFonts(on) {
+            boldFonts = on;
+            try { await pywebview.api.set_bold_fonts(on); } catch (e) {}
+            applyBold();
+        }
+
+        async function setDyslexiaFont(value) {
+            dyslexiaFont = value;
+            try { await pywebview.api.set_dyslexia_font(value); } catch (e) {}
+            applyDysFont();
+        }
+
+        async function setColorVision(value) {
+            colorVision = value;
+            try { await pywebview.api.set_color_vision(value); } catch (e) {}
+            applyColorVision();
+        }
+
+        // ===== Advanced: hardlink + XMP (Phase 5) =====
+
+        // Enable/disable the Hardlink option in the Export dropdown to match the toggle.
+        function applyHardlinkOption() {
+            const dd = document.getElementById('exportModeDropdown');
+            if (!dd) return;
+            const opt = dd.querySelector('option[value="hardlink"]');
+            if (opt) opt.disabled = !exportHardlinkEnabled;
+            if (!exportHardlinkEnabled && dd.value === 'hardlink') dd.value = 'copy';
+        }
+
+        async function setHardlinkEnabled(on) {
+            exportHardlinkEnabled = on;
+            try { await pywebview.api.set_export_hardlink_enabled(on); } catch (e) {}
+            applyHardlinkOption();
+            addLogEntry('Hardlink export: ' + (on ? 'enabled' : 'disabled'));
+        }
+
+        async function setXmpEnabled(on) {
+            xmpEnabled = on;
+            try { await pywebview.api.set_xmp_export_enabled(on); } catch (e) {}
+            const toggle = document.getElementById('xmpEnabledToggle');
+            if (toggle) toggle.checked = on;
+            addLogEntry('XMP sidecar export: ' + (on ? 'enabled' : 'disabled'));
+        }
+
+        function openXmpConsent() {
+            const check = document.getElementById('xmpUnderstandCheck');
+            const confirmBtn = document.getElementById('xmpConfirmBtn');
+            if (check) check.checked = false;
+            if (confirmBtn) confirmBtn.disabled = true;
+            document.getElementById('xmpConsentOverlay').classList.add('active');
+        }
+
+        function closeXmpConsent() {
+            document.getElementById('xmpConsentOverlay').classList.remove('active');
+        }
+
+        // The scan-include folders the user can opt into for XMP. Mirrors the export
+        // people list, but with folders; selections persist to xmp_folders.
+        async function loadXmpFolders() {
+            let folders = [];
+            try { folders = await pywebview.api.get_include_folders() || []; } catch (e) {}
+            let saved = [];
+            try { saved = await pywebview.api.get_xmp_folders() || []; } catch (e) {}
+            const valid = new Set(folders);
+            xmpFolders = new Set(saved.filter(f => valid.has(f)));
+            renderXmpFolders(folders);
+        }
+
+        function renderXmpFolders(folders) {
+            const container = document.getElementById('xmpFolderList');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!folders.length) {
+                container.innerHTML = '<div style="color: var(--text-dimmer); padding: 12px; text-align: center; font-size: 13px;">No folders to scan yet</div>';
+                return;
+            }
+            folders.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'folder-item' + (xmpFolders.has(f) ? ' selected' : '');
+                item.textContent = f;
+                item.addEventListener('click', () => {
+                    if (xmpFolders.has(f)) { xmpFolders.delete(f); item.classList.remove('selected'); }
+                    else { xmpFolders.add(f); item.classList.add('selected'); }
+                    pywebview.api.set_xmp_folders(Array.from(xmpFolders));
+                });
+                container.appendChild(item);
+            });
+        }
 
         function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -2194,13 +2402,22 @@ let people = [];
             logViewer.scrollTop = logViewer.scrollHeight;
         }
 
+        // Show/hide the progress bar and swap the status text (Phase 1): while a scan or
+        // export runs the progress text occupies the status line in place of the face
+        // count; when it ends the face count returns.
+        function setProgressVisible(visible) {
+            document.getElementById('progressBar').style.display = visible ? 'block' : 'none';
+            document.getElementById('progressText').style.display = visible ? 'inline' : 'none';
+            document.getElementById('faceCount').style.display = visible ? 'none' : 'inline';
+        }
+
         function updateProgress(current, total, percent, label) {
             document.getElementById('progressFill').style.width = percent + '%';
             document.getElementById('progressText').textContent = `${label || 'Scanning'}: ${current}/${total}`;
         }
 
         function hideProgress() {
-            document.getElementById('progressSection').style.display = 'none';
+            setProgressVisible(false);
             updateFaceCount();
         }
 
@@ -2313,6 +2530,112 @@ let people = [];
                 // will call setShowPhotoDetails() later; applyPhotoDetailsVisibility runs
                 // when the lightbox opens.
                 showPhotoDetails = await pywebview.api.get_show_photo_details();
+
+                // Phase 3: theme + accent. Apply immediately so the whole app reflects it.
+                currentTheme = await pywebview.api.get_theme();
+                currentAccent = await pywebview.api.get_accent_color();
+                applyTheme();
+                buildAccentSwatches();
+                const themeDropdown = document.getElementById('themeDropdown');
+                if (themeDropdown) {
+                    themeDropdown.value = currentTheme;
+                    themeDropdown.addEventListener('change', (e) => setTheme(e.target.value));
+                }
+
+                // Phase 4: accessibility settings.
+                increaseContrast = await pywebview.api.get_increase_contrast();
+                boldFonts = await pywebview.api.get_bold_fonts();
+                dyslexiaFont = await pywebview.api.get_dyslexia_font();
+                colorVision = await pywebview.api.get_color_vision();
+                applyContrast();
+                applyBold();
+                applyDysFont();
+                applyColorVision();
+
+                const contrastToggle = document.getElementById('increaseContrastToggle');
+                if (contrastToggle) {
+                    contrastToggle.checked = increaseContrast;
+                    contrastToggle.addEventListener('change', (e) => setIncreaseContrast(e.target.checked));
+                }
+                const boldToggle = document.getElementById('boldFontsToggle');
+                if (boldToggle) {
+                    boldToggle.checked = boldFonts;
+                    boldToggle.addEventListener('change', (e) => setBoldFonts(e.target.checked));
+                }
+                const dysFontDropdown = document.getElementById('dyslexiaFontDropdown');
+                if (dysFontDropdown) {
+                    dysFontDropdown.value = dyslexiaFont;
+                    dysFontDropdown.addEventListener('change', (e) => setDyslexiaFont(e.target.value));
+                }
+                const colorVisionDropdown = document.getElementById('colorVisionDropdown');
+                if (colorVisionDropdown) {
+                    colorVisionDropdown.value = colorVision;
+                    colorVisionDropdown.addEventListener('change', (e) => setColorVision(e.target.value));
+                }
+
+                // Phase 5: Advanced - hardlink gate + XMP toggle/consent.
+                exportHardlinkEnabled = await pywebview.api.get_export_hardlink_enabled();
+                xmpEnabled = await pywebview.api.get_xmp_export_enabled();
+                xmpConsentGiven = await pywebview.api.get_xmp_consent_given();
+                applyHardlinkOption();
+
+                const hardlinkToggle = document.getElementById('hardlinkEnabledToggle');
+                if (hardlinkToggle) {
+                    hardlinkToggle.checked = exportHardlinkEnabled;
+                    hardlinkToggle.addEventListener('change', (e) => setHardlinkEnabled(e.target.checked));
+                }
+
+                const xmpToggle = document.getElementById('xmpEnabledToggle');
+                if (xmpToggle) {
+                    xmpToggle.checked = xmpEnabled;
+                    xmpToggle.addEventListener('change', async (e) => {
+                        if (e.target.checked) {
+                            if (xmpConsentGiven) {
+                                await setXmpEnabled(true);
+                            } else {
+                                e.target.checked = false;   // hold until consent is confirmed
+                                openXmpConsent();
+                            }
+                        } else {
+                            await setXmpEnabled(false);
+                        }
+                    });
+                }
+
+                const xmpUnderstand = document.getElementById('xmpUnderstandCheck');
+                const xmpConfirmBtn = document.getElementById('xmpConfirmBtn');
+                if (xmpUnderstand && xmpConfirmBtn) {
+                    xmpUnderstand.addEventListener('change', (e) => { xmpConfirmBtn.disabled = !e.target.checked; });
+                    xmpConfirmBtn.addEventListener('click', async () => {
+                        xmpConsentGiven = true;
+                        try { await pywebview.api.set_xmp_consent_given(true); } catch (e) {}
+                        await setXmpEnabled(true);
+                        closeXmpConsent();
+                    });
+                }
+                const xmpCancelBtn = document.getElementById('xmpCancelBtn');
+                if (xmpCancelBtn) {
+                    xmpCancelBtn.addEventListener('click', closeXmpConsent);  // toggle stays off
+                }
+
+                // Phase 6: About links + dialogs. External links open in the default browser.
+                const aboutLinks = {
+                    aboutBugBtn: 'https://github.com/revoconner/Facial-Recognition-Photo-Organiser/issues/new',
+                    aboutDeveloperBtn: 'https://www.revoconner.com',
+                    aboutWebsiteBtn: 'https://www.felicity-app.com',
+                    aboutEulaBtn: 'https://github.com/revoconner/Facial-Recognition-Photo-Organiser/raw/refs/heads/0.8.0-Beta/LICENSE',
+                    aboutOnlineHelpBtn: 'https://github.com/revoconner/Facial-Recognition-Photo-Organiser/wiki/Help-Documentation',
+                };
+                Object.entries(aboutLinks).forEach(([id, url]) => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.addEventListener('click', () => pywebview.api.open_url(url));
+                });
+                const bindClick = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+                bindClick('aboutHelpBtn', () => document.getElementById('aboutHelpOverlay').classList.add('active'));
+                bindClick('aboutHelpCloseBtn', () => document.getElementById('aboutHelpOverlay').classList.remove('active'));
+                bindClick('aboutOfflinePdfBtn', () => pywebview.api.open_help_pdf());
+                bindClick('aboutPrivacyBtn', () => document.getElementById('aboutPrivacyOverlay').classList.add('active'));
+                bindClick('aboutPrivacyCloseBtn', () => document.getElementById('aboutPrivacyOverlay').classList.remove('active'));
 
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
@@ -2430,11 +2753,10 @@ let people = [];
                 addLogEntry('Application started');
 
                 const sysInfo = await pywebview.api.get_system_info();
-                document.getElementById('pytorchVersion').textContent = `PyTorch ${sysInfo.pytorch_version}`;
-                document.getElementById('gpuStatus').textContent = sysInfo.gpu_available ? 'GPU Available' : 'CPU Only';
-                document.getElementById('cudaVersion').textContent = `CUDA: ${sysInfo.cuda_version}`;
+                // PyTorch/GPU/CUDA badges were removed from the bottom bar (Phase 1); the
+                // info still goes to the log, and CUDA is shown in Settings -> About.
                 document.getElementById('faceCount').textContent = `Found: ${sysInfo.total_faces} faces`;
-                
+
                 addLogEntry(`System: PyTorch ${sysInfo.pytorch_version}, ${sysInfo.gpu_available ? 'GPU' : 'CPU'}, CUDA ${sysInfo.cuda_version}`);
                 
                 await loadAllSettings();
@@ -2449,7 +2771,7 @@ let people = [];
                 const state = await pywebview.api.check_initial_state();
 
                 if (state && state.needs_scan) {
-                    document.getElementById('progressSection').style.display = 'flex';
+                    setProgressVisible(true);
                     updateStatusMessage('Checking for new photos...');
                 }
             } catch (error) {
@@ -2506,7 +2828,8 @@ let people = [];
             
             const filterBtn = document.getElementById('filterBtn');
             activeMenu = { element: filterMenu, parent: filterBtn };
-            
+            filterBtn.classList.add('active');   // accent the icon while its menu is open
+
             positionMenu(filterMenu, filterBtn);
             
             filterMenu.addEventListener('click', async (e) => {
@@ -2644,7 +2967,10 @@ let people = [];
             appContainer.classList.remove('blurred');
         }
 
-        openHelpBtn.addEventListener('click', openHelp);
+        // Bottom-bar help opens the same dialog as Settings > About > Help.
+        openHelpBtn.addEventListener('click', () => {
+            document.getElementById('aboutHelpOverlay').classList.add('active');
+        });
         closeHelpBtn.addEventListener('click', closeHelp);
 
         helpOverlay.addEventListener('click', (e) => {
@@ -2677,8 +3003,10 @@ let people = [];
                 panels.forEach(panel => panel.classList.remove('active'));
                 document.getElementById(panelId).classList.add('active');
 
-                if (item.getAttribute('data-panel') === 'general') {
-                updateCacheSize(); }
+                if (item.getAttribute('data-panel') === 'advanced') {
+                    updateCacheSize();
+                    loadXmpFolders();
+                }
 
                 if (item.getAttribute('data-panel') === 'export') {
                     loadExportPeople();
@@ -2694,7 +3022,7 @@ let people = [];
         document.getElementById('recalibrateBtn').addEventListener('click', async () => {
             const threshold = parseInt(thresholdSlider.value);
             updateStatusMessage('Starting recalibration...');
-            document.getElementById('progressSection').style.display = 'flex';
+            setProgressVisible(true);
             closeSettings();
             await pywebview.api.recalibrate(threshold);
         });
@@ -2773,8 +3101,7 @@ let people = [];
 
         function startExportUI(label) {
             isExporting = true;
-            const progressSection = document.getElementById('progressSection');
-            progressSection.style.display = 'flex';
+            setProgressVisible(true);
             document.getElementById('progressFill').style.width = '0%';
             document.getElementById('progressText').textContent = (label || 'Exporting') + '...';
             const cancelBtn = document.getElementById('exportCancelBtn');
@@ -2786,7 +3113,7 @@ let people = [];
             isExporting = false;
             document.getElementById('exportCancelBtn').style.display = 'none';
             // No clustering runs after an export, so hide the shared progress bar here.
-            document.getElementById('progressSection').style.display = 'none';
+            setProgressVisible(false);
         }
 
         let pendingExport = null;  // { label, startFn } awaiting destination-warning confirmation
@@ -3161,7 +3488,7 @@ let people = [];
 
         document.getElementById('rescanBtn').addEventListener('click', async () => {
             updateStatusMessage('Starting folder rescan...');
-            document.getElementById('progressSection').style.display = 'flex';
+            setProgressVisible(true);
             closeSettings();
             
             try {
@@ -3437,6 +3764,8 @@ let people = [];
             document.querySelectorAll('.person-item, .photo-item').forEach(item => {
                 item.classList.remove('menu-active');
             });
+            const filterBtn = document.getElementById('filterBtn');
+            if (filterBtn) filterBtn.classList.remove('active');   // un-accent the sort icon
             activeMenu = null;
         }
 
