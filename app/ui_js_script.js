@@ -2194,13 +2194,22 @@ let people = [];
             logViewer.scrollTop = logViewer.scrollHeight;
         }
 
+        // Show/hide the progress bar and swap the status text (Phase 1): while a scan or
+        // export runs the progress text occupies the status line in place of the face
+        // count; when it ends the face count returns.
+        function setProgressVisible(visible) {
+            document.getElementById('progressSection').style.display = visible ? 'flex' : 'none';
+            document.getElementById('progressText').style.display = visible ? 'inline' : 'none';
+            document.getElementById('faceCount').style.display = visible ? 'none' : 'inline';
+        }
+
         function updateProgress(current, total, percent, label) {
             document.getElementById('progressFill').style.width = percent + '%';
             document.getElementById('progressText').textContent = `${label || 'Scanning'}: ${current}/${total}`;
         }
 
         function hideProgress() {
-            document.getElementById('progressSection').style.display = 'none';
+            setProgressVisible(false);
             updateFaceCount();
         }
 
@@ -2430,11 +2439,10 @@ let people = [];
                 addLogEntry('Application started');
 
                 const sysInfo = await pywebview.api.get_system_info();
-                document.getElementById('pytorchVersion').textContent = `PyTorch ${sysInfo.pytorch_version}`;
-                document.getElementById('gpuStatus').textContent = sysInfo.gpu_available ? 'GPU Available' : 'CPU Only';
-                document.getElementById('cudaVersion').textContent = `CUDA: ${sysInfo.cuda_version}`;
+                // PyTorch/GPU/CUDA badges were removed from the bottom bar (Phase 1); the
+                // info still goes to the log, and CUDA is shown in Settings -> About.
                 document.getElementById('faceCount').textContent = `Found: ${sysInfo.total_faces} faces`;
-                
+
                 addLogEntry(`System: PyTorch ${sysInfo.pytorch_version}, ${sysInfo.gpu_available ? 'GPU' : 'CPU'}, CUDA ${sysInfo.cuda_version}`);
                 
                 await loadAllSettings();
@@ -2449,7 +2457,7 @@ let people = [];
                 const state = await pywebview.api.check_initial_state();
 
                 if (state && state.needs_scan) {
-                    document.getElementById('progressSection').style.display = 'flex';
+                    setProgressVisible(true);
                     updateStatusMessage('Checking for new photos...');
                 }
             } catch (error) {
@@ -2694,7 +2702,7 @@ let people = [];
         document.getElementById('recalibrateBtn').addEventListener('click', async () => {
             const threshold = parseInt(thresholdSlider.value);
             updateStatusMessage('Starting recalibration...');
-            document.getElementById('progressSection').style.display = 'flex';
+            setProgressVisible(true);
             closeSettings();
             await pywebview.api.recalibrate(threshold);
         });
@@ -2773,8 +2781,7 @@ let people = [];
 
         function startExportUI(label) {
             isExporting = true;
-            const progressSection = document.getElementById('progressSection');
-            progressSection.style.display = 'flex';
+            setProgressVisible(true);
             document.getElementById('progressFill').style.width = '0%';
             document.getElementById('progressText').textContent = (label || 'Exporting') + '...';
             const cancelBtn = document.getElementById('exportCancelBtn');
@@ -2786,7 +2793,7 @@ let people = [];
             isExporting = false;
             document.getElementById('exportCancelBtn').style.display = 'none';
             // No clustering runs after an export, so hide the shared progress bar here.
-            document.getElementById('progressSection').style.display = 'none';
+            setProgressVisible(false);
         }
 
         let pendingExport = null;  // { label, startFn } awaiting destination-warning confirmation
@@ -3161,7 +3168,7 @@ let people = [];
 
         document.getElementById('rescanBtn').addEventListener('click', async () => {
             updateStatusMessage('Starting folder rescan...');
-            document.getElementById('progressSection').style.display = 'flex';
+            setProgressVisible(true);
             closeSettings();
             
             try {

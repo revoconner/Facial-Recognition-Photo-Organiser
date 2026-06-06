@@ -584,25 +584,24 @@
             z-index: 4;
         }
 
+        /* One-row bottom bar (Phase 1): Settings | status/progress text | progress bar
+           (when scanning) | Help (pushed to the right edge). */
         .bottom-bar {
             background: var(--surface-deep);
             border-top: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 16px 28px;
-        }
-
-        .bottom-content {
+            padding: 12px 28px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
+            gap: 16px;
         }
 
         .settings-btn {
+            flex: 0 0 auto;
             padding: 10px 20px;
-            background: var(--surface);
+            background: var(--accent);
             border: none;
             border-radius: 8px;
-            color: var(--text);
+            color: var(--accent-on);
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
@@ -610,19 +609,30 @@
         }
 
         .settings-btn:hover {
-            background: var(--surface-2);
+            background: var(--accent-hover);
+        }
+
+        /* No box of its own - inherits the bottom-bar background. Shows the face count,
+           or the progress text while a scan/export runs (the two spans swap). */
+        .status-text {
+            flex: 0 1 auto;
+            min-width: 0;
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .progress-section {
-            flex: 1;
+            flex: 0 0 auto;
             display: flex;
             align-items: center;
-            gap: 16px;
-            margin: 0 32px;
+            gap: 12px;
         }
 
         .progress-bar {
-            flex: 1;
+            width: 220px;
             height: 8px;
             background: var(--surface);
             border-radius: 4px;
@@ -632,7 +642,7 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--accent) 0%, #558be1 100%);
+            background: linear-gradient(90deg, var(--accent) 0%, rgba(var(--accent-rgb), 0.6) 100%);
             width: 35%;
             border-radius: 4px;
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -665,63 +675,9 @@
             }
         }
 
-        .progress-text {
-            font-size: 12px;
-            color: var(--text-muted);
-            white-space: nowrap;
-        }
-
-        .status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 8px;
-            padding: 8px 12px;
-            background: var(--bg);
-            border-radius: 6px;
-        }
-
-        .status-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 8px;
-            background: rgba(var(--accent-rgb), 0.1);
-            border-radius: 4px;
-            color: var(--accent);
-            transition: all 0.3s ease;
-        }
-
-        .status-badge:hover {
-            background: rgba(var(--accent-rgb), 0.2);
-        }
-
-        .status-indicator {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-        }
-
         .help-btn {
+            flex: 0 0 auto;
+            margin-left: auto;
             padding: 6px;
             background: transparent;
             border: none;
