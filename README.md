@@ -222,19 +222,11 @@ Our focus is on creating a user friendly app to organise photos by person instea
 
 ----
 
-## License and Usage
+## License and Usage — Source Available (Not Open Source)
 
-This app is provided free of cost, and no usage restriction for personal, non-commercial use only. You may not use this app on computers used for commercial purposes, even if the app itself is being used for personal use.
+This software and code is provided as is, free of cost, for personal and commercial use, provided you do not redistribute the code, or packaged software for commercial use. Read [License](LICENSE).
 
-The app uses facial recognition technology. You are responsible for complying with applicable privacy laws and obtaining consent from individuals whose images are processed.
-
-
-## Performance Stats
-1. [10/7/2025, 5:46:28 AM] - [10/7/2025, 10:50:24 AM] - Scan complete: 104577 faces in 90491 photos
-2. Took almost 5 hours to scan 90,000 photos for 100,000 faces from a Seagate Exos HDD, running on AMD Threadripper 7960x
-3. [10/7/2025, 10:46:38 AM] - [10/7/2025, 10:50:24 AM] - Custering to person identification
-4. Took 4 minutes on Nvidia RTX 4090 for face clustering and identification
-
+----
 
 ## LLM generated code notice
 #### Some parts of the source code is LLM generated, here's a summary of it:
