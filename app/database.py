@@ -721,7 +721,60 @@ class FaceDatabase:
     def get_photos_by_person(self, clustering_id: int, person_id: int) -> List[dict]:
         photos, _ = self.get_photos_by_person_paginated(clustering_id, person_id, limit=999999, offset=0)
         return photos
-    
+
+    def get_named_faces_for_xmp(self, clustering_id: int, show_hidden: bool = False,
+                                show_hidden_photos: bool = False) -> List[dict]:
+        """Photo-grouped named faces for XMP sidecar writing (F6).
+
+        Returns one entry per photo that has at least one named, included face:
+            {photo_id, file_path, faces: [{bbox_x1, bbox_y1, bbox_x2, bbox_y2, name}]}
+
+        Reuses the same per-person resolution as the rest of the app (so a person's
+        dominant name and any manually cross-tagged faces are handled consistently).
+        Visibility follows the same rules as the photo export: hidden persons are
+        excluded unless show_hidden is set, and individually hidden faces are excluded
+        unless show_hidden_photos is set. Auto "Person X" clusters and "Unmatched Faces"
+        (and person 0) are always skipped - XMP only writes named people.
+
+        A face is attributed to the first named person (by person_id) that claims it,
+        so a face manually cross-tagged across clusters is not written twice.
+        """
+        hidden_persons = set() if show_hidden else self.get_hidden_persons(clustering_id)
+        hidden_faces = set() if show_hidden_photos else self.get_hidden_photos()
+
+        photos = {}
+        seen_faces = set()
+
+        for person in self.get_persons_in_clustering(clustering_id):
+            person_id = person['person_id']
+            if person_id == 0 or person_id in hidden_persons:
+                continue
+
+            name = self.get_person_name_fast(clustering_id, person_id)
+            if name.startswith("Person ") or name == "Unmatched Faces":
+                continue
+
+            for photo in self.get_photos_by_person(clustering_id, person_id):
+                face_id = photo['face_id']
+                if face_id in hidden_faces or face_id in seen_faces:
+                    continue
+                seen_faces.add(face_id)
+
+                entry = photos.setdefault(photo['photo_id'], {
+                    'photo_id': photo['photo_id'],
+                    'file_path': photo['file_path'],
+                    'faces': [],
+                })
+                entry['faces'].append({
+                    'bbox_x1': photo['bbox_x1'],
+                    'bbox_y1': photo['bbox_y1'],
+                    'bbox_x2': photo['bbox_x2'],
+                    'bbox_y2': photo['bbox_y2'],
+                    'name': name,
+                })
+
+        return list(photos.values())
+
     def get_face_data(self, face_id: int) -> Optional[dict]:
         cursor = self.conn.cursor()
         cursor.execute('''

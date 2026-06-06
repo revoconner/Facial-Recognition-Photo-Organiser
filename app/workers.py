@@ -16,6 +16,7 @@ import torch
 
 from utils import get_insightface_root
 from metadata import read_photo_metadata
+import xmp
 
 GPU_AVAILABLE = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if GPU_AVAILABLE else 'cpu')
@@ -215,6 +216,12 @@ class ScanWorker(threading.Thread):
         # every scan until the whole library is captured, then finds nothing to do.
         self.backfill_metadata()
 
+        # Fold-in XMP sidecar write (F6): if enabled, write/refresh .xmp sidecars next to
+        # tagged photos in the selected folders. Runs after backfill so the active
+        # clustering and names are current. Reads the DB and writes only .xmp files (no
+        # SQLite writes), so it never contends with clustering for the write lock.
+        self.write_xmp_sidecars()
+
     def backfill_metadata(self):
         """Read filesystem + EXIF metadata for completed photos missing it (no face
         detection). Commits in batches and honors the dynamic-resource throttle. This is
@@ -249,7 +256,100 @@ class ScanWorker(threading.Thread):
 
         self.db.conn.commit()
         self.api.update_status(f"Metadata read complete: {total} photos")
-    
+
+    def write_xmp_sidecars(self):
+        """Write/refresh MWG-Regions .xmp sidecars next to tagged photos (F6).
+
+        Opt-in (gated by the xmp_export_enabled setting) and limited to the scan folders
+        the user selected (xmp_folders). Only named, visible faces are written (see
+        database.get_named_faces_for_xmp). Dimensions are read live from each file
+        (Image.open + exif_transpose) so the normalized regions match the coordinate
+        space the bounding boxes were detected in, regardless of how the stored width/
+        height were captured. A sidecar is only rewritten when its bytes change, so a
+        no-op rescan does not churn file mtimes."""
+        if not self.api.get_xmp_export_enabled():
+            return
+
+        selected = self.api.get_xmp_folders() or []
+        if not selected:
+            self.api.update_status("XMP export is on but no folders are selected - skipping sidecars")
+            return
+
+        clustering = self.db.get_active_clustering()
+        if not clustering:
+            return
+
+        # Visibility follows the same toggles as the photo export: hidden people are
+        # included only when "show hidden persons" is on, hidden faces only when "show
+        # hidden photos" is on. The XMP folder selection is the extra gate on top.
+        photos = self.db.get_named_faces_for_xmp(
+            clustering['clustering_id'],
+            show_hidden=self.api.get_show_hidden(),
+            show_hidden_photos=self.api.get_show_hidden_photos())
+
+        # Keep only photos that live under one of the selected folders.
+        selected_norm = [os.path.normcase(os.path.normpath(os.path.abspath(f))) for f in selected]
+
+        def under_selected(file_path):
+            p = os.path.normcase(os.path.normpath(os.path.abspath(file_path)))
+            return any(p == f or p.startswith(f + os.sep) for f in selected_norm)
+
+        photos = [item for item in photos if under_selected(item['file_path'])]
+        total = len(photos)
+        if total == 0:
+            self.api.update_status("XMP export: no tagged photos in the selected folders")
+            return
+
+        self.api.update_status(f"Writing XMP sidecars for {total} tagged photos...")
+
+        written = unchanged = skipped_missing = errors = processed = 0
+
+        for item in photos:
+            file_path = item['file_path']
+            processed += 1
+
+            if not os.path.exists(file_path):
+                skipped_missing += 1
+            else:
+                try:
+                    with Image.open(file_path) as pil_img:
+                        pil_img = ImageOps.exif_transpose(pil_img)
+                        width, height = pil_img.size
+
+                    sidecar_path = str(Path(file_path).with_suffix('.xmp'))
+                    root = xmp.load_existing_xmp_root(sidecar_path)
+                    xmp.upsert_mwg_regions(root, item['faces'], width, height)
+                    payload = xmp.serialize_xmp(root)
+
+                    existing = None
+                    if os.path.exists(sidecar_path):
+                        try:
+                            with open(sidecar_path, 'rb') as f:
+                                existing = f.read()
+                        except OSError:
+                            existing = None
+
+                    if existing == payload:
+                        unchanged += 1
+                    else:
+                        with open(sidecar_path, 'wb') as f:
+                            f.write(payload)
+                        written += 1
+                except Exception as e:
+                    errors += 1
+                    self.api.update_status(
+                        f"WARNING: XMP write failed - {os.path.basename(file_path)}: {e}")
+
+            if processed % 50 == 0 or processed == total:
+                self.api.update_progress(processed, total, label="Writing XMP")
+
+            if self.api.get_dynamic_resources() and not self.api.is_window_foreground():
+                time.sleep(0.005)
+
+        self.api.update_status(
+            f"XMP sidecars complete: {written} written, {unchanged} unchanged, "
+            f"{skipped_missing} missing, {errors} errors")
+
     def process_batch(self, batch: List[str], start_idx: int, total_photos: int, new_photos: set):
         batch_data = []
         
