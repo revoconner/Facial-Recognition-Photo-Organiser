@@ -2616,6 +2616,25 @@ let people = [];
                     xmpCancelBtn.addEventListener('click', closeXmpConsent);  // toggle stays off
                 }
 
+                // Phase 6: About links + dialogs. External links open in the default browser.
+                const aboutLinks = {
+                    aboutBugBtn: 'https://github.com/revoconner/Facial-Recognition-Photo-Organiser/issues/new',
+                    aboutDeveloperBtn: 'https://www.revoconner.com',
+                    aboutWebsiteBtn: 'https://www.felicity-app.com',
+                    aboutEulaBtn: 'https://github.com/revoconner/Facial-Recognition-Photo-Organiser/raw/refs/heads/0.8.0-Beta/LICENSE',
+                    aboutOnlineHelpBtn: 'https://github.com/revoconner/Facial-Recognition-Photo-Organiser/wiki/Help-Documentation',
+                };
+                Object.entries(aboutLinks).forEach(([id, url]) => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.addEventListener('click', () => pywebview.api.open_url(url));
+                });
+                const bindClick = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+                bindClick('aboutHelpBtn', () => document.getElementById('aboutHelpOverlay').classList.add('active'));
+                bindClick('aboutHelpCloseBtn', () => document.getElementById('aboutHelpOverlay').classList.remove('active'));
+                bindClick('aboutOfflinePdfBtn', () => pywebview.api.open_help_pdf());
+                bindClick('aboutPrivacyBtn', () => document.getElementById('aboutPrivacyOverlay').classList.add('active'));
+                bindClick('aboutPrivacyCloseBtn', () => document.getElementById('aboutPrivacyOverlay').classList.remove('active'));
+
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 currentGridSize = parseInt(gridSize);   // virtualizer reads this for the cell size

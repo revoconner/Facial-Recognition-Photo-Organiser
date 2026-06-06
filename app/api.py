@@ -3,6 +3,7 @@ import os
 import base64
 import threading
 import time
+import webbrowser
 import ctypes
 from ctypes import wintypes
 from pathlib import Path
@@ -1008,7 +1009,32 @@ class API:
                 os.system(f'xdg-open "{path}"')
         except Exception as e:
             print(f"Error opening photo: {e}")
-    
+
+    # About-section links (Phase 6).
+    def open_url(self, url):
+        try:
+            webbrowser.open(url)
+            return {'success': True}
+        except Exception as e:
+            log.warning("Failed to open URL %s: %s", url, e)
+            return {'success': False, 'error': str(e)}
+
+    def open_help_pdf(self):
+        """Open the bundled help.pdf, which ships next to the app (next to the exe in a
+        frozen build, or the app/ folder in dev)."""
+        try:
+            base = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) \
+                else os.path.dirname(os.path.abspath(__file__))
+            pdf = os.path.join(base, 'help.pdf')
+            if not os.path.exists(pdf):
+                log.warning("help.pdf not found at %s", pdf)
+                return {'success': False, 'error': 'help.pdf not found'}
+            os.startfile(pdf)
+            return {'success': True}
+        except Exception as e:
+            log.warning("Failed to open help.pdf: %s", e)
+            return {'success': False, 'error': str(e)}
+
     def save_log(self, log_content):
         try:
             import tkinter as tk

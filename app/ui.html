@@ -192,7 +192,7 @@
                 
                 <div class="settings-footer">
                     <button class="close-settings-btn" id="closeSettingsBtn">Close Settings</button>
-                    <div class="footer-credit">For personal use only - Free license</br>Version: 0.7.0.b</div>
+                    <div class="footer-credit">For personal use only - Free license</br>Version: 0.8.0.b</div>
                 </div>
             </div>
             
@@ -469,23 +469,6 @@
                     </div>
                 </div>
 
-                <div class="content-panel" id="log-panel">
-                    <div class="log-header">
-                        <div class="panel-title">View Log</div>
-                        <div class="log-header-actions">
-                            <select class="view-dropdown" id="logLevelDropdown" title="Log detail level">
-                                <option value="INFO">Normal</option>
-                                <option value="DEBUG">Debug</option>
-                            </select>
-                            <button class="save-log-btn" id="saveLogBtn">
-                                <span>Save Log</span>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="log-viewer" id="logViewer"></div>
-                </div>
-
                 <div class="content-panel" id="themes-panel">
                     <div class="settings-subheader">Themes</div>
 
@@ -676,7 +659,43 @@
                 </div>
 
                 <div class="content-panel" id="about-panel">
-                    <!-- Phase 6: About copy, buttons, dialogs + Log -->
+                    <div class="settings-subheader">About</div>
+
+                    <div class="about-text">
+                        <div class="about-title">Felicity (Previously FRPO) - Public Beta</div>
+                        Version - 0.8.0.b
+                        <br>CUDA 13.0
+                        <br>CUDA&reg; is a registered trademark of NVIDIA Corporation.
+                        <br><br>
+                        &copy; R&eacute;v O'Conner 2025 - 2026. All rights reserved.
+                        <br><br>
+                        Free to use for personal or commercial use. By using this app you agree to the EULA.
+                        <br><br>
+                        Notice: Felicity ("The Software"), including but not limited to its code, documentation, appearance, structure, and organization, where applicable, is proprietary to and copyrighted by R&eacute;v O'Conner ("Developer") and revoconner ("The Company"), and is protected by copyright laws and international treaty provisions.
+                        <br><br>
+                        The source code is available for everyone to view with restrictions. To read the full End User License Agreement, click the button below.
+                    </div>
+
+                    <div class="about-buttons">
+                        <button class="about-btn" id="aboutHelpBtn">Help</button>
+                        <button class="about-btn" id="aboutBugBtn">File a bug</button>
+                        <button class="about-btn" id="aboutDeveloperBtn">Developer</button>
+                        <button class="about-btn" id="aboutWebsiteBtn">Website</button>
+                        <button class="about-btn" id="aboutEulaBtn">EULA</button>
+                        <button class="about-btn" id="aboutPrivacyBtn">Privacy Policy</button>
+                    </div>
+
+                    <div class="settings-subheader secondary">Log</div>
+                    <div class="log-header-actions" style="justify-content: flex-end; margin-bottom: 14px;">
+                        <select class="view-dropdown" id="logLevelDropdown" title="Log detail level">
+                            <option value="INFO">Normal</option>
+                            <option value="DEBUG">Debug</option>
+                        </select>
+                        <button class="save-log-btn" id="saveLogBtn">
+                            <span>Save Log</span>
+                        </button>
+                    </div>
+                    <div class="log-viewer" id="logViewer"></div>
                 </div>
             </div>
         </div>
@@ -867,6 +886,41 @@
                 <button class="folder-btn remove" id="xmpCancelBtn">
                     <span>Cancel</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About > Help dialog (Phase 6). -->
+    <div class="cleanup-overlay" id="aboutHelpOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title">Help</div>
+            <div class="export-result-body" style="text-align: left; line-height: 1.6;">
+                Online help is regularly updated and improved. Unless you do not have an internet
+                connection, please visit the online help page.
+            </div>
+            <div class="folder-controls" style="justify-content: center; margin-top: 24px; flex-wrap: wrap;">
+                <button class="folder-btn" id="aboutOnlineHelpBtn"><span>Online Help</span></button>
+                <button class="folder-btn" id="aboutOfflinePdfBtn"><span>Offline Help PDF</span></button>
+                <button class="folder-btn remove" id="aboutHelpCloseBtn"><span>Close</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About > Privacy Policy dialog (Phase 6). -->
+    <div class="cleanup-overlay" id="aboutPrivacyOverlay">
+        <div class="cleanup-message">
+            <div class="cleanup-title">Privacy Policy</div>
+            <div class="export-result-body" style="text-align: left; line-height: 1.6;">
+                We do not collect any data whatsoever. The app only connects to the internet during a
+                first install to download the AI model. You may transfer the downloaded model using an
+                offline method to your %userprofile% home directory to avoid this. You can use this app
+                on an "air-gapped" computer if you want. And as such, we do not collect any data,
+                analytical or otherwise. If you ever discover Felicity connecting to the Internet,
+                uninstall immediately, as you may have downloaded a modified version of the app from
+                malicious sources.
+            </div>
+            <div class="folder-controls" style="justify-content: center; margin-top: 24px;">
+                <button class="folder-btn remove" id="aboutPrivacyCloseBtn"><span>Close</span></button>
             </div>
         </div>
     </div>
