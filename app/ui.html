@@ -204,20 +204,6 @@
                     <div class="setting-group">
                         <div class="setting-row">
                             <div class="setting-label">
-                                <span>Use system resources dynamically</span>
-                                <span class="info-icon">
-                                    i
-                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage when app is minimised to system tray, and uses all resources when cpu is running in desktop mode. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
-                                </span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="dynamicResourcesToggle">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        
-                        <div class="setting-row">
-                            <div class="setting-label">
                                 <span>Show single unmatched images</span>
                                 <span class="info-icon">
                                     i
@@ -239,13 +225,13 @@
                                 </span>
                             </div>
                             <div class="min-photos-control">
+                                <input type="number" class="min-photos-input" id="minPhotosInput"
+                                       min="0" max="999" value="2" disabled>
+                                <span style="color: var(--text-muted); font-size: 13px;">photos</span>
                                 <label class="toggle-switch">
                                     <input type="checkbox" id="minPhotosToggle">
                                     <span class="toggle-slider"></span>
                                 </label>
-                                <input type="number" class="min-photos-input" id="minPhotosInput" 
-                                       min="0" max="999" value="2" disabled>
-                                <span style="color: #a0a0a0; font-size: 13px;">photos</span>
                             </div>
                         </div>
                         <div class="setting-row">
@@ -321,7 +307,7 @@
 
                             <div class="setting-row">
                                 <div class="setting-label">
-                                    <span>Find changes in photos in the drive</span>
+                                    <span>Rescan frequency for changes in photos</span>
                                     <span class="info-icon">
                                         i
                                         <div class="tooltip">Every time the app restarts, it searches for new photos or removes old photos from the database which has been deleted to keep in sync with your drive. This results in a slow start. If you do make a lot of changes to your photos library, you can set a threshold of time before it rescans for changes after a restart. If set to manually you will have to go to "Folders to Scan" section and click the rescan button.</div>
@@ -336,38 +322,9 @@
                             </div>
 
                         
-                        <div class="setting-row">
-                            <div class="setting-label">
-                                <span>Show development options</span>
-                                <span class="info-icon">
-                                    i
-                                    <div class="tooltip">Shows internal tagging statistics and advanced options for debugging. Regular users should keep this off. Default Off</div>
-                                </span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="showDevOptionsToggle">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <div class="setting-group">
-                            <div class="setting-row">
-                                <div class="setting-label">
-                                    <span>Thumbnail Cache</span>
-                                    <span class="info-icon">
-                                        i
-                                        <div class="tooltip">Cached thumbnails speed up photo loading dramatically. First load generates cache, subsequent loads are instant. Clear cache if photos have been edited externally.</div>
-                                    </span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <span id="cacheSize" style="color: #a0a0a0; font-size: 13px;">Calculating...</span>
-                                    <button class="recalibrate-btn" id="clearCacheBtn" onclick="clearThumbnailCache()">Clear Cache</button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
-                
+
                 <div class="content-panel" id="folders-panel">
                     <div class="panel-title">Folders to Scan</div>
                     
@@ -378,6 +335,11 @@
                                 i
                                 <div class="tooltip">Include all folders that will be scanned for photos. Add folders here that contains photos. Supported: jpg, png, bmp, gif, heic, heif</div>
                             </span>
+                        </div>
+                        <div class="export-note">
+                            Folders are scanned recursively, that means it includes any subfolders.
+                            <br>To exclude any subfolder, add those in the excluded section below.
+                            <br>Any network path must be online during each scan or rescan. Paths that are offline will be detected as not being present, and the photos will be considered deleted.
                         </div>
                         <div class="folder-list-container" id="includeFolders">
                             <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders added yet</div>
@@ -402,6 +364,10 @@
                                 <div class="tooltip">Exclude subfolders of "included folders" above, that are not to be scanned. This takes precedence over include folders, so if you add the same folder to both, they will not be scanned</div>
                             </span>
                         </div>
+                        <div class="export-note">
+                            Any folder here is added recursively, that means it includes any subfolders.
+                            <br>This takes precedence over included folders, that means a folder added here will not be scanned even if the same folder is included in the section above.
+                        </div>
                         <div class="folder-list-container" id="excludeFolders">
                             <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No folders excluded yet</div>
                         </div>
@@ -422,10 +388,10 @@
                             <span>Wildcard Exclusion</span>
                             <span class="info-icon">
                                 i
-                                <div class="tooltip">Use wildcards like *.jpg, *.gif with extension names or *thumbnail with folder names to exclude them from being scanned, separated by commas</div>
+                                <div class="tooltip">Skip files or folders whose name matches a pattern, separated by commas. Use * as a wildcard: *.gif skips every GIF, *thumbnail* skips anything with "thumbnail" in its name, and a full path like C:\Photos\Private excludes that folder. Each pattern is matched against file and folder names while scanning, and applies on top of the excluded-folders list above.</div>
                             </span>
                         </div>
-                        <input type="text" class="wildcard-input" id="wildcardInput" placeholder="e.g., *.gif, *thumbnail, *cache*, C:\Photos\private photos ">
+                        <input type="text" class="wildcard-input" id="wildcardInput" placeholder="*.gif, *thumbnail, *cache*, C:\Photos\private photos">
                     </div>
                     
                     <div class="folder-section">
@@ -449,14 +415,15 @@
                             <br>1. Any person not shown in the app UI because they are hidden will not appear here. This includes unnamed people or any other filters.
                             <br>2. A person's hidden photos will not be exported unless "show hidden photos" is toggled on.
                         </div>
-                        <input type="text" class="wildcard-input" id="exportSearchInput" placeholder="Search people...">
+                        <input type="text" class="wildcard-input export-search" id="exportSearchInput" placeholder="Search people...">
                         <div class="folder-list-container" id="exportPeopleList">
                             <div style="color: #606060; padding: 12px; text-align: center; font-size: 13px;">No people available</div>
                         </div>
+                        <div class="export-note">Hardlink is disabled by default. The toggle to enable it is located in Advanced Settings.</div>
                         <div class="folder-controls export-actions">
                             <select class="view-dropdown" id="exportModeDropdown" style="min-width: 130px;">
                                 <option value="copy" selected>Copy</option>
-                                <option value="hardlink">Hardlink</option>
+                                <option value="hardlink" disabled>Hardlink</option>
                             </select>
                             <span class="info-icon">
                                 i
@@ -498,6 +465,64 @@
                     </div>
                     
                     <div class="log-viewer" id="logViewer"></div>
+                </div>
+
+                <div class="content-panel" id="themes-panel">
+                    <!-- Phase 3/4: Themes (dropdown + accent swatches) and Accessibility -->
+                </div>
+
+                <div class="content-panel" id="advanced-panel">
+                    <div class="panel-title">Advanced Settings</div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Use system resources dynamically</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Smartly uses system resources to not hinder user's task. When enabled, limits CPU usage when app is minimised to system tray, and uses all resources when cpu is running in desktop mode. When disabled, the app will perform faster at the cost of fully utilizing system's resources. Default On.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="dynamicResourcesToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Show development options</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Shows internal tagging statistics and advanced options for debugging. Regular users should keep this off. Default Off</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="showDevOptionsToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-group">
+                            <div class="setting-row">
+                                <div class="setting-label">
+                                    <span>Thumbnail Cache</span>
+                                    <span class="info-icon">
+                                        i
+                                        <div class="tooltip">Cached thumbnails speed up photo loading dramatically. First load generates cache, subsequent loads are instant. Clear cache if photos have been edited externally.</div>
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span id="cacheSize" style="color: var(--text-muted); font-size: 13px;">Calculating...</span>
+                                    <button class="recalibrate-btn" id="clearCacheBtn" onclick="clearThumbnailCache()">Clear Cache</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-panel" id="about-panel">
+                    <!-- Phase 6: About copy, buttons, dialogs + Log -->
                 </div>
             </div>
         </div>

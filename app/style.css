@@ -1283,6 +1283,11 @@
             margin-bottom: 16px;
         }
 
+        /* Breathing room between the people search box and the selectable list (Phase 2). */
+        .export-search {
+            margin-bottom: 12px;
+        }
+
         .export-actions {
             flex-wrap: wrap;
             align-items: center;

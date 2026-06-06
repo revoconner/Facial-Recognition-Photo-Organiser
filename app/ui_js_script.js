@@ -2685,7 +2685,7 @@ let people = [];
                 panels.forEach(panel => panel.classList.remove('active'));
                 document.getElementById(panelId).classList.add('active');
 
-                if (item.getAttribute('data-panel') === 'general') {
+                if (item.getAttribute('data-panel') === 'advanced') {
                 updateCacheSize(); }
 
                 if (item.getAttribute('data-panel') === 'export') {
