@@ -2198,7 +2198,7 @@ let people = [];
         // export runs the progress text occupies the status line in place of the face
         // count; when it ends the face count returns.
         function setProgressVisible(visible) {
-            document.getElementById('progressSection').style.display = visible ? 'flex' : 'none';
+            document.getElementById('progressBar').style.display = visible ? 'block' : 'none';
             document.getElementById('progressText').style.display = visible ? 'inline' : 'none';
             document.getElementById('faceCount').style.display = visible ? 'none' : 'inline';
         }

@@ -73,7 +73,7 @@
                         <div class="sidebar-title">People</div>
                         <div class="sidebar-controls">
                             <button class="icon-btn" id="filterBtn" title="Sort people">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <svg height="18" viewBox="2 6 20 12" fill="currentColor">
                                     <path fill-rule="evenodd" clip-rule="evenodd" d="M2.25 7C2.25 6.58579 2.58579 6.25 3 6.25H13C13.4142 6.25 13.75 6.58579 13.75 7C13.75 7.41421 13.4142 7.75 13 7.75H3C2.58579 7.75 2.25 7.41421 2.25 7ZM16.5 6.25C16.7951 6.25 17.0628 6.42309 17.1839 6.69223L21.6839 16.6922C21.8539 17.07 21.6855 17.514 21.3078 17.6839C20.93 17.8539 20.486 17.6855 20.3161 17.3078L18.8787 14.1136H14.1213L12.6839 17.3078C12.514 17.6855 12.07 17.8539 11.6922 17.6839C11.3145 17.514 11.1461 17.07 11.3161 16.6922L15.8161 6.69223C15.9372 6.42309 16.2049 6.25 16.5 6.25ZM14.7963 12.6136H18.2037L16.5 8.82764L14.7963 12.6136ZM2.25 12C2.25 11.5858 2.58579 11.25 3 11.25H10C10.4142 11.25 10.75 11.5858 10.75 12C10.75 12.4142 10.4142 12.75 10 12.75H3C2.58579 12.75 2.25 12.4142 2.25 12ZM2.25 17C2.25 16.5858 2.58579 16.25 3 16.25H8C8.41421 16.25 8.75 16.5858 8.75 17C8.75 17.4142 8.41421 17.75 8 17.75H3C2.58579 17.75 2.25 17.4142 2.25 17Z"/>
                                 </svg>
                             </button>
@@ -125,14 +125,14 @@
                 <span id="faceCount">Found: 0 faces</span>
                 <span id="progressText" style="display: none;">Initializing...</span>
             </div>
-            <div class="progress-section" id="progressSection" style="display: none;">
-                <div class="progress-bar">
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar" id="progressBar" style="display: none;">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <button class="export-cancel-btn" id="exportCancelBtn" style="display: none;" onclick="cancelExport()">Cancel</button>
             </div>
             <button class="help-btn" id="openHelpBtn" title="Quick Help">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zM7.92 9.234v.102a.5.5 0 0 0 .5.5h.997a.499.499 0 0 0 .499-.499c0-1.29.998-1.979 2.34-1.979 1.308 0 2.168.689 2.168 1.67 0 .928-.482 1.359-1.686 1.91l-.344.154C11.379 11.54 11 12.21 11 13.381v.119a.5.5 0 0 0 .5.5h.997a.499.499 0 0 0 .499-.499c0-.516.138-.723.55-.912l.345-.155c1.445-.654 2.529-1.514 2.529-3.39v-.103c0-1.978-1.72-3.441-4.164-3.441-2.478 0-4.336 1.428-4.336 3.734zm2.58 7.757c0 .867.659 1.509 1.491 1.509.85 0 1.509-.642 1.509-1.509 0-.867-.659-1.491-1.509-1.491-.832 0-1.491.624-1.491 1.491z"/>
                 </svg>
             </button>
@@ -164,9 +164,11 @@
                 
                 <div class="settings-nav">
                     <div class="nav-item active" data-panel="general">General Settings</div>
+                    <div class="nav-item" data-panel="themes">Themes and Accessibility</div>
                     <div class="nav-item" data-panel="folders">Folders to Scan</div>
                     <div class="nav-item" data-panel="export">Export Photos</div>
-                    <div class="nav-item" data-panel="log">View Log</div>
+                    <div class="nav-item" data-panel="advanced">Advanced Settings</div>
+                    <div class="nav-item" data-panel="about">About</div>
                 </div>
                 
                 <div class="settings-footer">

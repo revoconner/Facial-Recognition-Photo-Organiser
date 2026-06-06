@@ -615,8 +615,8 @@
         /* No box of its own - inherits the bottom-bar background. Shows the face count,
            or the progress text while a scan/export runs (the two spans swap). */
         .status-text {
-            flex: 0 1 auto;
-            min-width: 0;
+            flex: 0 0 auto;
+            min-width: 30vw;
             font-size: 12px;
             color: var(--text-muted);
             white-space: nowrap;
@@ -624,17 +624,23 @@
             text-overflow: ellipsis;
         }
 
+        /* The section stays in flow as a flex:1 filler even when the bar is hidden, so
+           the Help button stays pinned right without a margin-auto that would stop the
+           bar from growing. */
         .progress-section {
-            flex: 0 0 auto;
+            flex: 1;
+            min-width: 0;
             display: flex;
             align-items: center;
             gap: 12px;
         }
 
         .progress-bar {
-            width: 220px;
+            flex: 1;
+            min-width: 0;
             height: 8px;
             background: var(--surface);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 4px;
             overflow: hidden;
             position: relative;
@@ -677,7 +683,6 @@
 
         .help-btn {
             flex: 0 0 auto;
-            margin-left: auto;
             padding: 6px;
             background: transparent;
             border: none;
