@@ -904,8 +904,10 @@ let people = [];
             root.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
             const darken = c => Math.round(c * 0.82);
             root.setProperty('--accent-hover', `rgb(${darken(r)}, ${darken(g)}, ${darken(b)})`);
-            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-            root.setProperty('--accent-on', luminance > 150 ? '#000000' : '#ffffff');
+            // Text colour on accent backgrounds is fixed by accent (not luminance, not
+            // theme): light text only on blue/indigo, dark text on all others.
+            const lightTextAccents = ['blue', 'indigo'];
+            root.setProperty('--accent-on', lightTextAccents.includes(currentAccent) ? '#ffffff' : '#000000');
             document.documentElement.classList.toggle('accent-red', currentAccent === 'red');
         }
 
@@ -2826,7 +2828,8 @@ let people = [];
             
             const filterBtn = document.getElementById('filterBtn');
             activeMenu = { element: filterMenu, parent: filterBtn };
-            
+            filterBtn.classList.add('active');   // accent the icon while its menu is open
+
             positionMenu(filterMenu, filterBtn);
             
             filterMenu.addEventListener('click', async (e) => {
@@ -2964,7 +2967,10 @@ let people = [];
             appContainer.classList.remove('blurred');
         }
 
-        openHelpBtn.addEventListener('click', openHelp);
+        // Bottom-bar help opens the same dialog as Settings > About > Help.
+        openHelpBtn.addEventListener('click', () => {
+            document.getElementById('aboutHelpOverlay').classList.add('active');
+        });
         closeHelpBtn.addEventListener('click', closeHelp);
 
         helpOverlay.addEventListener('click', (e) => {
@@ -3758,6 +3764,8 @@ let people = [];
             document.querySelectorAll('.person-item, .photo-item').forEach(item => {
                 item.classList.remove('menu-active');
             });
+            const filterBtn = document.getElementById('filterBtn');
+            if (filterBtn) filterBtn.classList.remove('active');   // un-accent the sort icon
             activeMenu = null;
         }
 

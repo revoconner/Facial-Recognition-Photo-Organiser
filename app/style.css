@@ -17,6 +17,10 @@
             --text-dimmer: #606060;
             --border: rgba(255, 255, 255, 0.05);
             --contrast-border: rgba(255, 255, 255, 0.9);
+            --input-bg: #1a1a1a;
+            /* Make native form controls (number input, select popups, scrollbars) follow
+               the app theme instead of the OS scheme. */
+            color-scheme: dark;
 
             --accent: #3b82f6;
             --accent-hover: #2563eb;
@@ -50,6 +54,8 @@
             --text-dimmer: #9f9f9f;
             --border: rgba(0, 0, 0, 0.12);
             --contrast-border: rgba(0, 0, 0, 0.9);
+            --input-bg: #ffffff;
+            color-scheme: light;
         }
 
 * {
@@ -268,7 +274,19 @@
         }
 
         .person-item.active {
-            background: var(--surface);
+            background: var(--accent);
+        }
+
+        .person-item.active .person-name,
+        .person-item.active .person-count {
+            color: var(--accent-on);
+        }
+
+        /* On hover, the active person keeps its accent background (so its accent-on text
+           stays readable); the slide/shadow/avatar effects still come from the generic
+           hover rules. */
+        .person-item.active:hover:not(.menu-active) {
+            background: var(--accent);
         }
 
         .person-avatar {
@@ -287,7 +305,7 @@
 
         .person-item:hover:not(.menu-active) .person-avatar {
             transform: scale(1.1);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.4);
         }
 
         .person-info {
@@ -510,6 +528,16 @@
             box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.3);
         }
 
+        /* Settings dropdowns sit on a subsection (--surface); give them a darker normal
+           bg so they stand out (hover/focus unchanged). */
+        .content-panel .view-dropdown {
+            background: var(--input-bg);
+        }
+
+        .content-panel .view-dropdown:hover {
+            background: var(--surface-2);
+        }
+
         .photo-grid-container {
             flex: 1;
             overflow-y: auto;
@@ -709,7 +737,7 @@
             padding: 6px;
             background: transparent;
             border: none;
-            color: var(--text-muted);
+            color: var(--accent);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -971,6 +999,7 @@
             align-items: center;
             gap: 16px;
             width: 100%;
+            margin-left: 24px;
         }
 
         .threshold-slider-wrapper {
@@ -1022,7 +1051,7 @@
             background: var(--accent);
             border: none;
             border-radius: 6px;
-            color: var(--text);
+            color: var(--accent-on);
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
@@ -1136,7 +1165,7 @@
 
         .folder-item.selected {
             background: var(--accent);
-            color: var(--text);
+            color: var(--accent-on);
         }
 
         .folder-controls {
@@ -1163,12 +1192,28 @@
             background: var(--surface-3);
         }
 
+        /* Match the Close Settings button: solid red background, light text (was red text
+           on a transparent button). */
         .folder-btn.remove {
-            color: var(--danger-2);
+            background: var(--danger);
+            color: var(--text);
         }
 
         .folder-btn.remove:hover {
-            background: rgba(var(--danger-2-rgb), 0.1);
+            background: var(--danger-hover);
+        }
+
+        /* Themed so it follows the app theme instead of the webview's OS form-control
+           colours (which left it dark-on-white in the light theme). */
+        .min-photos-input {
+            background: var(--input-bg);
+            color: var(--text);
+            border: 1px solid var(--surface-2);
+            border-radius: 6px;
+            padding: 8px 10px;
+            width: 64px;
+            font-size: 13px;
+            outline: none;
         }
 
         .wildcard-input {
@@ -1203,11 +1248,11 @@
         }
 
         .save-log-btn {
-            padding: 8px 20px;
-            background: var(--surface-2);
+            padding: 10px 20px;
+            background: var(--accent);
             border: none;
-            border-radius: 6px;
-            color: var(--text);
+            border-radius: 8px;
+            color: var(--accent-on);
             font-size: 13px;
             cursor: pointer;
             transition: background 0.2s ease;
@@ -1217,7 +1262,7 @@
         }
 
         .save-log-btn:hover {
-            background: var(--surface-3);
+            background: var(--accent-hover);
         }
 
         .log-viewer {
@@ -1358,10 +1403,11 @@
             margin-top: 24px;
         }
 
+        /* Most About buttons are neutral; only .primary (Help, Report a bug) is accented. */
         .about-btn {
             padding: 10px 16px;
-            background: var(--accent);
-            color: var(--accent-on);
+            background: var(--surface-2);
+            color: var(--text);
             border: none;
             border-radius: 8px;
             font-size: 14px;
@@ -1371,15 +1417,25 @@
         }
 
         .about-btn:hover {
+            background: var(--surface-3);
+        }
+
+        .about-btn.primary {
+            background: var(--accent);
+            color: var(--accent-on);
+        }
+
+        .about-btn.primary:hover {
             background: var(--accent-hover);
         }
 
         /* Themes & Accessibility panel (Phase 3). Two subheaders instead of a panel title. */
+        /* Same type style as a category header (.panel-title), per the brief. */
         .settings-subheader {
-            font-size: 17px;
-            font-weight: 600;
+            font-size: 28px;
+            font-weight: 700;
             color: var(--text);
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         .settings-subheader.secondary {
@@ -1413,12 +1469,19 @@
             box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
         }
 
-        /* Red accent stripes the red/destructive buttons so they stay distinct from the
-           now-red accent buttons (Phase 3). */
-        :root.accent-red .close-settings-btn,
-        :root.accent-red .export-cancel-btn,
-        :root.accent-red .close-help-btn,
-        :root.accent-red .conflict-btn.proceed {
+        /* Stripe every red/destructive button so it stays distinguishable from accent
+           buttons when the accent itself is red, OR under any colour-vision mode (where
+           hue alone won't separate red from the accent). */
+        :is(:root.accent-red,
+            :root[data-cvd="protanopia"],
+            :root[data-cvd="deuteranopia"],
+            :root[data-cvd="tritanopia"],
+            :root[data-cvd="achromatopsia"]) :is(
+            .close-settings-btn,
+            .export-cancel-btn,
+            .close-help-btn,
+            .conflict-btn.proceed,
+            .folder-btn.remove) {
             background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 14px);
         }
 
@@ -1507,7 +1570,7 @@
         #photoFilterBtn.active,
         #photoGroupBtn.active {
             background: var(--accent);
-            color: var(--text);
+            color: var(--accent-on);
         }
 
         .group-header {
@@ -1558,7 +1621,7 @@
 
         .context-menu-item.active {
             background: var(--accent);
-            color: var(--text);
+            color: var(--accent-on);
         }
 
         .filter-panel {
@@ -1955,7 +2018,7 @@
             background: var(--accent);
             border: none;
             border-radius: 8px;
-            color: var(--text);
+            color: var(--accent-on);
             font-size: 15px;
             font-weight: 500;
             cursor: pointer;
@@ -2115,7 +2178,7 @@
             left: 8px;
             width: 24px;
             height: 24px;
-            color: var(--text);
+            color: var(--accent-on);
             font-size: 14px;
             font-weight: bold;
             display: flex;
@@ -2269,7 +2332,7 @@
 
         .conflict-btn.auto-rename {
             background: var(--accent);
-            color: var(--text);
+            color: var(--accent-on);
         }
 
         .conflict-btn.auto-rename:hover {
