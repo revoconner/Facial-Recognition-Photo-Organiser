@@ -1,141 +1,135 @@
-PROPRIETARY LICENSE (Non-Commercial Use Only)
+SOURCE-AVAILABLE LICENSE (Non-Redistributable)
 
-   Copyright (c) 2025-2026 Rév Oconner. All Rights Reserved.
+Copyright (c) 2025-2026 Rév Oconner. All Rights Reserved.
 
-   NOTICE: This repository contains proprietary code and documentation ("the Software") of the repository owner and is
-   protected under copyright law and international treaties. All rights not explicitly granted herein are strictly reserved.
+NOTICE: This repository contains the source-available code and documentation ("the Software") of the repository owner. The Software is protected under copyright law and international treaties. The source code is made publicly available for inspection, use, and modification under the terms below. This is NOT an open-source license as defined by the Open Source Initiative. All rights not explicitly granted herein are strictly reserved.
 
-   PLEASE READ THIS AGREEMENT CAREFULLY. BY DOWNLOADING, INSTALLING, OR USING THE SOFTWARE, YOU ARE AGREEING TO BE BOUND
-   BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT OR CANNOT AGREE TO THE TERMS OF THIS AGREEMENT, DO NOT USE THE SOFTWARE.
+PLEASE READ THIS AGREEMENT CAREFULLY. BY DOWNLOADING, INSTALLING, USING, OR MODIFYING THE SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT OR CANNOT AGREE TO THE TERMS OF THIS AGREEMENT, DO NOT USE THE SOFTWARE.
 
-   When we say "you," "your" or "yourself", we mean you as an individual or the legal entity exercising rights under this
-   Agreement through you. When we say "Copyright Holder," "we" or "us," we are referring to Rev Oconner.
+When we say "you," "your," or "yourself," we mean you as an individual or the legal entity exercising rights under this Agreement through you. When we say "Copyright Holder," "we," or "us," we are referring to Rév Oconner.
 
 
+1. DEFINITIONS
 
- 1. DEFINITIONS
+"The Software" refers to the source code, object code, documentation, and any other materials contained in this repository, including any modified version of any of the foregoing that you make under this License.
 
-   "The Software" refers to the source code, object code, documentation, and any other materials contained in this
-   repository, including any modified version of any of the foregoing that you make under this License.
+"Source Form" means the human-readable form of the Software, including any modified version of it.
 
-   "Derivative Work" means any work that is based on or derived from the Software, including but not limited to
-   modifications, translations, adaptations, or any work that incorporates all or part of the Software.
+"Packaged Form" means the Software in any compiled, built, bundled, installable, or otherwise executable form intended for end-user installation or execution, whether built from the original or from a modified Source Form.
 
-   "Product" means any product, service, or project that either (a) is made using any of the Software or (b) combines
-   any of the Software with any other software or content.
+"Derivative Work" means any work that is based on or derived from the Software, including but not limited to modifications, translations, adaptations, or any work that incorporates all or part of the Software.
 
-   "Distribute" or "Distribution" means to provide or otherwise make a copy available, or to make the functionality of
-   the Software available to third parties.
+"Distribute" or "Distribution" means to provide or otherwise make a copy available to any third party, or to make the functionality of the Software available to third parties as a packaged or executable application.
 
-   "Commercial Use" includes, but is not limited to, selling, sublicensing, or distributing the Software or its
-   Derivative Works for profit, or incorporating the Software into a Product that generates revenue.
+"Commercial Purpose" means any activity intended to generate, or that does generate, revenue or other commercial advantage, whether directly or indirectly.
 
-   "Licensee" refers to any individual or entity exercising rights under this License.
+"Contribution" means any modification, addition, or change to the Software that you make and that you Distribute or otherwise make publicly available in any form, whether by submission to the Copyright Holder, by publication of a fork or repository, or by any other public Distribution.
 
- 2. SCOPE OF LICENSE
-
-   The Copyright Holder grants you a non-exclusive, non-transferable, non-sublicensable license to privately use,
-   reproduce, display, perform, and modify the Software in accordance with the terms of this Agreement.
-
-   This license grants limited rights for Non-Commercial Use Only as defined in Section 3. All other rights, including,
-   but not limited to, commercial use, sublicensing, or redistribution for compensation, are expressly reserved by the
-   Copyright Holder (Rev Oconner).
+"Licensee" refers to any individual or entity exercising rights under this License.
 
 
- 3. PERMITTED NON-COMMERCIAL USE
+2. SCOPE OF LICENSE
 
-   Permission is hereby granted, free of charge, to any person obtaining a copy of the Software, to deal in the Software
-   without charge, including the rights to clone, fork, merge, modify, and distribute the Software or Derivative Works
-   thereof, for the purpose of non-commercial use only.
+The Copyright Holder grants you a non-exclusive, non-transferable, non-sublicensable license to use, reproduce, display, perform, modify, and decompile the Software in accordance with the terms of this Agreement, including for a Commercial Purpose, subject in all cases to the redistribution restrictions in Section 4.
 
-   The use of the Software on a device which is otherwise used for commercial purposes is permitted, provided the Software
-   itself is not utilized for or in direct support of a commercial purpose.
+This license does not grant you the right to Distribute the Software in Packaged Form, to Distribute the Software for a Commercial Purpose in any form, or to relicense the Software. All such rights are expressly reserved by the Copyright Holder.
 
-   Any use, distribution, or licensing of the Software, or any Derivative Work, for the purpose of Commercial Use is
-   strictly prohibited without a separate commercial license obtained from the Copyright Holder.
 
- 4. ATTRIBUTION
+3. PERMITTED USE
 
-   All copies or substantial portions of the Software, including Derivative Works, must include:
+3.1 Use. You may use the Software for any purpose, including personal use and use for a Commercial Purpose. Use of the Software on a device that is otherwise used for commercial activity is permitted.
 
-   (a) This license in its entirety, or a prominent link to it;
-   (b) The original copyright notice;
-   (c) Clear attribution to the original author(s).
+3.2 Modification. You may modify the Software and create Derivative Works for your own use, including for a Commercial Purpose, subject to Sections 4, 5, and 6.
 
- 5. RECORDS AND AUDITS
+3.3 Decompilation. You may decompile, disassemble, or reverse-engineer the Software for any purpose, including personal use and use for a Commercial Purpose, provided that you do not Distribute the results of such decompilation, disassembly, or reverse-engineering in any form.
 
-   You agree to keep accurate books and records related to your use of the Software sufficient to verify compliance with
-   the non-commercial use requirements of this License. The Copyright Holder may conduct reasonable audits to verify
-   compliance with the terms of this License, upon reasonable notice and during normal business hours. If an audit reveals
-   non-compliance, you shall promptly remedy the situation and bear the reasonable costs of the audit.
 
- 6. INDEMNIFICATION
+4. REDISTRIBUTION
 
-   You agree to indemnify, pay the defense costs of, and hold the Copyright Holder and its affiliates, officers,
-   directors, and employees harmless from all claims, losses, damages, liabilities, and expenses (including reasonable
-   attorneys' fees) arising out of or in connection with any claims arising from: (a) your breach of this Agreement;
-   (b) your Products or Derivative Works; or (c) your use of the Software.
+4.1 Source Form, non-commercial. You may Distribute the Software in Source Form, including a modified Source Form, only for purposes that are not a Commercial Purpose, and only if you comply with Sections 5 and 6.
 
- 7. TERMINATION
+4.2 Source Form, commercial. You may not Distribute the Software in Source Form, whether original or modified, in whole or in part, for a Commercial Purpose.
 
-   This License and the rights granted hereunder will terminate automatically if the Licensee fails to comply with any
-   of its terms. Upon termination, the Licensee must cease all use and distribution of the Software and any Derivative
-   Works. The following sections shall survive any termination of this Agreement: Sections 1, 6, 8, 9, 10, 11 and 14.
+4.3 Packaged Form. You may not Distribute the Software in Packaged Form, whether built from the original or from a modified Source Form, for any purpose. This includes, without limitation, redistributing, publishing, selling, sublicensing, or otherwise making available any compiled, built, bundled, or installable build of the Software or any Derivative Work.
 
- 8. DISCLAIMER
+4.4 No relicensing. You may not Distribute the Software, or any Derivative Work, under any license terms other than this License.
 
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
- 9. LIMITATION OF LIABILITY
+5. CONTRIBUTIONS AND MODIFIED CODE
 
-   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY INDIRECT,
-   INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED
-   DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM (A) YOUR
-   ACCESS TO OR USE OF OR INABILITY TO ACCESS OR USE THE SOFTWARE; (B) ANY CONDUCT OR CONTENT OF ANY THIRD PARTY
-   RELATING TO THE SOFTWARE; OR (C) UNAUTHORIZED ACCESS, USE, OR ALTERATION OF THE SOFTWARE.
+5.1 Grant-back license. By making a Contribution, you grant to the Copyright Holder a perpetual, irrevocable, worldwide, royalty-free, non-exclusive, sublicensable, and transferable license to use, reproduce, modify, display, perform, incorporate into the Software, and otherwise exploit your Contribution for any purpose and under any license terms, including commercial license terms and including incorporation into versions of the Software offered for a Commercial Purpose by the Copyright Holder.
 
- 10. GOVERNING LAW AND JURISDICTION
+5.2 Ownership. You retain ownership of the copyright in your Contribution. This Section does not transfer ownership of your Contribution to the Copyright Holder; it grants the license described in Section 5.1.
 
-   This Agreement shall be governed by and construed in accordance with the laws of Republic of India, without regard to
-   its conflict of law principles. Any dispute arising out of or relating to this Agreement shall be subject to the
-   exclusive jurisdiction of the courts located in the Republic of India.
+5.3 Scope. The grant in Section 5.1 applies to any Contribution, whether or not it was submitted directly to the Copyright Holder, and is triggered by any public Distribution of modified Source Form by you.
 
- 11. SEVERABILITY AND MODIFICATION
+5.4 Authority. You represent that you have the legal right to grant the license in Section 5.1 for each Contribution you make.
 
-   If any provision of this License is held to be unenforceable, such provision shall be reformed only to the extent
-   necessary to make it enforceable, and the remaining provisions shall continue in full force and effect.
 
-   The Copyright Holder reserves the right to release the Software under different license terms or to modify the terms
-   of this License for future versions of the Software. Such modifications shall not retroactively affect the rights
-   granted under prior versions of this License.
+6. ATTRIBUTION AND LICENSE PRESERVATION
 
- 12. ENTIRE AGREEMENT
+All copies and substantial portions of the Software, including any modified Source Form that you are permitted to Distribute under Section 4.1, must include:
 
-   This Agreement constitutes the entire agreement between the parties regarding its subject matter and supersedes all
-   prior agreements and understandings, whether written or oral, relating to such subject matter.
+(a) This License in its entirety, or a prominent link to it;
+(b) The original copyright notice;
+(c) Clear attribution to the original author(s).
 
- 13. CONTACT
+You may not remove, alter, or obscure this License, the copyright notice, or the attribution from the Software or from any Derivative Work.
 
-   For inquiries regarding commercial licensing, please contact the developer at https://www.revoconner.com/
 
-14. THIRD-PARTY COMPONENTS
+7. RECORDS AND AUDITS
 
-   The Software may include, reference, or depend upon third-party libraries, packages, modules, frameworks, or other
-   external components ("Third-Party Components") that are not authored by the Copyright Holder. These Third-Party
-   Components are not covered by this License and are instead governed solely by their respective licenses.
+You agree to keep accurate records sufficient to verify your compliance with the redistribution restrictions of this License. The Copyright Holder may conduct reasonable audits to verify compliance, upon reasonable notice and during normal business hours. If an audit reveals non-compliance, you shall promptly remedy the situation and bear the reasonable costs of the audit.
 
-   The term "Software" as used in this License does not include any Third-Party Components. Nothing in this License
-   shall be construed as granting any rights to Third-Party Components, nor shall it impose any restrictions beyond
-   those established by their respective licenses.
 
-   It is the Licensee's responsibility to review and comply with the licenses of any Third-Party Components included
-   in or used alongside the Software. The Copyright Holder makes no representations or warranties regarding Third-Party
-   Components and assumes no liability for their use.
+8. INDEMNIFICATION
 
-   A list of Third-Party Components and their respective licenses may be found in the THIRD-PARTY-LICENSES file or
-   within the dependency manifest files (e.g., package.json, requirements.txt, packages.config) included in this
-   repository.
+You agree to indemnify, pay the defense costs of, and hold the Copyright Holder and its affiliates, officers, directors, and employees harmless from all claims, losses, damages, liabilities, and expenses (including reasonable attorneys' fees) arising out of or in connection with: (a) your breach of this Agreement; (b) your Products or Derivative Works; or (c) your use of the Software.
 
+
+9. TERMINATION
+
+This License and the rights granted hereunder will terminate automatically if you fail to comply with any of its terms. Upon termination, you must cease all use and Distribution of the Software and any Derivative Works. The following sections shall survive any termination of this Agreement: Sections 1, 5, 8, 10, 11, 12, and 15.
+
+
+10. DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+11. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM (A) YOUR ACCESS TO OR USE OF OR INABILITY TO ACCESS OR USE THE SOFTWARE; (B) ANY CONDUCT OR CONTENT OF ANY THIRD PARTY RELATING TO THE SOFTWARE; OR (C) UNAUTHORIZED ACCESS, USE, OR ALTERATION OF THE SOFTWARE.
+
+
+12. GOVERNING LAW AND JURISDICTION
+
+This Agreement shall be governed by and construed in accordance with the laws of the Republic of India, without regard to its conflict of law principles. Any dispute arising out of or relating to this Agreement shall be subject to the exclusive jurisdiction of the courts located in the Republic of India.
+
+
+13. SEVERABILITY AND RESERVED RIGHTS
+
+If any provision of this License is held to be unenforceable, such provision shall be reformed only to the extent necessary to make it enforceable, and the remaining provisions shall continue in full force and effect.
+
+The Copyright Holder reserves the right to release the Software under different license terms or to modify the terms of this License for future versions of the Software. Such modifications shall not retroactively affect the rights granted under prior versions of this License.
+
+
+14. ENTIRE AGREEMENT
+
+This Agreement constitutes the entire agreement between the parties regarding its subject matter and supersedes all prior agreements and understandings, whether written or oral, relating to such subject matter.
+
+
+15. CONTACT
+
+For inquiries regarding commercial redistribution licensing, please contact the developer at https://www.revoconner.com/
+
+
+16. THIRD-PARTY COMPONENTS
+
+The Software may include, reference, or depend upon third-party libraries, packages, modules, frameworks, or other external components ("Third-Party Components") that are not authored by the Copyright Holder. These Third-Party Components are not covered by this License and are instead governed solely by their respective licenses.
+
+The term "Software" as used in this License does not include any Third-Party Components. Nothing in this License shall be construed as granting any rights to Third-Party Components, nor shall it impose any restrictions beyond those established by their respective licenses.
+
+It is the Licensee's responsibility to review and comply with the licenses of any Third-Party Components included in or used alongside the Software. The Copyright Holder makes no representations or warranties regarding Third-Party Components and assumes no liability for their use.
+
+A list of Third-Party Components and their respective licenses may be found in the THIRD-PARTY-LICENSES file or within the dependency manifest files (e.g., package.json, requirements.txt, packages.config) included in this repository.
