@@ -468,7 +468,37 @@
                 </div>
 
                 <div class="content-panel" id="themes-panel">
-                    <!-- Phase 3/4: Themes (dropdown + accent swatches) and Accessibility -->
+                    <div class="settings-subheader">Themes</div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Theme</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Choose the overall light or dark appearance of the app.</div>
+                                </span>
+                            </div>
+                            <select class="view-dropdown" id="themeDropdown" style="min-width: 160px;">
+                                <option value="dark">Dark theme</option>
+                                <option value="light">Light theme</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row" style="align-items: flex-start;">
+                            <div class="setting-label">
+                                <span>Accent color</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">The highlight colour used across the app. Each swatch previews the exact shade for the current theme.</div>
+                                </span>
+                            </div>
+                            <div class="accent-swatches" id="accentSwatches"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-subheader secondary">Accessibility</div>
+                    <!-- Phase 4: increase contrast, bold fonts, dyslexia font, colour-vision -->
                 </div>
 
                 <div class="content-panel" id="advanced-panel">

@@ -33,6 +33,8 @@ class Settings:
             'last_scan_time': None,
             'show_face_tags_preview': True,
             'show_photo_details': True,
+            'theme': 'dark',
+            'accent_color': 'blue',
             'log_level': 'INFO'
         }
         

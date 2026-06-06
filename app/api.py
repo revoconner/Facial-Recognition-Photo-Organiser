@@ -1346,6 +1346,20 @@ class API:
     def set_show_photo_details(self, enabled):
         self._settings.set('show_photo_details', enabled)
 
+    # Theme + accent (F7 / Phase 3). Persisted; the frontend resolves the actual accent
+    # value from the swatch table using theme x increase-contrast.
+    def get_theme(self):
+        return self._settings.get('theme', 'dark')
+
+    def set_theme(self, theme):
+        self._settings.set('theme', theme)
+
+    def get_accent_color(self):
+        return self._settings.get('accent_color', 'blue')
+
+    def set_accent_color(self, color):
+        self._settings.set('accent_color', color)
+
 
     def close(self):
         if self._tray_icon:

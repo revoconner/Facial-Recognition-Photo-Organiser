@@ -37,6 +37,12 @@ let people = [];
         // setShowPhotoDetails() later. When off, the image uses the full width.
         let showPhotoDetails = true;
 
+        // Theme + accent (Phase 3). increaseContrast is wired by Phase 4; it already
+        // selects the accent's contrast variant here.
+        let currentTheme = 'dark';
+        let currentAccent = 'blue';
+        let increaseContrast = false;
+
         // People-list multi-select (F9). Mirrors the grid's selectedPhotos pattern:
         // ctrl/cmd toggles, shift selects a range. selectedPeople holds person ids;
         // currentPeopleOrder is the displayed order (for shift-range index math).
@@ -853,6 +859,82 @@ let people = [];
         // Inlined pin icon (from app/svg/pinned.svg) shown on the right edge of a
         // pinned person row (F9).
         const SVG_PINNED = '<svg viewBox="0 0 56 56" width="12" height="12" fill="#cfcfcf"><path d="M 14.2539 35.9688 L 25.9492 35.9688 L 25.9492 48.0156 C 25.9492 51.5781 27.4258 54.5781 28.0117 54.5781 C 28.5976 54.5781 30.0742 51.5781 30.0742 48.0156 L 30.0742 35.9688 L 41.7461 35.9688 C 43.3633 35.9688 44.5351 34.9375 44.5351 33.3672 C 44.5351 32.3828 44.2305 31.6797 43.5508 30.9532 L 36.3789 23.1719 C 35.8867 22.6563 35.5820 22.2813 35.6992 21.3203 L 36.8945 12.7657 C 36.9649 12.2735 37.0117 11.9922 37.4336 11.6875 L 43.1992 7.5157 C 44.4883 6.5781 45.0508 5.4297 45.0508 4.3750 C 45.0508 2.8047 43.7851 1.4219 41.9805 1.4219 L 14.0195 1.4219 C 12.2149 1.4219 10.9492 2.8047 10.9492 4.3750 C 10.9492 5.4297 11.5117 6.5781 12.7773 7.5157 L 18.5429 11.6875 C 18.9883 11.9922 19.0351 12.2735 19.1054 12.7657 L 20.3008 21.3203 C 20.4180 22.2813 20.1133 22.6563 19.6211 23.1719 L 12.4492 30.9532 C 11.7695 31.6797 11.4649 32.3828 11.4649 33.3672 C 11.4649 34.9375 12.6367 35.9688 14.2539 35.9688 Z"/></svg>';
+
+        // Accent swatch table (Phase 3). Each colour has 4 RGB variants, in the order
+        // [default-light, default-dark, contrast-light, contrast-dark]; the active one
+        // is picked by theme x increase-contrast.
+        const ACCENT_COLORS = {
+            red:    [[255,56,60],   [255,66,69],   [233,21,45],  [255,97,101]],
+            orange: [[255,141,40],  [255,146,48],  [197,83,0],   [255,160,86]],
+            yellow: [[255,204,0],   [255,214,0],   [161,106,0],  [254,223,67]],
+            green:  [[52,199,89],   [48,209,88],   [0,137,50],   [74,217,104]],
+            mint:   [[0,200,179],   [0,218,195],   [0,133,117],  [84,223,203]],
+            teal:   [[0,195,208],   [0,210,224],   [0,129,152],  [59,221,236]],
+            cyan:   [[0,192,232],   [60,211,254],  [0,126,174],  [109,217,255]],
+            blue:   [[0,136,255],   [0,145,255],   [30,110,244], [92,184,255]],
+            indigo: [[97,85,245],   [109,124,255], [86,74,222],  [167,170,255]],
+            purple: [[203,48,224],  [219,52,242],  [176,47,194], [234,141,255]],
+            pink:   [[255,45,85],   [255,55,95],   [231,18,77],  [255,138,196]],
+            brown:  [[172,127,94],  [183,138,102], [149,109,81], [219,166,121]],
+        };
+        const ACCENT_ORDER = ['red','orange','yellow','green','mint','teal','cyan','blue','indigo','purple','pink','brown'];
+
+        // Index into a colour's 4 variants for the current theme + contrast.
+        function accentVariantIndex() {
+            if (!increaseContrast) return currentTheme === 'light' ? 0 : 1;
+            return currentTheme === 'light' ? 2 : 3;
+        }
+
+        // Push the resolved accent (and a derived hover + readable on-accent text colour)
+        // into the CSS variables, and flag red so destructive areas get striped.
+        function applyAccent() {
+            const variants = ACCENT_COLORS[currentAccent] || ACCENT_COLORS.blue;
+            const [r, g, b] = variants[accentVariantIndex()];
+            const root = document.documentElement.style;
+            root.setProperty('--accent', `rgb(${r}, ${g}, ${b})`);
+            root.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
+            const darken = c => Math.round(c * 0.82);
+            root.setProperty('--accent-hover', `rgb(${darken(r)}, ${darken(g)}, ${darken(b)})`);
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            root.setProperty('--accent-on', luminance > 150 ? '#000000' : '#ffffff');
+            document.documentElement.classList.toggle('accent-red', currentAccent === 'red');
+        }
+
+        function applyTheme() {
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            applyAccent();
+        }
+
+        // Render the 12 swatch circles in the current theme's colours, marking the active one.
+        function buildAccentSwatches() {
+            const container = document.getElementById('accentSwatches');
+            if (!container) return;
+            container.innerHTML = '';
+            const idx = accentVariantIndex();
+            ACCENT_ORDER.forEach(key => {
+                const [r, g, b] = ACCENT_COLORS[key][idx];
+                const sw = document.createElement('div');
+                sw.className = 'accent-swatch' + (key === currentAccent ? ' selected' : '');
+                sw.style.background = `rgb(${r}, ${g}, ${b})`;
+                sw.title = key.charAt(0).toUpperCase() + key.slice(1);
+                sw.addEventListener('click', () => setAccentColor(key));
+                container.appendChild(sw);
+            });
+        }
+
+        async function setTheme(theme) {
+            currentTheme = theme;
+            try { await pywebview.api.set_theme(theme); } catch (e) {}
+            applyTheme();
+            buildAccentSwatches();   // swatch colours depend on the theme
+        }
+
+        async function setAccentColor(color) {
+            currentAccent = color;
+            try { await pywebview.api.set_accent_color(color); } catch (e) {}
+            applyAccent();
+            buildAccentSwatches();   // refresh the selected ring
+        }
 
         function pad2(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -2322,6 +2404,17 @@ let people = [];
                 // will call setShowPhotoDetails() later; applyPhotoDetailsVisibility runs
                 // when the lightbox opens.
                 showPhotoDetails = await pywebview.api.get_show_photo_details();
+
+                // Phase 3: theme + accent. Apply immediately so the whole app reflects it.
+                currentTheme = await pywebview.api.get_theme();
+                currentAccent = await pywebview.api.get_accent_color();
+                applyTheme();
+                buildAccentSwatches();
+                const themeDropdown = document.getElementById('themeDropdown');
+                if (themeDropdown) {
+                    themeDropdown.value = currentTheme;
+                    themeDropdown.addEventListener('change', (e) => setTheme(e.target.value));
+                }
 
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;

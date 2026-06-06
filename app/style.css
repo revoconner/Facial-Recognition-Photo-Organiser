@@ -15,6 +15,7 @@
             --text-muted: #a0a0a0;
             --text-dim: #808080;
             --text-dimmer: #606060;
+            --border: rgba(255, 255, 255, 0.05);
 
             --accent: #3b82f6;
             --accent-hover: #2563eb;
@@ -27,6 +28,26 @@
             --danger-2-rgb: 239, 68, 68;
             --danger-deep: #6b1d1d;
             --danger-strong: #e81123;
+        }
+
+        /* Light theme (Phase 3): the neutral greys are inverted from the dark values
+           (255 - each channel), so surfaces/text flip while accent + danger keep their
+           own values. Borders flip to a dark alpha so they stay visible on light. The
+           accent variables are set at runtime by applyAccent() from the swatch table. */
+        :root[data-theme="light"] {
+            --bg: #e5e5e5;
+            --surface: #d5d5d5;
+            --surface-2: #c5c5c5;
+            --surface-3: #b5b5b5;
+            --surface-deep: #f2f2f2;
+            --surface-deep-2: #e9e9e9;
+            --text: #000000;
+            --text-2: #1f1f1f;
+            --text-3: #3f3f3f;
+            --text-muted: #5f5f5f;
+            --text-dim: #7f7f7f;
+            --text-dimmer: #9f9f9f;
+            --border: rgba(0, 0, 0, 0.12);
         }
 
 * {
@@ -50,7 +71,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
             user-select: none;
         }
 
@@ -127,7 +148,7 @@
             background: var(--surface-deep);
             display: flex;
             flex-direction: column;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid var(--border);
         }
 
         .sidebar-header {
@@ -398,7 +419,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
 
         .content-title {
@@ -588,7 +609,7 @@
            (when scanning) | Help (pushed to the right edge). */
         .bottom-bar {
             background: var(--surface-deep);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border);
             padding: 12px 28px;
             display: flex;
             align-items: center;
@@ -640,7 +661,7 @@
             min-width: 0;
             height: 8px;
             background: var(--surface);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
             border-radius: 4px;
             overflow: hidden;
             position: relative;
@@ -757,7 +778,7 @@
         .settings-sidebar {
             width: 240px;
             background: var(--surface-deep);
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             padding: 24px 0;
@@ -765,7 +786,7 @@
 
         .settings-header {
             padding: 0 20px 24px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
 
         .settings-title {
@@ -802,7 +823,7 @@
 
         .settings-footer {
             padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid var(--border);
         }
 
         .close-settings-btn {
@@ -882,7 +903,7 @@
         }
 
         .setting-row:not(:last-child) {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid var(--border);
         }
 
         .setting-label {
@@ -1286,6 +1307,54 @@
         /* Breathing room between the people search box and the selectable list (Phase 2). */
         .export-search {
             margin-bottom: 12px;
+        }
+
+        /* Themes & Accessibility panel (Phase 3). Two subheaders instead of a panel title. */
+        .settings-subheader {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 16px;
+        }
+
+        .settings-subheader.secondary {
+            margin-top: 32px;
+        }
+
+        .accent-swatches {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        /* Circle colour is set inline per swatch (the resolved value for the current
+           theme x contrast). */
+        .accent-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+            transition: transform 0.15s ease;
+        }
+
+        .accent-swatch:hover {
+            transform: scale(1.12);
+        }
+
+        .accent-swatch.selected {
+            box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+        }
+
+        /* Red accent stripes the red/destructive buttons so they stay distinct from the
+           now-red accent buttons (Phase 3). */
+        :root.accent-red .close-settings-btn,
+        :root.accent-red .export-cancel-btn,
+        :root.accent-red .close-help-btn,
+        :root.accent-red .conflict-btn.proceed {
+            background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 14px);
         }
 
         .export-actions {
