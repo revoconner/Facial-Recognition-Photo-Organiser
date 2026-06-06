@@ -1386,6 +1386,33 @@ class API:
     def set_color_vision(self, value):
         self._settings.set('color_vision', value)
 
+    # Advanced (Phase 5). Hardlink-export gate, and the XMP toggle + consent + the
+    # subset of scan folders that get sidecars on the next rescan. The XMP writer itself
+    # is the separate F6 task; these just persist the user's intent.
+    def get_export_hardlink_enabled(self):
+        return self._settings.get('export_hardlink_enabled', False)
+
+    def set_export_hardlink_enabled(self, enabled):
+        self._settings.set('export_hardlink_enabled', enabled)
+
+    def get_xmp_export_enabled(self):
+        return self._settings.get('xmp_export_enabled', False)
+
+    def set_xmp_export_enabled(self, enabled):
+        self._settings.set('xmp_export_enabled', enabled)
+
+    def get_xmp_consent_given(self):
+        return self._settings.get('xmp_consent_given', False)
+
+    def set_xmp_consent_given(self, given):
+        self._settings.set('xmp_consent_given', given)
+
+    def get_xmp_folders(self):
+        return self._settings.get('xmp_folders', [])
+
+    def set_xmp_folders(self, folders):
+        self._settings.set('xmp_folders', folders)
+
 
     def close(self):
         if self._tray_icon:

@@ -46,6 +46,12 @@ let people = [];
         let dyslexiaFont = 'off';
         let colorVision = 'none';
 
+        // Advanced (Phase 5).
+        let exportHardlinkEnabled = false;
+        let xmpEnabled = false;
+        let xmpConsentGiven = false;
+        let xmpFolders = new Set();
+
         // People-list multi-select (F9). Mirrors the grid's selectedPhotos pattern:
         // ctrl/cmd toggles, shift selects a range. selectedPeople holds person ids;
         // currentPeopleOrder is the displayed order (for shift-range index math).
@@ -981,6 +987,77 @@ let people = [];
             colorVision = value;
             try { await pywebview.api.set_color_vision(value); } catch (e) {}
             applyColorVision();
+        }
+
+        // ===== Advanced: hardlink + XMP (Phase 5) =====
+
+        // Enable/disable the Hardlink option in the Export dropdown to match the toggle.
+        function applyHardlinkOption() {
+            const dd = document.getElementById('exportModeDropdown');
+            if (!dd) return;
+            const opt = dd.querySelector('option[value="hardlink"]');
+            if (opt) opt.disabled = !exportHardlinkEnabled;
+            if (!exportHardlinkEnabled && dd.value === 'hardlink') dd.value = 'copy';
+        }
+
+        async function setHardlinkEnabled(on) {
+            exportHardlinkEnabled = on;
+            try { await pywebview.api.set_export_hardlink_enabled(on); } catch (e) {}
+            applyHardlinkOption();
+            addLogEntry('Hardlink export: ' + (on ? 'enabled' : 'disabled'));
+        }
+
+        async function setXmpEnabled(on) {
+            xmpEnabled = on;
+            try { await pywebview.api.set_xmp_export_enabled(on); } catch (e) {}
+            const toggle = document.getElementById('xmpEnabledToggle');
+            if (toggle) toggle.checked = on;
+            addLogEntry('XMP sidecar export: ' + (on ? 'enabled' : 'disabled'));
+        }
+
+        function openXmpConsent() {
+            const check = document.getElementById('xmpUnderstandCheck');
+            const confirmBtn = document.getElementById('xmpConfirmBtn');
+            if (check) check.checked = false;
+            if (confirmBtn) confirmBtn.disabled = true;
+            document.getElementById('xmpConsentOverlay').classList.add('active');
+        }
+
+        function closeXmpConsent() {
+            document.getElementById('xmpConsentOverlay').classList.remove('active');
+        }
+
+        // The scan-include folders the user can opt into for XMP. Mirrors the export
+        // people list, but with folders; selections persist to xmp_folders.
+        async function loadXmpFolders() {
+            let folders = [];
+            try { folders = await pywebview.api.get_include_folders() || []; } catch (e) {}
+            let saved = [];
+            try { saved = await pywebview.api.get_xmp_folders() || []; } catch (e) {}
+            const valid = new Set(folders);
+            xmpFolders = new Set(saved.filter(f => valid.has(f)));
+            renderXmpFolders(folders);
+        }
+
+        function renderXmpFolders(folders) {
+            const container = document.getElementById('xmpFolderList');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!folders.length) {
+                container.innerHTML = '<div style="color: var(--text-dimmer); padding: 12px; text-align: center; font-size: 13px;">No folders to scan yet</div>';
+                return;
+            }
+            folders.forEach(f => {
+                const item = document.createElement('div');
+                item.className = 'folder-item' + (xmpFolders.has(f) ? ' selected' : '');
+                item.textContent = f;
+                item.addEventListener('click', () => {
+                    if (xmpFolders.has(f)) { xmpFolders.delete(f); item.classList.remove('selected'); }
+                    else { xmpFolders.add(f); item.classList.add('selected'); }
+                    pywebview.api.set_xmp_folders(Array.from(xmpFolders));
+                });
+                container.appendChild(item);
+            });
         }
 
         function pad2(n) { return n < 10 ? '0' + n : '' + n; }
@@ -2494,6 +2571,51 @@ let people = [];
                     colorVisionDropdown.addEventListener('change', (e) => setColorVision(e.target.value));
                 }
 
+                // Phase 5: Advanced - hardlink gate + XMP toggle/consent.
+                exportHardlinkEnabled = await pywebview.api.get_export_hardlink_enabled();
+                xmpEnabled = await pywebview.api.get_xmp_export_enabled();
+                xmpConsentGiven = await pywebview.api.get_xmp_consent_given();
+                applyHardlinkOption();
+
+                const hardlinkToggle = document.getElementById('hardlinkEnabledToggle');
+                if (hardlinkToggle) {
+                    hardlinkToggle.checked = exportHardlinkEnabled;
+                    hardlinkToggle.addEventListener('change', (e) => setHardlinkEnabled(e.target.checked));
+                }
+
+                const xmpToggle = document.getElementById('xmpEnabledToggle');
+                if (xmpToggle) {
+                    xmpToggle.checked = xmpEnabled;
+                    xmpToggle.addEventListener('change', async (e) => {
+                        if (e.target.checked) {
+                            if (xmpConsentGiven) {
+                                await setXmpEnabled(true);
+                            } else {
+                                e.target.checked = false;   // hold until consent is confirmed
+                                openXmpConsent();
+                            }
+                        } else {
+                            await setXmpEnabled(false);
+                        }
+                    });
+                }
+
+                const xmpUnderstand = document.getElementById('xmpUnderstandCheck');
+                const xmpConfirmBtn = document.getElementById('xmpConfirmBtn');
+                if (xmpUnderstand && xmpConfirmBtn) {
+                    xmpUnderstand.addEventListener('change', (e) => { xmpConfirmBtn.disabled = !e.target.checked; });
+                    xmpConfirmBtn.addEventListener('click', async () => {
+                        xmpConsentGiven = true;
+                        try { await pywebview.api.set_xmp_consent_given(true); } catch (e) {}
+                        await setXmpEnabled(true);
+                        closeXmpConsent();
+                    });
+                }
+                const xmpCancelBtn = document.getElementById('xmpCancelBtn');
+                if (xmpCancelBtn) {
+                    xmpCancelBtn.addEventListener('click', closeXmpConsent);  // toggle stays off
+                }
+
                 const gridSize = await pywebview.api.get_grid_size();
                 document.getElementById('sizeSlider').value = gridSize;
                 currentGridSize = parseInt(gridSize);   // virtualizer reads this for the cell size
@@ -2857,7 +2979,9 @@ let people = [];
                 document.getElementById(panelId).classList.add('active');
 
                 if (item.getAttribute('data-panel') === 'advanced') {
-                updateCacheSize(); }
+                    updateCacheSize();
+                    loadXmpFolders();
+                }
 
                 if (item.getAttribute('data-panel') === 'export') {
                     loadExportPeople();

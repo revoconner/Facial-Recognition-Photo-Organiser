@@ -39,6 +39,10 @@ class Settings:
             'bold_fonts': False,
             'dyslexia_font': 'off',
             'color_vision': 'none',
+            'export_hardlink_enabled': False,
+            'xmp_export_enabled': False,
+            'xmp_consent_given': False,
+            'xmp_folders': [],
             'log_level': 'INFO'
         }
         

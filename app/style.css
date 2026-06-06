@@ -1311,6 +1311,30 @@
             margin-bottom: 12px;
         }
 
+        /* XMP consent (Phase 5): the "I understand" gate and a disabled-button look. */
+        .xmp-understand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            cursor: pointer;
+            color: var(--text-2);
+            font-size: 14px;
+        }
+
+        .xmp-understand input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+
+        .folder-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
         /* Themes & Accessibility panel (Phase 3). Two subheaders instead of a panel title. */
         .settings-subheader {
             font-size: 17px;

@@ -629,6 +629,50 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Hardlink export</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">When on, the Export Photos screen offers Hardlink mode (uses no extra disk space, same-drive only, falls back to copy across drives). A hardlinked file shares its data with your original, so editing the copy in another app would also change the original. Off by default.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="hardlinkEnabledToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Write XMP sidecar files</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Writes a small .xmp file next to each tagged photo (only in the folders selected below), recording face regions and names so other photo apps such as digiKam or Lightroom can read them. Your original photos are never modified.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="xmpEnabledToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="folder-section">
+                        <div class="folder-section-title">
+                            <span>Folders to write XMP into</span>
+                            <span class="info-icon">
+                                i
+                                <div class="tooltip">Only the folders selected here get .xmp sidecars written on the next rescan. This list mirrors your "Folders to Scan" include list.</div>
+                            </span>
+                        </div>
+                        <div class="export-note">Sidecars are written on the next rescan, only for the folders you select. They live next to your photos: deleting Felicity or its database will not remove them, and turning XMP off later will not delete files already written.</div>
+                        <div class="folder-list-container" id="xmpFolderList">
+                            <div style="color: var(--text-dimmer); padding: 12px; text-align: center; font-size: 13px;">No folders to scan yet</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="content-panel" id="about-panel">
@@ -787,6 +831,40 @@
                     <span>Continue</span>
                 </button>
                 <button class="folder-btn remove" id="exportConfirmCancelBtn">
+                    <span>Cancel</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- XMP first-enable consent (Phase 5). Cannot be dismissed by clicking outside;
+         Confirm is enabled only once "I understand" is checked. -->
+    <div class="cleanup-overlay" id="xmpConsentOverlay">
+        <div class="cleanup-message" id="xmpConsentDialog">
+            <div class="cleanup-title">Enable XMP sidecar export?</div>
+            <div class="export-result-body" style="text-align: left; line-height: 1.6;">
+                This lets Felicity write a small <strong>.xmp</strong> file next to each tagged photo
+                (only in the folders you select), recording the face regions and names so other photo
+                software such as digiKam or Lightroom can read them.
+                <br><br>
+                Please note:
+                <br>&bull; These .xmp files live on your disk, next to your photos. <strong>Deleting
+                Felicity or its database does not remove them.</strong>
+                <br>&bull; They are written on the next rescan, only for the folders you select.
+                <br>&bull; <strong>Turning this off later does not delete</strong> any .xmp files
+                already written - you would remove those yourself.
+                <br><br>
+                Your original photos are never modified.
+            </div>
+            <label class="xmp-understand">
+                <input type="checkbox" id="xmpUnderstandCheck">
+                <span>I understand</span>
+            </label>
+            <div class="folder-controls" style="justify-content: center; margin-top: 20px;">
+                <button class="folder-btn" id="xmpConfirmBtn" disabled>
+                    <span>Confirm</span>
+                </button>
+                <button class="folder-btn remove" id="xmpCancelBtn">
                     <span>Cancel</span>
                 </button>
             </div>
