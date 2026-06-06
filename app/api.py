@@ -1360,6 +1360,32 @@ class API:
     def set_accent_color(self, color):
         self._settings.set('accent_color', color)
 
+    # Accessibility (Phase 4). All persisted; the frontend applies them via root
+    # data-attributes / SVG filters.
+    def get_increase_contrast(self):
+        return self._settings.get('increase_contrast', False)
+
+    def set_increase_contrast(self, enabled):
+        self._settings.set('increase_contrast', enabled)
+
+    def get_bold_fonts(self):
+        return self._settings.get('bold_fonts', False)
+
+    def set_bold_fonts(self, enabled):
+        self._settings.set('bold_fonts', enabled)
+
+    def get_dyslexia_font(self):
+        return self._settings.get('dyslexia_font', 'off')
+
+    def set_dyslexia_font(self, value):
+        self._settings.set('dyslexia_font', value)
+
+    def get_color_vision(self):
+        return self._settings.get('color_vision', 'none')
+
+    def set_color_vision(self, value):
+        self._settings.set('color_vision', value)
+
 
     def close(self):
         if self._tray_icon:

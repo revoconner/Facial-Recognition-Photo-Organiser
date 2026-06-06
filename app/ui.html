@@ -65,6 +65,25 @@
             </button>
         </div>
     </div>
+    <!-- Colour-vision daltonization correction filters (Phase 4). Applied to body via
+         [data-cvd]. sRGB interpolation matches the sRGB-derived correction matrices. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <filter id="cvd-protanopia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="1 0 0 0 0  -0.2549 1.2549 0 0 0  0.3031 -0.5451 1.2420 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="cvd-deuteranopia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="1 0 0 0 0  -0.4375 1.4375 0 0 0  0.2625 -0.5625 1.3 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="cvd-tritanopia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="1.05 -0.3825 0.3325 0 0  0 1.2345 -0.2345 0 0  0 0 1 0 0  0 0 0 1 0"/>
+            </filter>
+            <filter id="cvd-achromatopsia" color-interpolation-filters="sRGB">
+                <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0"/>
+            </filter>
+        </defs>
+    </svg>
+
     <div class="app-container" id="appContainer">
         <div class="main-content">
             <div class="sidebar">
@@ -498,7 +517,68 @@
                     </div>
 
                     <div class="settings-subheader secondary">Accessibility</div>
-                    <!-- Phase 4: increase contrast, bold fonts, dyslexia font, colour-vision -->
+
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Increase contrast</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Adds strong borders to dividers and surfaces and uses higher-contrast accent shades, so areas that are otherwise told apart only by a subtle shade of grey become clearer.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="increaseContrastToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Bold fonts</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Increases the weight of text throughout the app for easier reading. Text that is already bold is unaffected.</div>
+                                </span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="boldFontsToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Dyslexia-friendly font</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Switches the app to a typeface designed to be easier to read with dyslexia. OpenDyslexic has weighted letter bottoms; Atkinson Hyperlegible maximises the distinction between characters.</div>
+                                </span>
+                            </div>
+                            <select class="view-dropdown" id="dyslexiaFontDropdown" style="min-width: 190px;">
+                                <option value="off">Off</option>
+                                <option value="opendyslexic">OpenDyslexic</option>
+                                <option value="atkinson">Atkinson Hyperlegible</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <span>Colour vision</span>
+                                <span class="info-icon">
+                                    i
+                                    <div class="tooltip">Applies a colour-correction (daltonization) filter to help distinguish colours for the chosen type of colour blindness, the whole app included. This is an assistive approximation, not a medical correction.</div>
+                                </span>
+                            </div>
+                            <select class="view-dropdown" id="colorVisionDropdown" style="min-width: 210px;">
+                                <option value="none">None</option>
+                                <option value="protanopia">Protanopia (no red)</option>
+                                <option value="deuteranopia">Deuteranopia (no green)</option>
+                                <option value="tritanopia">Tritanopia (no blue)</option>
+                                <option value="achromatopsia">Achromatopsia (no colour)</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="content-panel" id="advanced-panel">

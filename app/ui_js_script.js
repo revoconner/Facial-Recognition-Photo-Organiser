@@ -42,6 +42,9 @@ let people = [];
         let currentTheme = 'dark';
         let currentAccent = 'blue';
         let increaseContrast = false;
+        let boldFonts = false;
+        let dyslexiaFont = 'off';
+        let colorVision = 'none';
 
         // People-list multi-select (F9). Mirrors the grid's selectedPhotos pattern:
         // ctrl/cmd toggles, shift selects a range. selectedPeople holds person ids;
@@ -934,6 +937,50 @@ let people = [];
             try { await pywebview.api.set_accent_color(color); } catch (e) {}
             applyAccent();
             buildAccentSwatches();   // refresh the selected ring
+        }
+
+        // Accessibility appliers (Phase 4): each just flips a root data-attribute that
+        // the CSS keys off; contrast also re-resolves the accent's contrast variant.
+        function applyContrast() {
+            document.documentElement.setAttribute('data-contrast', increaseContrast ? 'high' : 'normal');
+            applyAccent();
+            buildAccentSwatches();
+        }
+
+        function applyBold() {
+            document.documentElement.setAttribute('data-bold', boldFonts ? 'on' : 'off');
+        }
+
+        function applyDysFont() {
+            document.documentElement.setAttribute('data-dysfont', dyslexiaFont);
+        }
+
+        function applyColorVision() {
+            document.documentElement.setAttribute('data-cvd', colorVision);
+        }
+
+        async function setIncreaseContrast(on) {
+            increaseContrast = on;
+            try { await pywebview.api.set_increase_contrast(on); } catch (e) {}
+            applyContrast();
+        }
+
+        async function setBoldFonts(on) {
+            boldFonts = on;
+            try { await pywebview.api.set_bold_fonts(on); } catch (e) {}
+            applyBold();
+        }
+
+        async function setDyslexiaFont(value) {
+            dyslexiaFont = value;
+            try { await pywebview.api.set_dyslexia_font(value); } catch (e) {}
+            applyDysFont();
+        }
+
+        async function setColorVision(value) {
+            colorVision = value;
+            try { await pywebview.api.set_color_vision(value); } catch (e) {}
+            applyColorVision();
         }
 
         function pad2(n) { return n < 10 ? '0' + n : '' + n; }
@@ -2414,6 +2461,37 @@ let people = [];
                 if (themeDropdown) {
                     themeDropdown.value = currentTheme;
                     themeDropdown.addEventListener('change', (e) => setTheme(e.target.value));
+                }
+
+                // Phase 4: accessibility settings.
+                increaseContrast = await pywebview.api.get_increase_contrast();
+                boldFonts = await pywebview.api.get_bold_fonts();
+                dyslexiaFont = await pywebview.api.get_dyslexia_font();
+                colorVision = await pywebview.api.get_color_vision();
+                applyContrast();
+                applyBold();
+                applyDysFont();
+                applyColorVision();
+
+                const contrastToggle = document.getElementById('increaseContrastToggle');
+                if (contrastToggle) {
+                    contrastToggle.checked = increaseContrast;
+                    contrastToggle.addEventListener('change', (e) => setIncreaseContrast(e.target.checked));
+                }
+                const boldToggle = document.getElementById('boldFontsToggle');
+                if (boldToggle) {
+                    boldToggle.checked = boldFonts;
+                    boldToggle.addEventListener('change', (e) => setBoldFonts(e.target.checked));
+                }
+                const dysFontDropdown = document.getElementById('dyslexiaFontDropdown');
+                if (dysFontDropdown) {
+                    dysFontDropdown.value = dyslexiaFont;
+                    dysFontDropdown.addEventListener('change', (e) => setDyslexiaFont(e.target.value));
+                }
+                const colorVisionDropdown = document.getElementById('colorVisionDropdown');
+                if (colorVisionDropdown) {
+                    colorVisionDropdown.value = colorVision;
+                    colorVisionDropdown.addEventListener('change', (e) => setColorVision(e.target.value));
                 }
 
                 const gridSize = await pywebview.api.get_grid_size();

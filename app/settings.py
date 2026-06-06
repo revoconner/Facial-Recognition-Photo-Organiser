@@ -35,6 +35,10 @@ class Settings:
             'show_photo_details': True,
             'theme': 'dark',
             'accent_color': 'blue',
+            'increase_contrast': False,
+            'bold_fonts': False,
+            'dyslexia_font': 'off',
+            'color_vision': 'none',
             'log_level': 'INFO'
         }
         

@@ -16,6 +16,7 @@
             --text-dim: #808080;
             --text-dimmer: #606060;
             --border: rgba(255, 255, 255, 0.05);
+            --contrast-border: rgba(255, 255, 255, 0.9);
 
             --accent: #3b82f6;
             --accent-hover: #2563eb;
@@ -48,6 +49,7 @@
             --text-dim: #7f7f7f;
             --text-dimmer: #9f9f9f;
             --border: rgba(0, 0, 0, 0.12);
+            --contrast-border: rgba(0, 0, 0, 0.9);
         }
 
 * {
@@ -1356,6 +1358,83 @@
         :root.accent-red .conflict-btn.proceed {
             background-image: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.22) 0 7px, transparent 7px 14px);
         }
+
+        /* ===== Accessibility (Phase 4) ===== */
+
+        /* Increase contrast: borders go near-solid white/black, and surfaces that are
+           otherwise told apart only by a shade of grey get an explicit border. */
+        :root[data-contrast="high"] {
+            --border: var(--contrast-border);
+        }
+
+        :root[data-contrast="high"] .context-menu,
+        :root[data-contrast="high"] .person-item,
+        :root[data-contrast="high"] .photo-item,
+        :root[data-contrast="high"] .setting-group,
+        :root[data-contrast="high"] .folder-list-container,
+        :root[data-contrast="high"] .lightbox-detail-row,
+        :root[data-contrast="high"] .lightbox-details,
+        :root[data-contrast="high"] .settings-container,
+        :root[data-contrast="high"] .help-container,
+        :root[data-contrast="high"] .toggle-slider,
+        :root[data-contrast="high"] .accent-swatch,
+        :root[data-contrast="high"] .progress-bar,
+        :root[data-contrast="high"] .view-dropdown,
+        :root[data-contrast="high"] .wildcard-input,
+        :root[data-contrast="high"] .min-photos-input {
+            border: 1px solid var(--contrast-border);
+        }
+
+        /* Bold fonts: bump weight everywhere; already-heavy text sits at/above this so it
+           is effectively unchanged. */
+        :root[data-bold="on"] * {
+            font-weight: 600 !important;
+        }
+
+        /* Dyslexia-friendly fonts (user drops the files in app/fonts/). If a file is
+           missing the browser falls back to the default UI font, so the option is a safe
+           no-op until the fonts exist. */
+        @font-face {
+            font-family: 'OpenDyslexic';
+            src: url('fonts/OpenDyslexic-Regular.otf');
+            font-weight: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'OpenDyslexic';
+            src: url('fonts/OpenDyslexic-Bold.otf');
+            font-weight: bold;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'AtkinsonHyperlegible';
+            src: url('fonts/AtkinsonHyperlegible-Regular.ttf');
+            font-weight: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'AtkinsonHyperlegible';
+            src: url('fonts/AtkinsonHyperlegible-Bold.ttf');
+            font-weight: bold;
+            font-display: swap;
+        }
+
+        :root[data-dysfont="opendyslexic"] body,
+        :root[data-dysfont="opendyslexic"] body * {
+            font-family: 'OpenDyslexic', sans-serif !important;
+        }
+        :root[data-dysfont="atkinson"] body,
+        :root[data-dysfont="atkinson"] body * {
+            font-family: 'AtkinsonHyperlegible', sans-serif !important;
+        }
+
+        /* Colour-vision assist: daltonization correction filters (computed via the
+           standard M = I + Shift*(I - Sim) algorithm) applied to the whole app, incl.
+           photos, so a CVD user can better perceive colour differences. */
+        :root[data-cvd="protanopia"] body { filter: url(#cvd-protanopia); }
+        :root[data-cvd="deuteranopia"] body { filter: url(#cvd-deuteranopia); }
+        :root[data-cvd="tritanopia"] body { filter: url(#cvd-tritanopia); }
+        :root[data-cvd="achromatopsia"] body { filter: url(#cvd-achromatopsia); }
 
         .export-actions {
             flex-wrap: wrap;
