@@ -558,8 +558,16 @@ class FaceDatabase:
         return [row[0] for row in cursor.fetchall()]
     
     def get_person_name_fast(self, clustering_id: int, person_id: int) -> str:
+        # person_id 0 is always the Unmatched grab-bag. It must never be named after a
+        # tag, even when some of its faces carry manual tags (e.g. faces tagged/transferred
+        # before a re-cluster) - otherwise "Show unmatched faces" reveals it under a real
+        # person's name instead of "Unmatched Faces", and it would export/thumbnail as that
+        # person too.
+        if person_id == 0:
+            return "Unmatched Faces"
+
         cursor = self.conn.cursor()
-        
+
         cursor.execute('''
             SELECT ft.tag_name, COUNT(*) as cnt
             FROM cluster_assignments ca
@@ -569,14 +577,12 @@ class FaceDatabase:
             ORDER BY cnt DESC
             LIMIT 1
         ''', (clustering_id, person_id))
-        
+
         row = cursor.fetchone()
         if row:
             return row[0]
-        elif person_id > 0:
-            return f"Person {person_id}"
         else:
-            return "Unmatched Faces"
+            return f"Person {person_id}"
     
     def get_person_tagged_count_fast(self, clustering_id: int, person_id: int) -> int:
         cursor = self.conn.cursor()
