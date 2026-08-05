@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Felicity</h1>
 <br>
-<img width="2858" height="auto" alt="image" src="https://github.com/user-attachments/assets/2fed92c5-6873-4099-9366-9f7ffca402d4" />
+<img width="2858" height="auto" alt="image" src="https://github.com/user-attachments/assets/aedbc8ee-074f-4427-afa5-8f537a7cca87" />
 <br>
 <br>
 <a href="https://www.felicity-app.com/"><img width="180" height="auto" src="https://github.com/revoconner/Facial-Recognition-Photo-Organiser/raw/refs/heads/releases/extra/download.svg" /><br>Download Felicity</a>
