@@ -38,11 +38,13 @@ A no-nonsense photo organiser for windows, if you want to group people by faces 
 
 ## Why doesn't this repository have any code if the app is open source?
 
-**The code was removed to avoid people forking it, and implementing it in their own copycat app with the use of AI. 
+**Short Version:** The code was removed to avoid people forking it, and implementing it in their own copycat app with the use of AI.
 
-It's not thaat I have a problem with people using AI. I use AI for help as well. People using the source to adapt the tool to their needs are welcome and can still use the code. 
+It's not that I have a problem with people using AI. I use AI for help as well. People using the source to adapt the tool to their needs are welcome and can still use the code. 
 
-I have a problem with users forking to simply reskin using AI generated theme (**** eyesore), change the name, remove my name from the app and reupload it as their own. 
+I have a problem with users forking to simply reskin without an ounce of work, simply using AI generated theme (**** eyesore), change the name, remove my name from the app and re upload it as their own. 
+
+Now I know my other project and website is built with AI themes because they were made when I was sick and couldn't really sit for long on the workstation. And I know their UI but specially the UX and accessibility sucks terribly. They are being remade.
 
 Good luck with accessibility and readability on those, It took me weeks alone to properly research the UI, and days of testing.
 
